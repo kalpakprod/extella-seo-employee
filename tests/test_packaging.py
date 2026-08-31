@@ -36,7 +36,7 @@ class PackagingTest(unittest.TestCase):
 
     def test_runtime_payload_contains_installer_and_canonical_manifest_check(self) -> None:
         payload = RELEASE.payload_files()
-        self.assertEqual(RELEASE.VERSION, "2.0.1")
+        self.assertEqual(RELEASE.VERSION, "2.0.2")
         for relative in (
             ".gitattributes",
             "README.md",
@@ -65,7 +65,7 @@ class PackagingTest(unittest.TestCase):
         attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8").splitlines()
         self.assertIn("* text=auto eol=lf", attributes)
         self.assertIn("*.svg text eol=lf", attributes)
-        self.assertIn("manifest_check.py -text", attributes)
+        self.assertIn("manifest_check.py -text -eol -whitespace", attributes)
         self.assertIn("*.png binary", attributes)
         self.assertIn("*.zip binary", attributes)
 

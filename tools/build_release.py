@@ -11,7 +11,7 @@ import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 EPOCH = (2026, 1, 1, 0, 0, 0)
 APP_FILES = ("index.html", "styles.css", "app.js", "extella-bridge.js")
 ROOT_FILES = (

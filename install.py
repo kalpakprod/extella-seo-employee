@@ -19,6 +19,16 @@ HERE = pathlib.Path(__file__).resolve().parent
 TARGET = pathlib.Path(os.environ.get("XDG_DATA_HOME", pathlib.Path.home() / ".local" / "share")) / "extella-seo-employee"
 BACKUPS = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", pathlib.Path.home() / ".config")) / "extella-seo-employee" / "backups"
 AGENT_ID_RE = re.compile(r"^agent_[A-Za-z0-9_][A-Za-z0-9_-]{2,127}$")
+PREPARE_BINDINGS = (
+    "device_binding.json",
+    "agent_binding.json",
+    "agent_zero_no_tools_profile.json",
+)
+PREPARE_SECRETS = (
+    "crawlseo_db_password",
+    "seo_employee_api_token",
+    "agent_zero_api_key",
+)
 
 
 def emit(status: str, code: str, **extra: object) -> int:
@@ -46,32 +56,152 @@ def release_manifest(root: pathlib.Path) -> dict[str, str]:
     return files
 
 
-def install_payload(files: dict[str, str]) -> pathlib.Path | None:
-    if HERE == TARGET:
-        return None
-    backup = BACKUPS / dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    copied_previous = False
-    for relative in sorted(files):
-        source, destination = HERE / relative, TARGET / relative
-        if destination.is_file():
-            previous = backup / relative
-            previous.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(destination, previous)
-            copied_previous = True
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        temporary = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
+def atomic_copy(source: pathlib.Path, destination: pathlib.Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
+    try:
         shutil.copy2(source, temporary)
         os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def atomic_write(destination: pathlib.Path, data: bytes, mode: int) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
+    try:
+        temporary.write_bytes(data)
+        os.chmod(temporary, mode)
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+class InstallTransaction:
+    """Restore installer-owned files if deployment preparation does not finish."""
+
+    def __init__(self) -> None:
+        self._backup: pathlib.Path | None = None
+        self._replaced: dict[pathlib.Path, pathlib.Path] = {}
+        self._created: set[pathlib.Path] = set()
+        self._secret_replaced: dict[pathlib.Path, tuple[bytes, int]] = {}
+
+    @property
+    def backup(self) -> pathlib.Path | None:
+        return self._backup
+
+    def _ensure_backup(self) -> pathlib.Path:
+        if self._backup is None:
+            BACKUPS.mkdir(parents=True, exist_ok=True)
+            base = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            candidate = BACKUPS / base
+            suffix = 1
+            while True:
+                try:
+                    candidate.mkdir()
+                    self._backup = candidate
+                    break
+                except FileExistsError:
+                    candidate = BACKUPS / f"{base}-{suffix}"
+                    suffix += 1
+        return self._backup
+
+    def _backup_for(self, path: pathlib.Path) -> pathlib.Path:
+        try:
+            relative = path.relative_to(TARGET)
+        except ValueError as error:
+            raise RuntimeError("transaction path escapes install target") from error
+        return self._ensure_backup() / relative
+
+    def runtime_snapshot_path(self) -> pathlib.Path:
+        return self._ensure_backup() / "runtime-state.json"
+
+    def track(self, path: pathlib.Path) -> None:
+        if path in self._replaced or path in self._created or path in self._secret_replaced:
+            return
+        if not path.exists():
+            self._created.add(path)
+            return
+        if path.is_symlink() or not path.is_file():
+            raise RuntimeError(f"installer target is not a regular file: {path.relative_to(TARGET)}")
+        previous = self._backup_for(path)
+        previous.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, previous)
+        self._replaced[path] = previous
+
+    def track_secret(self, path: pathlib.Path) -> None:
+        if path in self._replaced or path in self._created or path in self._secret_replaced:
+            return
+        if not path.exists():
+            self._created.add(path)
+            return
+        if path.is_symlink() or not path.is_file():
+            raise RuntimeError("installer secret target is not a regular file")
+        self._secret_replaced[path] = (path.read_bytes(), stat.S_IMODE(path.stat().st_mode))
+
+    def track_prepare_outputs(self) -> None:
+        bindings = TARGET / "deploy" / "bindings"
+        for name in PREPARE_BINDINGS:
+            self.track(bindings / name)
+        secrets = TARGET / "deploy" / "secrets"
+        for name in PREPARE_SECRETS:
+            self.track_secret(secrets / name)
+
+    def _write_rollback_metadata(self) -> None:
+        if self._backup is None:
+            return
+        rollback = {
+            "target": str(TARGET),
+            "release": "2.0.2",
+            "replaced": sorted(str(path.relative_to(TARGET)) for path in self._replaced),
+            "created": sorted(str(path.relative_to(TARGET)) for path in self._created),
+        }
+        atomic_write(
+            self._backup / "rollback.json",
+            (json.dumps(rollback, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
+            0o600,
+        )
+
+    def commit(self) -> None:
+        self._write_rollback_metadata()
+
+    def rollback(self) -> None:
+        self._write_rollback_metadata()
+        errors: list[OSError] = []
+        for path in sorted(self._created, key=lambda value: len(value.parts), reverse=True):
+            try:
+                if path.exists() or path.is_symlink():
+                    if path.is_symlink() or path.is_file():
+                        path.unlink()
+                    else:
+                        raise OSError("created installer path is not a file")
+            except OSError as error:
+                errors.append(error)
+        for path, previous in self._replaced.items():
+            try:
+                atomic_copy(previous, path)
+            except OSError as error:
+                errors.append(error)
+        for path, (data, mode) in self._secret_replaced.items():
+            try:
+                atomic_write(path, data, mode)
+            except OSError as error:
+                errors.append(error)
+        if errors:
+            raise errors[0]
+
+
+def install_payload(files: dict[str, str], transaction: InstallTransaction) -> pathlib.Path | None:
+    if HERE == TARGET:
+        return None
+    for relative in sorted(files):
+        source, destination = HERE / relative, TARGET / relative
+        transaction.track(destination)
+        atomic_copy(source, destination)
     manifest_destination = TARGET / "release-manifest.json"
-    if manifest_destination.is_file():
-        backup.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(manifest_destination, backup / "release-manifest.json")
-        copied_previous = True
-    shutil.copy2(HERE / "release-manifest.json", manifest_destination)
-    if copied_previous:
-        (backup / "rollback.json").write_text(json.dumps({"target": str(TARGET), "release": "2.0.1"}, indent=2) + "\n", encoding="utf-8")
-        return backup
-    return None
+    transaction.track(manifest_destination)
+    atomic_copy(HERE / "release-manifest.json", manifest_destination)
+    return transaction.backup
 
 
 def read_existing_device_binding() -> dict[str, str] | None:
@@ -98,19 +228,16 @@ def read_existing_device_binding() -> dict[str, str] | None:
     }
 
 
-def write_agent_binding(agent_id: str, backup: pathlib.Path | None) -> None:
+def write_agent_binding(agent_id: str, transaction: InstallTransaction) -> None:
     if not AGENT_ID_RE.fullmatch(agent_id):
         raise RuntimeError("EXTELLA_AGENT_ID is not a canonical Extella agent id")
     binding = TARGET / "deploy" / "bindings" / "agent_binding.json"
-    binding.parent.mkdir(parents=True, exist_ok=True)
-    if backup is not None and binding.is_file():
-        previous = backup / "deploy" / "bindings" / "agent_binding.json"
-        previous.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(binding, previous)
-    temporary = binding.with_name(f".{binding.name}.{os.getpid()}.tmp")
-    temporary.write_text(json.dumps({"agent_id": agent_id}, sort_keys=True) + "\n", encoding="utf-8")
-    os.chmod(temporary, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
-    os.replace(temporary, binding)
+    transaction.track(binding)
+    atomic_write(
+        binding,
+        (json.dumps({"agent_id": agent_id}, sort_keys=True) + "\n").encode("utf-8"),
+        stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH,
+    )
 
 
 def prepare_and_start(device_binding: dict[str, str], agent_id: str) -> None:
@@ -127,6 +254,37 @@ def prepare_and_start(device_binding: dict[str, str], agent_id: str) -> None:
         agent_id,
     )
     subprocess.run(command, check=True, cwd=TARGET, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def capture_runtime_state(transaction: InstallTransaction) -> pathlib.Path | None:
+    compose = TARGET / "deploy" / "compose.yaml"
+    if not compose.is_file():
+        return None
+    snapshot = transaction.runtime_snapshot_path()
+    command = (
+        sys.executable,
+        str(HERE / "deploy" / "prepare.py"),
+        "--capture-runtime-state",
+        "--compose-file",
+        str(compose),
+        "--runtime-state",
+        str(snapshot),
+    )
+    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return snapshot
+
+
+def restore_runtime_state(snapshot: pathlib.Path) -> None:
+    command = (
+        sys.executable,
+        str(HERE / "deploy" / "prepare.py"),
+        "--restore-runtime-state",
+        "--compose-file",
+        str(TARGET / "deploy" / "compose.yaml"),
+        "--runtime-state",
+        str(snapshot),
+    )
+    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def main() -> int:
@@ -152,15 +310,35 @@ def main() -> int:
         )
     if shutil.which("docker") is None:
         return emit("error", "missing_docker", model_called=False, agent_called=False, paid=False)
+    transaction = InstallTransaction()
+    runtime_snapshot: pathlib.Path | None = None
+    prepare_started = False
     try:
         subprocess.run(("docker", "info"), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        backup = install_payload(release_manifest(HERE))
-        write_agent_binding(agent_id, backup)
+        runtime_snapshot = capture_runtime_state(transaction)
+        install_payload(release_manifest(HERE), transaction)
+        write_agent_binding(agent_id, transaction)
+        transaction.track_prepare_outputs()
+        prepare_started = True
         prepare_and_start(device_binding, agent_id)
+        transaction.commit()
     except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError):
-        return emit("error", "install_or_deployment_failed", backup=str(backup) if "backup" in locals() and backup else None,
+        try:
+            transaction.rollback()
+            files_rolled_back = True
+        except OSError:
+            files_rolled_back = False
+        runtime_rolled_back = True
+        if files_rolled_back and prepare_started and runtime_snapshot is not None:
+            try:
+                restore_runtime_state(runtime_snapshot)
+            except (OSError, RuntimeError, subprocess.CalledProcessError):
+                runtime_rolled_back = False
+        rolled_back = files_rolled_back and runtime_rolled_back
+        return emit("error", "install_or_deployment_failed", backup=str(transaction.backup) if transaction.backup else None,
+                    rolled_back=rolled_back, runtime_rolled_back=runtime_rolled_back,
                     model_called=False, agent_called=False, paid=False)
-    return emit("success", "installed_and_healthy", version="2.0.1", backup=str(backup) if backup else None,
+    return emit("success", "installed_and_healthy", version="2.0.2", backup=str(transaction.backup) if transaction.backup else None,
                 model_called=False, agent_called=False, paid=False)
 
 

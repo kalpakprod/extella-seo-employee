@@ -1,0 +1,8 @@
+{
+  "visibility_policy": {
+    "mode": "custom",
+    "default": "block",
+    "allowed": [],
+    "blocked": []
+  }
+}

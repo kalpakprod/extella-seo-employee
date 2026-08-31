@@ -1,0 +1,16 @@
+[Unit]
+Description=Extella SEO Employee schedule tick
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/extella-seo-employee
+Environment=PYTHONPATH=/opt/extella-seo-employee/experts
+ExecStart=/usr/bin/python3 /opt/extella-seo-employee/experts/seo_employee_schedule.py
+TimeoutStartSec=10min
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/extella-seo-employee /root/.extella-seo-employee

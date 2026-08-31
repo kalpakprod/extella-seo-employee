@@ -1,0 +1,42 @@
+diff --git a/lib/crawler/engine.ts b/lib/crawler/engine.ts
+index a5db52f..71481c9 100644
+--- a/lib/crawler/engine.ts
++++ b/lib/crawler/engine.ts
+@@ -721,13 +721,14 @@ export async function runSiteCrawl(
+   const crawl = existingCrawlId
+     ? await db.crawl.update({
+         where: { id: existingCrawlId },
+-        data: { status: "RUNNING", startedAt: new Date() },
++        data: { status: "RUNNING", startedAt: new Date(), maxPages: effectiveMax },
+       })
+     : await db.crawl.create({
+         data: {
+           siteId,
+           status: "RUNNING",
+           startedAt: new Date(),
++          maxPages: effectiveMax,
+         },
+       });
+ 
+diff --git a/mcp/server.ts b/mcp/server.ts
+index 7c63c69..73cbe25 100644
+--- a/mcp/server.ts
++++ b/mcp/server.ts
+@@ -197,16 +197,8 @@ server.tool(
+       return { content: [{ type: "text", text: `Site not found: ${siteId}` }] };
+     }
+ 
+-    // Update default max pages if specified
+-    if (maxPages && maxPages !== 200) {
+-      await db.crawl.updateMany({
+-        where: { siteId, status: "PENDING" },
+-        data: { maxPages },
+-      });
+-    }
+-
+     // Fire and forget — the crawl runs in the background
+-    const crawlPromise = runSiteCrawl(siteId, site.domain);
++    const crawlPromise = runSiteCrawl(siteId, site.domain, maxPages);
+     crawlPromise.catch((err) => {
+       console.error(`Crawl failed for site ${siteId}:`, err);
+     });

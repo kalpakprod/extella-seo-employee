@@ -1,0 +1,25 @@
+name: extella-seo-employee
+version: "2.0.0"
+platform: linux-amd64/docker-compose
+install: python3 install.py
+self_check: python tools/selfcheck.py
+checks:
+  - kind: python
+    min_version: "3.10"
+    fix_ru: "Установите Python 3.10 или новее."
+  - kind: command
+    name: docker
+    fix_ru: "Установите Docker Engine и Docker Compose."
+  - kind: command
+    name: git
+    fix_ru: "Установите Git."
+  - kind: file
+    path: deploy/compose.yaml
+    fix_ru: "Распакуйте полный runtime-архив заново."
+  - kind: file
+    path: deploy/agent-zero-profile/usr/agents/seo_employee_no_tools/plugins/_tool_access/config.json
+    fix_ru: "Распакуйте полный runtime-архив заново."
+runtime:
+  agent_zero: "v2.11 / sha256:9b65805d59b3dab7e14a5e732f6738621546070ec847441da2e75c368adaae30"
+  crawlseo_commit: "8683b2740eca5059faa0949c2175a7548216bd50"
+  seomator_commit: "bbca017b56086a2959382d8260b97021736ca18f"

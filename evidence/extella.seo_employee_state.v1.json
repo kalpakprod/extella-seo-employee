@@ -1,0 +1,113 @@
+{
+  "active_version": "1.0.0",
+  "bound_to": {
+    "account_ref": null,
+    "agent_ids": null,
+    "host": null,
+    "hosting_profile": "client_server",
+    "platform_profile_id": null,
+    "since": null
+  },
+  "checked_at": "2026-08-29T19:34:49.054157Z",
+  "config": {
+    "daily_run_time": "00:00",
+    "schema": "extella.seo_employee_config.v1",
+    "site_id": "example.com",
+    "site_url": "https://example.com/",
+    "timezone": "Asia/Tashkent"
+  },
+  "enabled": true,
+  "last_error": null,
+  "last_report": {
+    "comparison": {
+      "baseline": "compared",
+      "fixed": 0,
+      "fixed_items": [],
+      "new": 0,
+      "new_items": [],
+      "unchanged": 1,
+      "unchanged_items": [
+        {
+          "rule_key": "meta-description-missing",
+          "task_id": "3fd380f6f605974e",
+          "url": "https://example.com/"
+        }
+      ]
+    },
+    "missing_data": [],
+    "normalizer_version": "1.0.0",
+    "run": {
+      "completed_at": "2026-08-29T19:34:49.054157Z",
+      "requested_at": "2026-08-29T19:34:30.037982Z",
+      "run_id": "seo-ee5402c1355949adbf501ed02d35e39f",
+      "site_id": "example.com",
+      "site_url": "https://example.com/",
+      "started_at": "2026-08-29T19:34:30.037982Z",
+      "trigger": "daily"
+    },
+    "schema": "extella.seo_employee_report.v1",
+    "sources": [
+      {
+        "name": "CrawlSEO",
+        "obtained_at": "2026-08-29T19:34:30.037982Z",
+        "status": "ok"
+      },
+      {
+        "name": "SEOmator",
+        "obtained_at": "2026-08-29T19:34:30.037982Z",
+        "status": "ok"
+      },
+      {
+        "name": "Google Search Console",
+        "obtained_at": "2026-08-29T19:34:30.037982Z",
+        "reason": "Источник не подключён; выводы о трафике и позициях не формируются.",
+        "status": "not_configured"
+      }
+    ],
+    "state": "ready",
+    "tasks": [
+      {
+        "affected_pages_count": 1,
+        "business_impact": "Страница отображается в поисковой выдаче без заданного метаописания.",
+        "confirmed_fact": "На странице отсутствует meta description.",
+        "evidence": [
+          {
+            "fact": "Missing meta description",
+            "rule": "MISSING_DESCRIPTION",
+            "source": "CrawlSEO"
+          },
+          {
+            "fact": "Meta description is absent",
+            "rule": "core-description-present",
+            "source": "SEOmator"
+          }
+        ],
+        "evidence_level": "verified",
+        "minimal_fix": "Добавьте тег meta description на страницу.",
+        "rule_key": "meta-description-missing",
+        "severity": "warning",
+        "site_id": "example.com",
+        "task_id": "3fd380f6f605974e",
+        "url": "https://example.com/",
+        "verification": "Повторить проверку и убедиться, что правило больше не срабатывает."
+      }
+    ]
+  },
+  "last_result": "ok",
+  "last_run": {
+    "at": "2026-08-29T19:34:49.054157Z",
+    "kind": "daily"
+  },
+  "run_id": "seo-ee5402c1355949adbf501ed02d35e39f",
+  "schedules": [
+    {
+      "active": true,
+      "id": "seo_employee_daily_scan",
+      "next_run": null
+    }
+  ],
+  "schema": "extella.seo_employee_state.v1",
+  "state": "ready",
+  "status": "success",
+  "updated_at": "2026-08-29T19:34:49.054157Z"
+}

@@ -1,0 +1,277 @@
+x-container-logging: &container_logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  seo-employee:
+    image: extella-seo-employee:2.0.0
+    build:
+      context: ..
+      dockerfile: runtime/product/Dockerfile
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [SETGID, SETUID]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cpus: "1.0"
+    mem_limit: 512m
+    pids_limit: 256
+    logging: *container_logging
+    environment:
+      EXTELLA_AGENT_ZERO_BASE_URL: http://agent-zero-proxy:8080
+      EXTELLA_AGENT_ZERO_API_KEY_FILE: /run/secrets/agent_zero_api_key
+      EXTELLA_CRAWLSEO_URL: http://crawlseo:8081/run
+      EXTELLA_DNS_RESOLVER_URL: http://dns-resolver:8083/resolve
+      EXTELLA_SEOMATOR_URL: http://seomator:8082/run
+      EXTELLA_SEO_API_TOKEN_FILE: /run/secrets/seo_employee_api_token
+      EXTELLA_DEVICE_BINDING_FILE: /run/bindings/device_binding.json
+      EXTELLA_AGENT_BINDING_FILE: /run/bindings/agent_binding.json
+      EXTELLA_AGENT_ZERO_NO_TOOLS_PROFILE: seo_employee_no_tools
+      EXTELLA_AGENT_ZERO_NO_TOOLS_ASSERTION_FILE: /run/bindings/agent_zero_no_tools_profile.json
+      PORT: 8080
+    secrets:
+      - seo_employee_api_token
+      - agent_zero_api_key
+    volumes:
+      - ./bindings:/run/bindings:ro
+      - seo_config:/opt/extella-seo-employee/config
+      - seo_state:/opt/extella-seo-employee/state
+      - seo_reports:/opt/extella-seo-employee/reports
+      - seo_history:/opt/extella-seo-employee/history
+      - seo_evidence:/opt/extella-seo-employee/evidence
+    networks: [control, crawlseo_control, resolver_control, seomator_control]
+    depends_on:
+      crawlseo:
+        condition: service_healthy
+      dns-resolver:
+        condition: service_healthy
+      seomator:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  api-gateway:
+    image: extella-seo-employee:2.0.0
+    entrypoint: [python, /opt/extella-seo-employee/runtime/product/gateway.py]
+    command: []
+    user: "10001:10001"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: "0.25"
+    mem_limit: 128m
+    pids_limit: 64
+    logging: *container_logging
+    environment:
+      EXTELLA_PROXY_MODE: product
+      EXTELLA_PROXY_UPSTREAM: http://seo-employee:8080
+      PORT: 8080
+    ports:
+      - "127.0.0.1:${SEO_EMPLOYEE_PORT:-8088}:8080"
+    networks: [control, ingress]
+    depends_on:
+      seo-employee:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  agent-zero-proxy:
+    image: extella-seo-employee:2.0.0
+    entrypoint: [python, /opt/extella-seo-employee/runtime/product/gateway.py]
+    command: []
+    user: "10001:10001"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: "0.5"
+    mem_limit: 256m
+    pids_limit: 128
+    logging: *container_logging
+    environment:
+      EXTELLA_PROXY_MODE: agent-zero
+      EXTELLA_PROXY_UPSTREAM: ${AGENT_ZERO_UPSTREAM:-http://agent-zero:80}
+      PORT: 8080
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    networks: [control]
+    healthcheck:
+      disable: true
+
+  agent-zero:
+    image: agent0ai/agent-zero@sha256:9b65805d59b3dab7e14a5e732f6738621546070ec847441da2e75c368adaae30
+    profiles: [managed-agent-zero]
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    cpus: "2.0"
+    mem_limit: 2g
+    pids_limit: 512
+    logging: *container_logging
+    ports:
+      - "127.0.0.1:${AGENT_ZERO_PORT:-50081}:80"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - agent_zero_usr:/a0/usr
+    networks: [control, agent_zero_egress]
+
+  crawlseo-db:
+    image: postgres@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: crawlseo
+      POSTGRES_USER: crawlseo
+      POSTGRES_PASSWORD_FILE: /run/secrets/crawlseo_db_password
+    secrets: [crawlseo_db_password]
+    volumes:
+      - crawlseo_db:/var/lib/postgresql
+    cpus: "0.5"
+    mem_limit: 512m
+    pids_limit: 128
+    logging: *container_logging
+    networks: [crawlseo_db]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U crawlseo -d crawlseo]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  crawlseo-migrate:
+    image: extella-seo-crawlseo:2.0.0
+    command: [--migrate]
+    restart: "no"
+    environment: &crawlseo_environment
+      CRAWLSEO_DB_HOST: crawlseo-db
+      CRAWLSEO_DB_PORT: 5432
+      CRAWLSEO_DB_USER: crawlseo
+      CRAWLSEO_DB_NAME: crawlseo
+      CRAWLSEO_DB_SECRET: /run/secrets/crawlseo_db_password
+    secrets: [crawlseo_db_password]
+    cpus: "0.5"
+    mem_limit: 512m
+    pids_limit: 128
+    logging: *container_logging
+    networks: [crawlseo_db]
+    depends_on:
+      crawlseo-db:
+        condition: service_healthy
+
+  crawlseo:
+    image: extella-seo-crawlseo:2.0.0
+    command: [--serve]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+      - /work:rw,noexec,nosuid,size=64m
+    cpus: "1.0"
+    mem_limit: 768m
+    pids_limit: 256
+    logging: *container_logging
+    environment:
+      <<: *crawlseo_environment
+      HOME: /tmp
+    secrets: [crawlseo_db_password]
+    networks: [crawlseo_control, crawlseo_db, crawlseo_egress]
+    depends_on:
+      crawlseo-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, node, -e, "require('node:http').get('http://127.0.0.1:8081/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  dns-resolver:
+    image: extella-seo-crawlseo:2.0.0
+    entrypoint: [node, /app/extella_worker_server.mjs]
+    command: []
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: "0.10"
+    mem_limit: 64m
+    pids_limit: 32
+    logging: *container_logging
+    environment:
+      EXTELLA_WORKER_KIND: Resolver
+      EXTELLA_WORKER_PORT: 8083
+    networks: [resolver_control, resolver_egress]
+    healthcheck:
+      test: [CMD, node, -e, "require('node:http').get('http://127.0.0.1:8083/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  seomator:
+    image: extella-seo-seomator:2.0.0
+    command: [--serve]
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    shm_size: 1gb
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+      - /work:rw,noexec,nosuid,size=64m
+    cpus: "2.0"
+    mem_limit: 2g
+    pids_limit: 512
+    logging: *container_logging
+    environment:
+      HOME: /tmp
+    networks: [seomator_control, seomator_egress]
+    healthcheck:
+      test: [CMD, node, -e, "require('node:http').get('http://127.0.0.1:8082/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+networks:
+  control:
+    internal: true
+  crawlseo_control:
+    internal: true
+  resolver_control:
+    internal: true
+  seomator_control:
+    internal: true
+  crawlseo_db:
+    internal: true
+  agent_zero_egress: {}
+  crawlseo_egress: {}
+  resolver_egress: {}
+  seomator_egress: {}
+  ingress: {}
+
+volumes:
+  agent_zero_usr: {}
+  crawlseo_db: {}
+  seo_config: {}
+  seo_state: {}
+  seo_reports: {}
+  seo_history: {}
+  seo_evidence: {}
+
+secrets:
+  agent_zero_api_key:
+    file: ./secrets/agent_zero_api_key
+  crawlseo_db_password:
+    file: ./secrets/crawlseo_db_password
+  seo_employee_api_token:
+    file: ./secrets/seo_employee_api_token

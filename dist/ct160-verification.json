@@ -1,0 +1,62 @@
+{
+  "schema": "extella.seo_employee_ct160_verification.v1",
+  "verified_at": "2026-08-30T12:20:00Z",
+  "artifacts": {
+    "page": {
+      "file": "extella-seo-employee-page-1.0.0.zip",
+      "sha256": "4b0cde453459104f4877992bcd111242ad6f00053262aeb76af7171893b00da8"
+    },
+    "runtime": {
+      "file": "extella-seo-employee-runtime-1.0.0.zip",
+      "sha256": "3185640f4dee808cf9ce95b9fceed6e7c32870d631fbfa57eb06f199c402a12b"
+    }
+  },
+  "local_checks": {
+    "python_unittest": 51,
+    "node_test": 33,
+    "selfcheck": "pass",
+    "deterministic_second_build": "pass",
+    "contract_and_ui_gates": "pass"
+  },
+  "ct160": {
+    "compose_project": "extella-seo-release",
+    "source_root": "/opt/extella-seo-release",
+    "loopback_api": "127.0.0.1:18091",
+    "product_image": "sha256:d97f51a696d1c9a3fd790817d1cad57f37c1e74cda929d6e09295f44292dec9d",
+    "crawlseo_image": "sha256:ac901d17dc8b4054b0c143e2648cb1e40a27b312fd36e1b298eacc79e24a09a5",
+    "seomator_image": "sha256:6e7046ccb6877f1a202e6a1c8a2bd296e183c45a49e2ba728b45296c47920b74",
+    "health": "pass",
+    "manual_ready_run": "seo-23a6de3c644743609c637da181f062d0",
+    "daily_ready_run": "seo-b28f7c2e74ba4e12bd151c8a65c62991",
+    "partial_supported_run": "seo-62895b6db5a346039497199e18bec457",
+    "failed_not_compared_run": "seo-d291707ba38847d5aaab5818fd610422",
+    "concurrent_duplicate_run": "seo-f20874f807f747fba8c64da4c5113816",
+    "daily_duplicate_run": "seo-b28f7c2e74ba4e12bd151c8a65c62991",
+    "host_sigkill_restart_count": 1,
+    "stale_lock_recovery": "pass",
+    "stale_lock_concurrent_winners": 1,
+    "partial_baseline_unchanged": "pass",
+    "crawlseo_disconnect_cancellation": "pass",
+    "seomator_disconnect_cancellation": "pass",
+    "worker_orphan_processes": 0,
+    "ssrf_private_direct": "blocked",
+    "ssrf_control_network": "blocked",
+    "ssrf_public_to_private_redirect": "blocked",
+    "dns_resolver_run_route": "404",
+    "backup_snapshot": "/var/backups/extella-seo-release/20260830T114656Z-670cfe13",
+    "backup_artifacts": 6,
+    "backup_verify": "pass",
+    "restore_check_temporary_only": "pass",
+    "agent_zero_profile": "seo_employee_no_tools",
+    "agent_zero_recent_contexts": 21,
+    "agent_zero_contexts_with_tools": 0,
+    "model_route": "agy/gemini-3.7-flash-high"
+  },
+  "not_verified": [
+    "Extella platform authentication and real agent/device binding",
+    "Extella publication and buyer path",
+    "real pilot data",
+    "investor and commercial numbers",
+    "provider/model/auth routes other than agy/gemini-3.7-flash-high"
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "schema": "extella.seo_employee_ct160_verification.v2",
+  "verified_at": "2026-08-31T06:37:52Z",
+  "artifacts": {
+    "page": {
+      "file": "extella-seo-employee-page-2.0.0.zip",
+      "sha256": "2e1530cc531b6ce3000b7193d3f89ccfc8b7974d4becfd2fcd387ec15befc832"
+    },
+    "runtime": {
+      "file": "extella-seo-employee-runtime-2.0.0.zip",
+      "sha256": "fe460f2b2e7a282d1ba6c367c55d601ada416ce69a20f57c740551e277c253a4"
+    }
+  },
+  "local_checks": {
+    "python_unittest": {
+      "tests": 168,
+      "passed": 168,
+      "failed": 0,
+      "skipped": 0
+    },
+    "node_test": {
+      "tests": 64,
+      "passed": 62,
+      "failed": 0,
+      "skipped": 2,
+      "skip_scope": "Windows skips Linux cancellation tests"
+    },
+    "archive_hashes_match_build": "pass"
+  },
+  "ct160": {
+    "compose_project": "extella-seo-release-v2",
+    "source_root": "/opt/extella-seo-release-v2",
+    "loopback_api": "127.0.0.1:18092",
+    "compose_config": "pass",
+    "services_healthy": 7,
+    "images": {
+      "product": "sha256:903b86f292611677d1c14452cca2827d472eaacdf17d9970e84697aa2c912255",
+      "crawlseo": "sha256:435e67a16301c6ce5d6b2d216b8600b72e3cda220e0b76aa4bb9b74fbbad3010",
+      "seomator": "sha256:4b27ac6d0ecd941c6958cb59c02a7b19dd02b5359bcee9f3ed2b826809c88842"
+    },
+    "clean_runtime": {
+      "python_unittest": {
+        "tests": 168,
+        "passed": 168,
+        "failed": 0
+      },
+      "node_test": {
+        "tests": 64,
+        "passed": 64,
+        "failed": 0,
+        "skipped": 0,
+        "linux_cancellation": "pass"
+      }
+    },
+    "backup": {
+      "snapshot": "/mnt/usbdata/extella-seo-backups-v1/20260831T033842Z-d77364cb",
+      "verify": "pass",
+      "restore_check": "restore-check-ok",
+      "restore_check_scope": "temporary_only",
+      "wrong_scope_snapshot": {
+        "snapshot": "/mnt/usbdata/extella-seo-backups-v1/20260831T033708Z-cb9891ec",
+        "v1_evidence": "invalid",
+        "retained": true,
+        "reason": "wrong scope"
+      },
+      "v2_snapshot": {
+        "snapshot": "/mnt/usbdata/extella-seo-backups-v2/20260831T063614Z-15ebb195",
+        "project_name": "extella-seo-release-v2",
+        "verify": "pass",
+        "restore_check": "restore-check-ok",
+        "restore_check_scope": "temporary_only"
+      }
+    }
+  },
+  "agent_zero": {
+    "no_tools_preflight": "pass",
+    "chat_model": "agy/gemini-3.7-flash-high",
+    "utility_model": "agy/gemini-3.7-flash-high",
+    "auth_mechanism_subscription": "not_verified"
+  },
+  "probes": {
+    "example_com_worker": {
+      "status": "pass",
+      "url": "https://example.com/",
+      "crawlseo_crawled_pages": 1,
+      "seomator_crawled_pages": 1,
+      "crawlseo_search_performance": "not_configured"
+    },
+    "ownership_confirmed_api_gate": {
+      "status": "pass",
+      "without_confirmation": "blocked"
+    },
+    "multi_page_workers": {
+      "status": "pass",
+      "fixture": "https://quotes.toscrape.com/",
+      "crawlseo_crawled_pages": 25,
+      "seomator_crawled_pages": 25
+    },
+    "ssrf_defence_in_depth": {
+      "status": "pass",
+      "private_target": "blocked_by_both_workers",
+      "public_target_after_fix": "pass"
+    },
+    "multi_target_gateway": {
+      "status": "pass",
+      "target_state_query": "pass"
+    },
+    "full_api_e2e": {
+      "status": "pass",
+      "fixture": "https://books.toscrape.com/",
+      "profile": "ecommerce",
+      "state": "ready",
+      "crawlseo_crawled_pages": 25,
+      "seomator_crawled_pages": 25,
+      "seomator_sampled_pages": 5,
+      "model_enriched": 10,
+      "model_total": 10,
+      "tasks": 10,
+      "elapsed_seconds": 569
+    }
+  },
+  "not_verified": [
+    "An actual end-to-end audit of a user-owned domain",
+    "Agent Zero authentication mechanism and subscription"
+  ]
+}

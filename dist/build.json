@@ -1,0 +1,15 @@
+{
+  "artifacts": {
+    "page": {
+      "file": "extella-seo-employee-page-2.0.0.zip",
+      "sha256": "2e1530cc531b6ce3000b7193d3f89ccfc8b7974d4becfd2fcd387ec15befc832"
+    },
+    "runtime": {
+      "file": "extella-seo-employee-runtime-2.0.0.zip",
+      "sha256": "fe460f2b2e7a282d1ba6c367c55d601ada416ce69a20f57c740551e277c253a4"
+    }
+  },
+  "payload_files": 82,
+  "status": "success",
+  "version": "2.0.0"
+}

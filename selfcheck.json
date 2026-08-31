@@ -1,0 +1,90 @@
+{
+  "schema": "extella.selfcheck/v1",
+  "product": {
+    "name": "extella-seo-employee",
+    "version": "2.0.0"
+  },
+  "artifact": {
+    "kind": "archive",
+    "name": "extella-seo-employee-runtime-2.0.0.zip",
+    "sha256": "fe460f2b2e7a282d1ba6c367c55d601ada416ce69a20f57c740551e277c253a4"
+  },
+  "page_artifact": {
+    "kind": "archive",
+    "name": "extella-seo-employee-page-2.0.0.zip",
+    "sha256": "2e1530cc531b6ce3000b7193d3f89ccfc8b7974d4becfd2fcd387ec15befc832"
+  },
+  "ran_at": "2026-08-31T06:37:52Z",
+  "runner": {
+    "where": "author-device and CT160",
+    "runtime": "Python and Node"
+  },
+  "command": "python tools/selfcheck.py",
+  "result": "ready",
+  "checks": [
+    {
+      "name": "archive_hashes_match_build",
+      "status": "pass",
+      "detail": "The runtime and page SHA-256 values match dist/build.json."
+    },
+    {
+      "name": "local_python_suite",
+      "status": "pass",
+      "detail": "168 Python tests passed."
+    },
+    {
+      "name": "local_node_suite",
+      "status": "pass",
+      "detail": "62 Node tests passed; 2 Windows-only Linux cancellation tests were skipped."
+    },
+    {
+      "name": "ct160_clean_runtime",
+      "status": "pass",
+      "detail": "168 Python tests and Node 64/64 passed, including Linux cancellation."
+    },
+    {
+      "name": "agent_zero_no_tools_preflight",
+      "status": "pass",
+      "detail": "No-tools preflight passed with agy/gemini-3.7-flash-high configured for chat and utility."
+    },
+    {
+      "name": "example_com_worker_probe",
+      "status": "pass",
+      "detail": "CrawlSEO and SEOmator each crawled 1 page; CrawlSEO search_performance is not_configured."
+    },
+    {
+      "name": "ownership_confirmed_api_gate",
+      "status": "pass",
+      "detail": "A run without ownership confirmation was blocked."
+    },
+    {
+      "name": "ct160_multi_page_workers",
+      "status": "pass",
+      "detail": "CrawlSEO and SEOmator each completed 25/25 pages on the public scraping fixture."
+    },
+    {
+      "name": "ct160_ssrf_defence_in_depth",
+      "status": "pass",
+      "detail": "Both workers blocked a private target and retained public-target operation."
+    },
+    {
+      "name": "ct160_v2_backup",
+      "status": "pass",
+      "detail": "The project-scoped v2 snapshot verified and passed temporary restore-check."
+    },
+    {
+      "name": "ct160_full_api_e2e",
+      "status": "pass",
+      "detail": "The 25-page ecommerce run finished ready: CrawlSEO 25, SEOmator 25 plus 5 browser samples, Agent Zero 10/10, and 10 tasks."
+    }
+  ],
+  "negative_control": {
+    "ran": true,
+    "without_ownership_confirmation": "blocked"
+  },
+  "ct160_verification": "dist/ct160-verification-v2.json",
+  "not_verified": [
+    "An actual end-to-end audit of a user-owned domain",
+    "Agent Zero authentication mechanism and subscription"
+  ]
+}

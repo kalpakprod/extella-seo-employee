@@ -1,0 +1,225 @@
+{
+  "url": "https://example.com/",
+  "overallScore": 95,
+  "categoryResults": [
+    {
+      "categoryId": "core",
+      "score": 95,
+      "passCount": 14,
+      "warnCount": 3,
+      "failCount": 2,
+      "results": [
+        {
+          "ruleId": "core-title-present",
+          "status": "pass",
+          "message": "Title tag is present",
+          "score": 100,
+          "details": {
+            "found": true,
+            "title": "Example Domain",
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-title-length",
+          "status": "warn",
+          "message": "Title is too short (14 characters). Recommended: 30-60 characters",
+          "score": 50,
+          "details": {
+            "length": 14,
+            "minLength": 30,
+            "maxLength": 60,
+            "title": "Example Domain",
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-description-present",
+          "status": "fail",
+          "message": "No <meta name=\"description\"> tag found in the document",
+          "score": 0,
+          "details": {
+            "found": false,
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-description-length",
+          "status": "warn",
+          "message": "No <meta name=\"description\"> tag found in the document",
+          "score": 50,
+          "details": {
+            "found": false,
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-canonical-present",
+          "status": "fail",
+          "message": "No <link rel=\"canonical\"> tag found in the document",
+          "score": 0,
+          "details": {
+            "found": false,
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-canonical-valid",
+          "status": "warn",
+          "message": "No <link rel=\"canonical\"> tag found in the document",
+          "score": 50,
+          "details": {
+            "found": false,
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-viewport-present",
+          "status": "pass",
+          "message": "Viewport meta tag is present",
+          "score": 100,
+          "details": {
+            "found": true,
+            "viewport": "width=device-width, initial-scale=1",
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-favicon-present",
+          "status": "pass",
+          "message": "Favicon link tag is present",
+          "score": 100,
+          "details": {
+            "found": true,
+            "faviconUrl": "data:,",
+            "rel": "icon",
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-h1-present",
+          "status": "pass",
+          "message": "H1 tag is present",
+          "score": 100,
+          "details": {
+            "found": true,
+            "count": 1,
+            "text": "Example Domain",
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-h1-single",
+          "status": "pass",
+          "message": "Document has exactly one <h1> tag",
+          "score": 100,
+          "details": {
+            "count": 1,
+            "text": "Example Domain",
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-canonical-header",
+          "status": "pass",
+          "message": "No conflicting canonical signals (neither HTML tag nor Link header present)",
+          "score": 100,
+          "details": {
+            "htmlCanonical": null,
+            "headerCanonical": null,
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-nosnippet",
+          "status": "pass",
+          "message": "Page allows search engine snippets",
+          "score": 100,
+          "details": {
+            "directives": [
+              "none found"
+            ],
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-robots-meta",
+          "status": "pass",
+          "message": "No robots meta tag found (default: index, follow)",
+          "score": 100,
+          "details": {
+            "allDirectives": [],
+            "defaultBehavior": "index, follow",
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-title-unique",
+          "status": "pass",
+          "message": "Page title is unique",
+          "score": 100,
+          "details": {
+            "title": "Example Domain",
+            "normalizedTitle": "example domain",
+            "url": "https://example.com/",
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-canonical-conflicting",
+          "status": "pass",
+          "message": "No conflicting canonical URLs detected (at most one canonical source present)",
+          "score": 100,
+          "details": {
+            "htmlCanonical": null,
+            "headerCanonical": null,
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-canonical-to-homepage",
+          "status": "pass",
+          "message": "No canonical tag present; skipping homepage check",
+          "score": 100,
+          "details": {
+            "canonicalFound": false,
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-canonical-http-mismatch",
+          "status": "pass",
+          "message": "No canonical tag present; skipping protocol check",
+          "score": 100,
+          "details": {
+            "canonicalFound": false,
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-canonical-loop",
+          "status": "pass",
+          "message": "No canonical tag present; no loop risk",
+          "score": 100,
+          "details": {
+            "canonicalFound": false,
+            "pageUrl": "https://example.com/"
+          }
+        },
+        {
+          "ruleId": "core-canonical-to-noindex",
+          "status": "pass",
+          "message": "No canonical tag present; no noindex conflict possible",
+          "score": 100,
+          "details": {
+            "canonicalFound": false,
+            "hasNoindex": false,
+            "pageUrl": "https://example.com/"
+          }
+        }
+      ]
+    }
+  ],
+  "timestamp": "2026-08-29T19:34:32.930Z",
+  "crawledPages": 1
+}

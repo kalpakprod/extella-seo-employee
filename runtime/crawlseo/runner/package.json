@@ -1,0 +1,8 @@
+{
+  "name": "extella-seo-crawlseo-runner",
+  "private": true,
+  "version": "2.0.0",
+  "dependencies": {
+    "tsx": "4.23.12"
+  }
+}

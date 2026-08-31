@@ -1,0 +1,15 @@
+**/__pycache__
+**/*.pyc
+.git
+config
+dist
+evidence
+history
+reports
+state
+vendor
+deploy/secrets/*
+!deploy/secrets/.gitignore
+deploy/bindings/*
+!deploy/bindings/.gitignore
+deploy/.env

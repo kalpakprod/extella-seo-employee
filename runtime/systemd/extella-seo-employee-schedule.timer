@@ -1,0 +1,12 @@
+[Unit]
+Description=Check whether the Extella SEO Employee daily run is due
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=15s
+Persistent=true
+Unit=extella-seo-employee-schedule.service
+
+[Install]
+WantedBy=timers.target

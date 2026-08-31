@@ -1,0 +1,53 @@
+diff --git a/src/rules/links/external-valid.ts b/src/rules/links/external-valid.ts
+index b2d86f3..d81e2a1 100644
+--- a/src/rules/links/external-valid.ts
++++ b/src/rules/links/external-valid.ts
+@@ -2,10 +2,14 @@ import type { AuditContext } from '../../types.js';
+ import { defineRule, pass, warn } from '../define-rule.js';
+ import { fetchUrl } from '../../crawler/fetcher.js';
+ 
++const MAX_EXTERNAL_CHECKS = 20;
+ const externalStatusCache = new Map<string, Promise<number>>();
+ 
+-function fetchExternalStatus(href: string): Promise<number> {
++function fetchExternalStatus(href: string): Promise<number | null> {
+   let pending = externalStatusCache.get(href);
++  if (!pending && externalStatusCache.size >= MAX_EXTERNAL_CHECKS) {
++    return Promise.resolve(null);
++  }
+   if (!pending) {
+     pending = fetchUrl(href);
+     externalStatusCache.set(href, pending);
+@@ -53,6 +57,7 @@ export const externalValidRule = defineRule({
+       }));
+       unreachableLinks.push(...results.filter(({ statusCode }) => statusCode === 0 || statusCode >= 400));
+     }
++    const skippedByBudget = linksToCheck.filter((link) => !externalStatusCache.has(link.href)).length;
+ 
+     if (unreachableLinks.length > 0) {
+       return warn(
+@@ -63,10 +68,24 @@ export const externalValidRule = defineRule({
+           totalChecked: linksToCheck.length,
+           totalExternal: externalLinks.length,
+           unreachableLinks: unreachableLinks.slice(0, 10), // Limit to first 10
++          skippedByBudget,
+         }
+       );
+     }
+ 
++    if (skippedByBudget > 0) {
++      return warn(
++        'links-external-valid',
++        `External link reachability budget exhausted; skipped ${skippedByBudget} link(s) on this page`,
++        {
++          totalChecked: linksToCheck.length - skippedByBudget,
++          totalExternal: externalLinks.length,
++          skippedByBudget,
++          maxUniqueChecks: MAX_EXTERNAL_CHECKS,
++        }
++      );
++    }
++
+     return pass(
+       'links-external-valid',
+       `All ${linksToCheck.length} checked external link(s) are reachable`,

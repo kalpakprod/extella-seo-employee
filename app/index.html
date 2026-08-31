@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ru" data-lm="1">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SEO-сотрудник Extella</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>button,input,select,textarea{font-family:inherit}</style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow" data-i18n="productLabel">Extella · SEO-сотрудник · Closed Pilot</p>
+        <h1 data-i18n="title">Проверяй сайты и получай задачи с доказательствами</h1>
+        <p class="lead" data-i18n="lead">Выбери цель, сохрани настройки и начни с первой проверки сайта.</p>
+        <div class="capabilities" aria-labelledby="capabilities-title">
+          <span id="capabilities-title" class="eyebrow" data-i18n="capabilitiesLabel">Включено</span>
+          <ul class="capability-list">
+            <li data-i18n="capabilityAudit">Технический аудит</li>
+            <li data-i18n="capabilityCoverage">Покрытие и очередь</li>
+            <li data-i18n="capabilityPlan">Рабочий план</li>
+          </ul>
+        </div>
+      </div>
+      <span class="build" aria-label="Версия панели" data-i18n-aria="panelVersionLabel">2.0.0</span>
+    </header>
+
+    <section class="workspace" aria-label="Панель SEO-сотрудника" data-i18n-aria="panelLabel">
+      <aside class="stack target-column">
+        <section class="card target-list-card" aria-labelledby="target-list-title">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow" data-i18n="targetsLabel">Цели</p>
+              <h2 id="target-list-title" data-i18n="targetsTitle">Выбери цель</h2>
+            </div>
+            <button id="new-target" class="secondary" type="button" data-testid="new-target"
+                    data-i18n="newTarget">Добавить цель</button>
+          </div>
+          <p id="target-list-empty" class="empty-list" data-i18n="noTargets">
+            Целей пока нет. Создай первую цель, чтобы запустить проверку.
+          </p>
+          <ul id="target-list" class="target-list" aria-label="Список целей" data-i18n-aria="targetListLabel"></ul>
+        </section>
+
+      </aside>
+
+      <section class="stack detail-column" aria-labelledby="selected-target-title">
+        <form id="target-form" class="card target-form" novalidate aria-labelledby="target-form-title">
+          <p class="eyebrow" data-i18n="targetFormLabel">Настройки цели</p>
+          <h2 id="target-form-title" data-i18n="targetFormTitle">Сайт и расписание</h2>
+          <p id="target-form-hint" class="form-hint" data-i18n="targetFormHint">
+            Сохрани цель, затем подтверди право на аудит и запусти проверку.
+          </p>
+
+          <label for="target-name" data-i18n="targetNameLabel">Название цели</label>
+          <input id="target-name" name="target_name" type="text" autocomplete="organization"
+                 data-testid="target-name" required>
+
+          <label for="site-url" data-i18n="siteUrlLabel">Публичный URL сайта</label>
+          <input id="site-url" name="site_url" type="url" inputmode="url" autocomplete="url"
+                 placeholder="https://example.com" data-i18n-placeholder="siteUrlPlaceholder"
+                 data-testid="target-site-url" required>
+          <p id="site-url-help" class="field-help" data-testid="site-url-help" hidden></p>
+
+          <div class="field-grid">
+            <div>
+              <label for="profile" data-i18n="profileLabel">Профиль</label>
+              <select id="profile" name="profile" data-testid="target-profile" required>
+                <option value="service_b2b" data-i18n="profileService">Сервис B2B</option>
+                <option value="ecommerce" data-i18n="profileEcommerce">Интернет-магазин</option>
+                <option value="local_business" data-i18n="profileLocal">Локальный бизнес</option>
+                <option value="content_media" data-i18n="profileContent">Контент и медиа</option>
+                <option value="saas_marketplace" data-i18n="profileSaas">SaaS и маркетплейс</option>
+              </select>
+            </div>
+            <div>
+              <label for="language" data-i18n="languageLabel">Язык</label>
+              <select id="language" name="language" data-testid="target-language" required>
+                <option value="ru" data-i18n="languageRu">Русский</option>
+                <option value="en" data-i18n="languageEn">English</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <div>
+              <label for="region" data-i18n="regionLabel">Регион</label>
+              <input id="region" name="region" type="text" value="GLOBAL" maxlength="6"
+                     spellcheck="false" autocomplete="country" data-testid="target-region" required>
+            </div>
+            <div>
+              <label for="site-type" data-i18n="siteTypeLabel">Тип сайта</label>
+              <select id="site-type" name="site_type" data-testid="target-site-type" required>
+                <option value="website" data-i18n="siteTypeWebsite">Сайт</option>
+                <option value="store" data-i18n="siteTypeStore">Магазин</option>
+                <option value="service" data-i18n="siteTypeService">Сервис</option>
+                <option value="publication" data-i18n="siteTypePublication">Публикация</option>
+              </select>
+            </div>
+          </div>
+
+          <label for="business-goal" data-i18n="businessGoalLabel">Бизнес-цель</label>
+          <textarea id="business-goal" name="business_goal" rows="3"
+                    data-testid="target-business-goal"></textarea>
+
+          <div class="field-grid">
+            <div>
+              <label for="daily-time" data-i18n="dailyTimeLabel">Время суточного запуска</label>
+              <input id="daily-time" name="daily_run_time" type="time" value="09:00"
+                     data-testid="target-daily-time" required>
+            </div>
+            <div>
+              <label for="timezone" data-i18n="timezoneLabel">Часовой пояс IANA</label>
+              <input id="timezone" name="timezone" type="text" value="UTC" spellcheck="false"
+                     autocomplete="off" placeholder="Europe/Berlin"
+                     data-i18n-placeholder="timezonePlaceholder" data-testid="target-timezone" required>
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <div>
+              <label for="mode" data-i18n="modeLabel">Режим</label>
+              <select id="mode" name="mode" data-testid="target-mode" required>
+                <option value="full_audit" data-i18n="modeFull">Полный аудит</option>
+                <option value="daily_monitor" data-i18n="modeDaily">Суточный мониторинг</option>
+                <option value="search_performance" data-i18n="modePerformance">Поисковая аналитика</option>
+                <option value="work_plan" data-i18n="modeWorkPlan">Рабочий план</option>
+              </select>
+            </div>
+            <div>
+              <label for="max-pages" data-i18n="maxPagesLabel">Максимум страниц</label>
+              <input id="max-pages" name="max_pages" type="number" min="1" max="100" step="1" value="25"
+                     inputmode="numeric" data-testid="target-max-pages" required>
+            </div>
+          </div>
+
+          <label class="check-row" for="ownership-confirmed">
+            <input id="ownership-confirmed" name="ownership_confirmed" type="checkbox"
+                   data-testid="target-ownership">
+            <span data-i18n="ownershipLabel">У меня есть право владения сайтом или полномочие на аудит</span>
+          </label>
+
+          <p id="settings-error" class="field-error" role="alert" hidden></p>
+          <button id="save-target" class="secondary" type="submit" data-testid="save-target"
+                  data-i18n="saveTarget">Сохранить цель</button>
+        </form>
+
+        <article class="card detail-card">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow" data-i18n="selectedTargetLabel">Выбранная цель</p>
+              <h2 id="selected-target-title" data-i18n="noSelectedTarget">Выбери цель слева</h2>
+              <p id="target-summary" class="form-hint" data-i18n="selectTargetHint">
+                После сохранения здесь появятся состояние, покрытие и задачи.
+              </p>
+            </div>
+            <span id="state-tag" class="tag" data-i18n="stateEmpty">Проверок нет</span>
+          </div>
+
+          <section class="run-card" aria-labelledby="run-title">
+            <p class="eyebrow" data-i18n="runLabel">Запуск</p>
+            <h3 id="run-title" data-i18n="runTitle">Проверь выбранный сайт</h3>
+            <div class="action-row">
+              <button id="run-audit" class="primary" type="button" data-testid="main-action"
+                      data-i18n="runAction">Проверить сайт</button>
+              <p id="run-guidance" class="live-status" data-i18n="selectTargetHint">
+                Сначала сохрани цель с подтверждением права на аудит.
+              </p>
+            </div>
+            <p id="live-status" class="live-status live-region" aria-live="polite" aria-atomic="true"
+               data-testid="live-status" data-i18n="readyStatus">Готов к проверке.</p>
+          </section>
+
+          <section class="optional-sources" aria-labelledby="optional-sources-title">
+            <div class="section-head">
+              <h3 id="optional-sources-title" data-i18n="optionalSourcesTitle">Необязательные источники</h3>
+              <span class="tag" data-i18n="optionalSourcesStatus">Без подключения</span>
+            </div>
+            <div class="optional-source-row">
+              <strong>Google Search Console</strong>
+              <span class="tag" data-i18n="gscStatus">Не настроена, необязательно</span>
+            </div>
+            <div class="optional-source-row">
+              <strong>DataForSEO</strong>
+              <span class="tag" data-i18n="dataForSeoStatus">Не настроен, необязательно</span>
+            </div>
+            <p class="form-hint" data-i18n="optionalSourcesHint">Бесплатный технический аудит работает без этих подключений.</p>
+          </section>
+
+          <section class="state-panel" id="state-empty" data-state-view="empty">
+            <h3 data-i18n="emptyTitle">Проверок ещё нет</h3>
+            <p data-i18n="emptyText">Сохрани цель и нажми «Проверить сайт». Здесь появятся задачи и доказательства.</p>
+          </section>
+
+          <section class="state-panel waiting-panel" id="state-running" data-state-view="running" hidden
+                   aria-live="polite" aria-busy="true">
+            <span class="spinner" aria-hidden="true"></span>
+            <div>
+              <h3 data-i18n="runningTitle">Проверяю публичные страницы</h3>
+              <p id="running-stage" data-i18n="runningText">Собираю независимые источники и формирую задачи.</p>
+            </div>
+          </section>
+
+          <section class="state-panel failed-panel" id="state-failed" data-state-view="failed" hidden>
+            <h3 data-i18n="failedTitle">Проверку не удалось завершить</h3>
+            <p id="failed-reason" data-i18n="failedText">Проверь публичный адрес и подключение, затем запусти проверку ещё раз.</p>
+          </section>
+
+          <section class="state-panel result-panel" id="state-result" data-state-view="result" hidden>
+            <div id="partial-notice" class="partial-notice" hidden>
+              <strong data-i18n="partialTitle">Результат неполный</strong>
+              <span id="partial-sources"></span>
+            </div>
+            <dl class="result-meta">
+              <div><dt data-i18n="runTime">Время проверки</dt><dd id="run-time">—</dd></div>
+              <div><dt data-i18n="resultMode">Режим</dt><dd id="result-mode">—</dd></div>
+              <div><dt data-i18n="sourceStates">Источники</dt><dd><ul id="source-list" class="source-list"></ul></dd></div>
+            </dl>
+            <div id="model-limitation" class="model-limitation" hidden></div>
+            <div class="comparison-grid" aria-label="Сравнение находок" data-i18n-aria="findingComparisonLabel">
+              <section class="comparison-group" aria-labelledby="new-title">
+                <div class="group-head"><h3 id="new-title" data-i18n="newFindings">Новые</h3><span id="new-count" class="count">0</span></div>
+                <div id="new-findings" class="task-list"></div>
+              </section>
+              <section class="comparison-group" aria-labelledby="fixed-title">
+                <div class="group-head"><h3 id="fixed-title" data-i18n="fixedFindings">Исправленные</h3><span id="fixed-count" class="count">0</span></div>
+                <div id="fixed-findings" class="task-list"></div>
+              </section>
+              <section class="comparison-group" aria-labelledby="unchanged-title">
+                <div class="group-head"><h3 id="unchanged-title" data-i18n="unchangedFindings">Без изменений</h3><span id="unchanged-count" class="count">0</span></div>
+                <div id="unchanged-findings" class="task-list"></div>
+              </section>
+            </div>
+          </section>
+        </article>
+
+        <section class="card coverage-card" aria-labelledby="coverage-title">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow" data-i18n="coverageLabel">Покрытие</p>
+              <h2 id="coverage-title" data-i18n="coverageTitle">Что проверено</h2>
+            </div>
+            <span id="coverage-status" class="tag" data-i18n="coverageUnknown">Ещё нет данных</span>
+          </div>
+          <dl class="coverage-grid">
+            <div><dt data-i18n="plannedPages">Запланировано страниц</dt><dd id="coverage-planned">0</dd></div>
+            <div><dt data-i18n="crawledPages">Проверено страниц</dt><dd id="coverage-crawled">0</dd></div>
+            <div><dt data-i18n="sampledPages">Страниц в выборке</dt><dd id="coverage-sampled">0</dd></div>
+          </dl>
+          <div class="coverage-columns">
+            <div>
+              <h3 data-i18n="categoriesTitle">Категории</h3>
+              <ul id="coverage-categories" class="plain-list"></ul>
+            </div>
+            <div>
+              <h3 data-i18n="completedSourcesTitle">Выполнены</h3>
+              <ul id="coverage-completed" class="plain-list"></ul>
+            </div>
+            <div>
+              <h3 data-i18n="unavailableSourcesTitle">Недоступны</h3>
+              <ul id="coverage-unavailable" class="plain-list"></ul>
+            </div>
+          </div>
+          <div id="unmapped-wrap" class="unmapped-block" hidden>
+            <h3><span data-i18n="unmappedTitle">Непокрытые правила</span> <span id="unmapped-count" class="count">0</span></h3>
+            <ul id="coverage-unmapped" class="plain-list"></ul>
+          </div>
+        </section>
+
+        <section class="card queue-card" aria-labelledby="queue-title">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow" data-i18n="queueLabel">Очередь</p>
+              <h2 id="queue-title" data-i18n="queueTitle">Текущий и следующие запуски</h2>
+            </div>
+            <span id="queue-position" class="tag" data-i18n="queueNoPosition">Позиция не назначена</span>
+          </div>
+          <dl class="queue-meta">
+            <div><dt data-i18n="queueCurrent">Текущий запуск</dt><dd id="queue-current" data-i18n="queueIdle">Нет активного запуска</dd></div>
+            <div><dt data-i18n="queueReason">Причина ожидания</dt><dd id="queue-reason" data-i18n="queueNoReason">Ожидание не требуется</dd></div>
+            <div><dt data-i18n="scheduleTime">Время</dt><dd id="schedule-time">09:00 UTC</dd></div>
+            <div><dt data-i18n="nextRun">Следующий суточный запуск</dt><dd id="next-run" data-i18n="notScheduled">Ещё не рассчитан</dd></div>
+          </dl>
+          <ol id="queue-list" class="queue-list"></ol>
+          <p id="queue-empty" class="empty-list" data-i18n="queueEmpty">Ожидающих целей нет.</p>
+        </section>
+
+        <section class="card proposals-card" aria-labelledby="proposals-title">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow" data-i18n="proposalsLabel">Предложения действий</p>
+              <h2 id="proposals-title" data-i18n="proposalsTitle">Только ручное выполнение</h2>
+            </div>
+            <span class="tag" data-i18n="proposalStatus">Нужно подтверждение</span>
+          </div>
+          <p id="proposals-empty" class="empty-list" data-i18n="proposalsEmpty">
+            После обогащения модели здесь появятся отдельные предложения с доказательствами.
+          </p>
+          <div id="action-proposals" class="proposal-list"></div>
+        </section>
+
+        <details class="card disclosure">
+          <summary data-testid="help-toggle" data-i18n="helpTitle">? Как это работает</summary>
+          <div class="disclosure-body">
+            <p data-i18n="helpSources">CrawlSEO и SEOmator независимо проверяют публичные страницы. Google Search Console и DataForSEO остаются необязательными источниками.</p>
+            <p data-i18n="helpCoverage">Покрытие показывает план, фактически проверенные страницы и непокрытые правила. Неполный результат не называется полным.</p>
+            <p data-i18n="helpLimits">SEO-сотрудник не гарантирует позиции, трафик или выручку; он также не гарантирует лиды. Без пригодного источника поисковой аналитики он не определяет потери трафика.</p>
+            <p data-i18n="helpRollback">Владелец сайта решает, принимать ли задачу и как откатить изменение. Панель сама сайт не меняет.</p>
+          </div>
+        </details>
+
+        <details class="card disclosure">
+          <summary data-testid="data-toggle" data-i18n="dataTitle">Какие данные сохраняются</summary>
+          <div class="disclosure-body">
+            <p data-i18n="dataCategories"><strong>Категории:</strong> настройки целей, адреса страниц, факты, источники, доказательства и статусы очереди.</p>
+            <p data-i18n="dataLocation"><strong>Выполнение и хранение:</strong> в среде Extella владельца сайта.</p>
+            <p data-i18n="dataRecipient"><strong>Получатель входа модели:</strong> выбранный владельцем провайдер модели получает только разрешённый минимум по задаче.</p>
+            <p data-i18n="dataRetention"><strong>Срок:</strong> до удаления сохранённой цели или отчёта владельцем.</p>
+            <p data-i18n="dataRemoval"><strong>Удаление:</strong> владелец удаляет цель и связанные локальные данные через среду Extella.</p>
+            <p data-i18n="dataConsent">Google Search Console и DataForSEO не блокируют бесплатный технический аудит и подключаются только после отдельного явного согласия.</p>
+          </div>
+        </details>
+      </section>
+    </section>
+  </main>
+
+  <script src="extella-bridge.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

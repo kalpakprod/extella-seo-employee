@@ -1,0 +1,58 @@
+{
+  "schema": "extella.crawlseo_source.v1",
+  "source": "CrawlSEO",
+  "source_commit": "8683b2740eca5059faa0949c2175a7548216bd50",
+  "tool": "run_crawl",
+  "tool_calls": 1,
+  "requested_max_pages": 1,
+  "site_id": "extella-0f115db062b7c0dd",
+  "site_url": "https://example.com/",
+  "crawl": {
+    "id": "cmtes4o0t0001mq6q3gleg8cm",
+    "status": "COMPLETED",
+    "startedAt": "2026-08-29T19:34:31.316Z",
+    "finishedAt": "2026-08-29T19:34:31.616Z",
+    "pagesFound": 1,
+    "issuesFound": 6,
+    "healthScore": 89,
+    "maxPages": 1
+  },
+  "issues": [
+    {
+      "type": "MISSING_DESCRIPTION",
+      "severity": "WARNING",
+      "url": "https://example.com/",
+      "message": "Missing meta description"
+    },
+    {
+      "type": "MISSING_CANONICAL",
+      "severity": "INFO",
+      "url": "https://example.com/",
+      "message": "No canonical tag"
+    },
+    {
+      "type": "MISSING_ROBOTS",
+      "severity": "WARNING",
+      "url": "https://example.com/robots.txt",
+      "message": "robots.txt not found or unreachable"
+    },
+    {
+      "type": "MISSING_SITEMAP",
+      "severity": "WARNING",
+      "url": "https://example.com/sitemap.xml",
+      "message": "No sitemap.xml found"
+    },
+    {
+      "type": "MISSING_SCHEMA",
+      "severity": "INFO",
+      "url": "https://example.com/",
+      "message": "Crawl summary"
+    },
+    {
+      "type": "MISSING_SCHEMA",
+      "severity": "INFO",
+      "url": "https://example.com/",
+      "message": "No structured data (JSON-LD / microdata)"
+    }
+  ]
+}

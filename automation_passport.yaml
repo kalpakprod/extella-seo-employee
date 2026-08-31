@@ -1,0 +1,77 @@
+---
+# Release contract v2.0.0. Живые доказательства перечисляются отдельно от обещаний.
+automation:
+  automation_id: "extella_seo_employee"
+  name:
+    ru: "SEO-сотрудник: аудит и контроль"
+    en: "SEO Employee: Audit and Monitoring"
+  owner: "Максим"
+  business_goal: "по запросу и раз в сутки выполнять подтверждаемый технический SEO-аудит нескольких целей до 100 страниц с пятью детерминированными профилями и выдавать проверяемые задачи"
+  version: "2.0.0"
+  languages: ["ru", "en"]
+  hosting_profile: "client_server"
+  app_scopes: ["expert.run", "device.run"]
+  state_reader:
+    expert: "seo_employee_state"
+    params:
+      method: "state"
+    method: "state"
+    schema: "extella.seo_employee_state.v2"
+    agent_scope: "AGENT_USER_SELECTED"
+    agent_scope_ref: "seo_employee_agent"
+    expert_global: false
+    execution_device: "DEVICE_FROM_REF"
+    data_device: "DEVICE_FROM_REF"
+    device_ref: "~/.local/share/extella-seo-employee/deploy/bindings/device_binding.json:device_id"
+    evidence: "exact_target"
+  limits:
+    - "закрытый пилот поддерживает профили service_b2b, ecommerce, local_business, content_media и saas_marketplace"
+    - "по умолчанию проверяет 25 страниц на Цель и Запуск; жёсткий предел 100 страниц"
+    - "Performance и JS-rendering проверяются максимум на пяти страницах по детерминированной выборке"
+    - "поддерживает режимы full_audit, daily_monitor, search_performance и work_plan"
+    - "CrawlSEO и SEOmator являются обязательными источниками бесплатного технического аудита"
+    - "Google Search Console и DataForSEO являются опциональными; без credentials имеют статус not_configured"
+    - "не публикует и не меняет сайт"
+    - "не отправляет URL на индексацию"
+    - "не покупает ссылки и не выполняет outreach"
+    - "не гарантирует позиции, трафик, лиды или выручку"
+    - "без пригодного источника поисковой аналитики не заявляет о фактической потере поискового трафика"
+    - "не передаёт модели сырые страницы, заголовки, cookie, параметры запроса, данные форм или идентичность аккаунта Google Search Console"
+    - "не обращается к локальным, приватным или содержащим учётные данные URL"
+    - "внешняя запись возможна только отдельным адаптером после явного подтверждения конкретного предложения человеком"
+    - "доступность provider, model и auth route не считается подтверждённой без живой E2E-проверки точного маршрута"
+    - "автоматический model fallback запрещён"
+  help_surface: "панель закрытого пилота, кнопка «? Как это работает»"
+
+components:
+  platform_agents:
+    - component_id: "seo_employee_agent"
+      platform_agent_id: "USER_SELECTED"
+      binding_ref: "~/.local/share/extella-seo-employee/deploy/bindings/agent_binding.json:agent_id"
+      role: "через выбранный Пользователем provider/model/auth route объясняет деловое последствие доказанной находки и минимальное исправление из разрешённого входа"
+  experts:
+    - name: "seo_employee_run"
+      required: true
+    - name: "seo_employee_state"
+      required: true
+  schedules:
+    - id: "seo_employee_daily_scan"
+      kind: "in_service"
+      cadence: "daily"
+  integrations: []
+  knowledge: []
+  rules:
+    - "каждая рекомендация содержит URL, источник факта, уровень доказательства и способ проверки"
+    - "не более десяти задач в одном отчёте"
+    - "частичный результат явно перечисляет недоступные источники"
+    - "coverage содержит planned, crawled и sampled pages, применённые категории, состояния источников и unmapped rules"
+    - "любая внешняя запись требует отдельного подтверждения человека"
+    - "state_reader возвращает extella.seo_employee_state.v2, а завершённый отчёт использует extella.seo_employee_report.v2"
+    - "state envelope v2 использует только empty, running, ready, partial или failed; завершённый report v2 использует только terminal ready, partial или failed"
+    - "план аудита, порядок правил, лимиты, выборка и corroboration определяются детерминированно, а не моделью"
+    - "модель и способ доступа выбирает пользователь в конфигурации Agent Zero; SEO Runner не ограничивает provider или model"
+    - "ошибка модели сохраняет детерминированные findings и возвращает задачи без model-enriched полей"
+    - "каждый точный маршрут provider/model/auth до использования проходит живую E2E-проверку структурированного ответа; автоматический fallback запрещён"
+
+operations:
+  rollback: "проверить снимок командой deploy/backup.py restore-check; восстановление данных выполнять только отдельной командой с --apply; предыдущий runtime-архив и привязки сохранять"

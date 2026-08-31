@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+if [ "$#" -ne 3 ]; then
+  echo "usage: run_crawlseo <public-url> <plan-json> <output-json>" >&2
+  exit 2
+fi
+exec python3 /opt/extella-seo-employee/runtime/source_proxy.py CrawlSEO "$@"

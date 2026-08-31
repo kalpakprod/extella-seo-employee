@@ -1,0 +1,118 @@
+diff --git a/tools/check_app_scopes.py b/tools/check_app_scopes.py
+index 89e3954..346bcd1 100644
+--- a/tools/check_app_scopes.py
++++ b/tools/check_app_scopes.py
+@@ -21,8 +21,12 @@ import sys
+ # Что в коде страницы означает какое право. Составлено по H12/H15 и живым замерам.
+ ПРИЗНАКИ = [
+     (r"app-agent/run",            "expert.run",
+      "страница запускает эксперта"),
++    (r"etb_run_expert",           "expert.run",
++     "страница запускает эксперта через каноническую обёртку H62"),
+     (r"app-agent/message",        "agent.run",
+      "страница разговаривает с агентом"),
++    (r"etb_run_expert[\s\S]{0,240}\btarget\s*[,}]", "device.run",
++     "обёртка H62 закрепляет вызов за устройством покупателя"),
+     (r"subprocess\.(run|Popen|call|check_call|check_output)", "device.run",
+      "Expert запускает процесс на устройстве покупателя"),
+@@ -84,16 +88,34 @@ def объявленные(папка: pathlib.Path):
+     return None
+
+
++def исходники_страницы(папка: pathlib.Path, страницы: list[pathlib.Path]):
++    """HTML и его локальные script src; публичные URL и выход из корня запрещены."""
++    найдено = list(страницы)
++    корень = папка.resolve()
++    for страница in страницы:
++        текст = страница.read_text(encoding="utf-8", errors="ignore")
++        for совпадение in re.finditer(r'''<script[^>]+src=['"]([^'"]+)['"]''', текст):
++            ссылка = совпадение.group(1).split("?", 1)[0]
++            if ссылка.startswith(("http://", "https://", "//")):
++                continue
++            кандидат = (страница.parent / ссылка.lstrip("/")).resolve()
++            if кандидат.is_file() and (кандидат == корень or корень in кандидат.parents):
++                найдено.append(кандидат)
++    return sorted(set(найдено))
++
++
+ def проверить(папка: pathlib.Path) -> int:
+     страницы = list(папка.glob("index.html")) + list(папка.glob("*/index.html"))
+     if not страницы:
+         print("страницы нет — права приложения не нужны, проверять нечего")
+         return 0
++    страницы_и_скрипты = исходники_страницы(папка, страницы)
+     эксперты = [
+         п for п in папка.rglob("expert_*.py")
+         if not any(часть in {"__pycache__", "migrations", "tests"} for часть in п.parts)
+     ]
+-    код = "\n".join(п.read_text() for п in страницы + эксперты)
++    код = "\n".join(п.read_text(encoding="utf-8", errors="ignore")
++                     for п in страницы_и_скрипты + эксперты)
+
+     объявлено = объявленные(папка)
+     if объявлено is None:
+diff --git a/tools/check_ui_api_contract.py b/tools/check_ui_api_contract.py
+index 5fe45c7..f977c9a 100644
+--- a/tools/check_ui_api_contract.py
++++ b/tools/check_ui_api_contract.py
+@@ -379,3 +379,24 @@ def сверить_арность(text: str, сказать=print) -> list:
+     return беды
+
++def проверить_etb_мост(text: str) -> list[str] | None:
++    """Канонический iframe-мост H62; None означает другой транспорт."""
++    if "etb_run_expert" not in text:
++        return None
++    беды = []
++    требования = (
++        ("etb_expert_result", "нет обратной половины etb_expert_result"),
++        ("allowedExperts", "нет явного allowlist экспертов"),
++        ("setTimeout", "нет конечного ожидания ответа"),
++    )
++    for признак, сообщение in требования:
++        if признак not in text:
++            беды.append(сообщение)
++    if not re.search(r"event\.source\s*!==\s*window\.parent", text):
++        беды.append("ответы не ограничены родительским окном")
++    if not re.search(r"type\s*:\s*['\"]etb_run_expert['\"]", text):
++        беды.append("исходящее сообщение не имеет точного типа etb_run_expert")
++    if not re.search(r"\btarget\s*[,}]", text):
++        беды.append("вызов не закреплён singular target")
++    return беды
++
+ def main(argv) -> int:
+@@ -405,5 +426,16 @@ def main(argv) -> int:
+     if extra:
+         print(f"  дочитано подключённых скриптов: {extra}")
+     print(f"{root.name} ({ui_path.name}" + (f", порт {port}" if port else ", сервер не найден") + ")")
++    etb_беды = проверить_etb_мост(ui)
++    if etb_беды is not None:
++        print("Договор панели с обёрткой Extella H62\n")
++        if etb_беды:
++            for беда in etb_беды:
++                print(f"  ✗ {беда}")
++            print("\nДОГОВОР ETB РАСХОДИТСЯ")
++            return 1
++        print("  ✓ etb_run_expert → etb_expert_result, allowlist, timeout, parent guard, target")
++        return 0
++
+     called = called_methods(ui)
+     served = server_methods()
+@@ -585,5 +617,18 @@ def _selftest() -> int:
+                    ШЛЁТ_ПЯТЬ, БЕРЁТ_СВОБОДНО, False)
+
++    etb_good = """const allowedExperts=[]; setTimeout(()=>{},1);
++    window.parent.postMessage({type:'etb_run_expert', target}, '*');
++    if (event.source !== window.parent) return;
++    if (data.type === 'etb_expert_result') return data;"""
++    if проверить_etb_мост(etb_good) == []:
++        print("  ✓ канонический etb-мост H62 проходит")
++    else:
++        провалы.append("канонический etb-мост H62 не распознан")
++    if проверить_etb_мост(etb_good.replace("event.source !== window.parent", "true")):
++        print("  ✓ etb-мост без parent guard падает")
++    else:
++        провалы.append("etb-мост без parent guard прошёл")
++
+     if провалы:
+         print("ИТОГ САМОПРОВЕРКИ: провалы —", "; ".join(провалы))
+         return 1

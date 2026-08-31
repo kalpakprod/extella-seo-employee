@@ -744,7 +744,7 @@ test('bridge settles responses and timeouts without pending requests', async () 
 
 test('[H65] panel self-heals stale cache before creating the bridge', () => {
   const boot = app.slice(app.indexOf('async function boot'));
-  assert.match(app, /const PANEL_VERSION\s*=\s*'2\.0\.0'/);
+  assert.match(app, /const PANEL_VERSION\s*=\s*'2\.0\.1'/);
   assert.match(app, /fetch\(window\.location\.pathname, \{ cache: 'no-store', signal: controller\.signal \}\)/);
   assert.match(app, /controller\.abort\(\), 3000/);
   assert.ok(boot.indexOf('await healStaleCache()') < boot.indexOf('new ExtellaBridge'), 'cache check must run first');

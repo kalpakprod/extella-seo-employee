@@ -20,7 +20,7 @@ Status: **`SHIP_CLOSED_PILOT`**. The system is ready for a closed pilot, but is 
 | Target safety | Private addresses are blocked at the actual fetch boundary; site ownership is confirmed before an audit |
 | Independent review | OpenExecutive: `SHIP_CLOSED_PILOT`, severity `low`; final Sol review: `REVIEW_APPROVED`, no P0/P1 |
 
-Full verification record: [`dist/ct160-verification-v2.json`](./dist/ct160-verification-v2.json). Final audit: [`reviews/universal-seo-employee-v2-final-review.md`](./reviews/universal-seo-employee-v2-final-review.md).
+Full verification record: [`dist/ct160-verification-v202.json`](https://github.com/kalpakprod/extella-seo-employee/blob/main/dist/ct160-verification-v202.json). Closed-pilot final audit: [`reviews/universal-seo-employee-v2-final-review.md`](./reviews/universal-seo-employee-v2-final-review.md).
 
 ## What the worker does
 

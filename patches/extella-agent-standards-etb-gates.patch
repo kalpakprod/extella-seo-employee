@@ -1,9 +1,8 @@
 diff --git a/tools/check_app_scopes.py b/tools/check_app_scopes.py
-index 89e3954..346bcd1 100644
+index e45260f..fa9ff64 100644
 --- a/tools/check_app_scopes.py
 +++ b/tools/check_app_scopes.py
-@@ -21,8 +21,12 @@ import sys
- # Что в коде страницы означает какое право. Составлено по H12/H15 и живым замерам.
+@@ -22,8 +22,12 @@ import sys
  ПРИЗНАКИ = [
      (r"app-agent/run",            "expert.run",
       "страница запускает эксперта"),
@@ -15,10 +14,11 @@ index 89e3954..346bcd1 100644
 +     "обёртка H62 закрепляет вызов за устройством покупателя"),
      (r"subprocess\.(run|Popen|call|check_call|check_output)", "device.run",
       "Expert запускает процесс на устройстве покупателя"),
+     (r"[\"']?targets[\"']?\s*[:=]", "device.run",
 @@ -84,16 +88,34 @@ def объявленные(папка: pathlib.Path):
      return None
-
-
+ 
+ 
 +def исходники_страницы(папка: pathlib.Path, страницы: list[pathlib.Path]):
 +    """HTML и его локальные script src; публичные URL и выход из корня запрещены."""
 +    найдено = list(страницы)
@@ -48,16 +48,17 @@ index 89e3954..346bcd1 100644
 -    код = "\n".join(п.read_text() for п in страницы + эксперты)
 +    код = "\n".join(п.read_text(encoding="utf-8", errors="ignore")
 +                     for п in страницы_и_скрипты + эксперты)
-
+ 
      объявлено = объявленные(папка)
      if объявлено is None:
 diff --git a/tools/check_ui_api_contract.py b/tools/check_ui_api_contract.py
-index 5fe45c7..f977c9a 100644
+index 4207132..c9306fe 100644
 --- a/tools/check_ui_api_contract.py
 +++ b/tools/check_ui_api_contract.py
-@@ -379,3 +379,24 @@ def сверить_арность(text: str, сказать=print) -> list:
+@@ -378,6 +378,27 @@ def сверить_арность(ui: str, сказать=print) -> list:
+         сказать(f"  ✗ {б}")
      return беды
-
+ 
 +def проверить_etb_мост(text: str) -> list[str] | None:
 +    """Канонический iframe-мост H62; None означает другой транспорт."""
 +    if "etb_run_expert" not in text:
@@ -80,7 +81,9 @@ index 5fe45c7..f977c9a 100644
 +    return беды
 +
  def main(argv) -> int:
-@@ -405,5 +426,16 @@ def main(argv) -> int:
+     root = Path(argv[0]).expanduser().resolve() if argv else Path.cwd()
+     port_arg = argv[1] if len(argv) > 1 else None
+@@ -405,6 +426,17 @@ def main(argv) -> int:
      if extra:
          print(f"  дочитано подключённых скриптов: {extra}")
      print(f"{root.name} ({ui_path.name}" + (f", порт {port}" if port else ", сервер не найден") + ")")
@@ -97,9 +100,11 @@ index 5fe45c7..f977c9a 100644
 +
      called = called_methods(ui)
      served = server_methods()
-@@ -585,5 +617,18 @@ def _selftest() -> int:
+     problems = []
+@@ -585,6 +617,19 @@ class API:
+     случай_арности("метод со *args не сверяется",
                     ШЛЁТ_ПЯТЬ, БЕРЁТ_СВОБОДНО, False)
-
+ 
 +    etb_good = """const allowedExperts=[]; setTimeout(()=>{},1);
 +    window.parent.postMessage({type:'etb_run_expert', target}, '*');
 +    if (event.source !== window.parent) return;

@@ -20,7 +20,7 @@
 | Безопасность цели | Приватные адреса блокируются на фактической границе загрузки; владение сайтом подтверждается до аудита |
 | Независимая проверка | OpenExecutive: `SHIP_CLOSED_PILOT`, severity `low`; финальный Sol review: `REVIEW_APPROVED`, без P0/P1 |
 
-Полный протокол: [`dist/ct160-verification-v2.json`](./dist/ct160-verification-v2.json). Финальный аудит: [`reviews/universal-seo-employee-v2-final-review.md`](./reviews/universal-seo-employee-v2-final-review.md).
+Полный протокол: [`dist/ct160-verification-v202.json`](https://github.com/kalpakprod/extella-seo-employee/blob/main/dist/ct160-verification-v202.json). Финальный аудит закрытого пилота: [`reviews/universal-seo-employee-v2-final-review.md`](./reviews/universal-seo-employee-v2-final-review.md).
 
 ## Что делает сотрудник
 

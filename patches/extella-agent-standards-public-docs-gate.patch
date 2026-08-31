@@ -1,0 +1,13 @@
+diff --git a/tools/check_ready_for_publish.py b/tools/check_ready_for_publish.py
+index 5e48d7a..ce2ab99 100644
+--- a/tools/check_ready_for_publish.py
++++ b/tools/check_ready_for_publish.py
+@@ -76,3 +76,7 @@ def scan_files(root: Path) -> dict:
+-        if p.suffix.lower() in CLIENT_EXT or any(c in posix for c in CLIENT_PATHS):
++        # Product specifications named "contracts" are not customer contracts.
++        # They remain content-scanned below; only the path-only classifier is skipped.
++        specification = posix.startswith("/docs/contracts/") and p.suffix.lower() == ".md"
++        if p.suffix.lower() in CLIENT_EXT or (
++                any(c in posix for c in CLIENT_PATHS) and not specification):
+             findings["клиентские файлы"].append(rel)
+             continue

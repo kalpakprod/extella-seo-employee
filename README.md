@@ -88,11 +88,8 @@ API продукта доступен только на `http://127.0.0.1:8088`.
 - [Investor deck](./docs/investor/deck.md)
 - [Уведомления о сторонних компонентах](./THIRD_PARTY_NOTICES.md)
 
-## Артефакты 2.0.0
+## Сборка и контрольные суммы
 
-| Артефакт | SHA-256 |
-|---|---|
-| [`extella-seo-employee-runtime-2.0.0.zip`](./dist/extella-seo-employee-runtime-2.0.0.zip) | `fe460f2b2e7a282d1ba6c367c55d601ada416ce69a20f57c740551e277c253a4` |
-| [`extella-seo-employee-page-2.0.0.zip`](./dist/extella-seo-employee-page-2.0.0.zip) | `2e1530cc531b6ce3000b7193d3f89ccfc8b7974d4becfd2fcd387ec15befc832` |
+`python3 tools/build_release.py` создаёт детерминированные page/runtime ZIP. Точные имена и SHA-256 последней локальной сборки записываются в `dist/build.json`; опубликованные неизменяемые версии находятся в [GitHub Releases](https://github.com/kalpakprod/extella-seo-employee/releases).
 
 Лицензии и условия использования компонентов определяются их исходными проектами. Уведомления сохранены в [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md). Перед коммерческим распространением нужен отдельный license review полного release bundle.

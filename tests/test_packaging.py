@@ -5,6 +5,7 @@ import hashlib
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest import mock
 
@@ -35,7 +36,18 @@ class PackagingTest(unittest.TestCase):
 
     def test_runtime_payload_contains_installer_and_canonical_manifest_check(self) -> None:
         payload = RELEASE.payload_files()
-        self.assertEqual(RELEASE.VERSION, "2.0.0")
+        self.assertEqual(RELEASE.VERSION, "2.0.1")
+        for relative in (
+            ".gitattributes",
+            "README.md",
+            "README.en.md",
+            "THIRD_PARTY_NOTICES.md",
+            "assets/readme/architecture-en.svg",
+            "assets/readme/architecture-ru.svg",
+            "assets/readme/hero-en.svg",
+            "assets/readme/hero-ru.svg",
+        ):
+            self.assertIn(relative, payload)
         self.assertIn("install.py", payload)
         self.assertIn("MANIFEST.yaml", payload)
         self.assertIn("manifest_check.py", payload)
@@ -45,7 +57,43 @@ class PackagingTest(unittest.TestCase):
         self.assertFalse(any(path.startswith("docs/investor/") for path in payload))
         self.assertFalse(any(path.startswith("docs/plans/") for path in payload))
         self.assertFalse(any(path.startswith("evidence/") for path in payload))
+        self.assertFalse(any(path.startswith("patches/extella-agent-standards-") for path in payload))
+        self.assertFalse(any(path.startswith("docs/compliance/") for path in payload))
         self.assertNotIn("docs/verification/v2-progress.md", payload)
+
+    def test_gitattributes_keeps_text_lf_and_release_binaries_binary(self) -> None:
+        attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8").splitlines()
+        self.assertIn("* text=auto eol=lf", attributes)
+        self.assertIn("*.svg text eol=lf", attributes)
+        self.assertIn("manifest_check.py -text", attributes)
+        self.assertIn("*.png binary", attributes)
+        self.assertIn("*.zip binary", attributes)
+
+    def test_zip_writer_is_byte_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            source.mkdir()
+            (source / "README.md").write_bytes(b"release\n")
+            (source / "icon.png").write_bytes(b"\x89PNG\r\n")
+            first = Path(directory) / "first.zip"
+            second = Path(directory) / "second.zip"
+
+            first_hash = RELEASE.write_zip(first, source, ["icon.png", "README.md"], set())
+            second_hash = RELEASE.write_zip(second, source, ["README.md", "icon.png"], set())
+
+            self.assertEqual(first_hash, second_hash)
+            self.assertEqual(first.read_bytes(), second.read_bytes())
+            with zipfile.ZipFile(first) as archive:
+                self.assertEqual(archive.namelist(), ["README.md", "icon.png"])
+                self.assertEqual(archive.getinfo("README.md").date_time, RELEASE.EPOCH)
+
+    def test_generated_json_is_written_with_lf_on_every_platform(self) -> None:
+        paths = [ROOT / "release-manifest.json"]
+        build_record = ROOT / "dist" / "build.json"
+        if build_record.is_file():
+            paths.append(build_record)
+        for path in paths:
+            self.assertNotIn(b"\r\n", path.read_bytes())
 
     def test_docker_context_excludes_generated_bindings_and_local_env(self) -> None:
         rules = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()

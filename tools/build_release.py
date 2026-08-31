@@ -11,13 +11,16 @@ import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 EPOCH = (2026, 1, 1, 0, 0, 0)
 APP_FILES = ("index.html", "styles.css", "app.js", "extella-bridge.js")
 ROOT_FILES = (
     ".dockerignore",
+    ".gitattributes",
     "MANIFEST.yaml",
     "README.md",
+    "README.en.md",
+    "THIRD_PARTY_NOTICES.md",
     "automation_passport.yaml",
     "icon.png",
     "icon.svg",
@@ -25,7 +28,7 @@ ROOT_FILES = (
     "install.py",
     "manifest_check.py",
 )
-PAYLOAD_DIRS = ("app", "deploy", "docs", "experts", "patches", "runtime", "tests", "tools")
+PAYLOAD_DIRS = ("app", "assets/readme", "deploy", "docs", "experts", "patches", "runtime", "tests", "tools")
 EXECUTABLES = {
     "deploy/prepare.py",
     "deploy/probe.py",
@@ -52,6 +55,10 @@ def payload_files() -> list[str]:
                 continue
             relative = path.relative_to(ROOT).as_posix()
             if relative in LEGACY_RUNTIME:
+                continue
+            if relative.startswith("patches/extella-agent-standards-"):
+                continue
+            if relative.startswith("docs/compliance/"):
                 continue
             if relative.startswith("docs/investor/"):
                 continue
@@ -92,6 +99,7 @@ def main() -> int:
     (ROOT / "release-manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
 
     page_name = f"extella-seo-employee-page-{VERSION}.zip"
@@ -115,6 +123,7 @@ def main() -> int:
     (DIST / "build.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
     print(json.dumps(result, ensure_ascii=False))
     return 0

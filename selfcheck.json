@@ -2,22 +2,22 @@
   "schema": "extella.selfcheck/v1",
   "product": {
     "name": "extella-seo-employee",
-    "version": "2.0.0"
+    "version": "2.0.1"
   },
   "artifact": {
     "kind": "archive",
-    "name": "extella-seo-employee-runtime-2.0.0.zip",
-    "sha256": "fe460f2b2e7a282d1ba6c367c55d601ada416ce69a20f57c740551e277c253a4"
+    "name": "extella-seo-employee-runtime-2.0.1.zip",
+    "sha256": "8f61e6ce7854231a3ff79fbebead1cc37b30c8ae74a9882287d84ef53f826e6f"
   },
   "page_artifact": {
     "kind": "archive",
-    "name": "extella-seo-employee-page-2.0.0.zip",
-    "sha256": "2e1530cc531b6ce3000b7193d3f89ccfc8b7974d4becfd2fcd387ec15befc832"
+    "name": "extella-seo-employee-page-2.0.1.zip",
+    "sha256": "59b740e00da4b204787a702ed8810cd8b7b54f6c42f2104690edb49e2d0ead01"
   },
-  "ran_at": "2026-08-31T06:37:52Z",
+  "ran_at": "2026-08-31T08:52:56Z",
   "runner": {
     "where": "author-device and CT160",
-    "runtime": "Python and Node"
+    "runtime": "Python 3.11 and Node.js"
   },
   "command": "python tools/selfcheck.py",
   "result": "ready",
@@ -25,66 +25,67 @@
     {
       "name": "archive_hashes_match_build",
       "status": "pass",
-      "detail": "The runtime and page SHA-256 values match dist/build.json."
+      "detail": "The 2.0.1 runtime and page SHA-256 values match dist/build.json."
     },
     {
       "name": "local_python_suite",
       "status": "pass",
-      "detail": "168 Python tests passed."
+      "detail": "175 Python tests passed."
     },
     {
       "name": "local_node_suite",
       "status": "pass",
-      "detail": "62 Node tests passed; 2 Windows-only Linux cancellation tests were skipped."
+      "detail": "62 Node tests passed; 2 Linux-only cancellation tests were skipped on Windows."
     },
     {
       "name": "ct160_clean_runtime",
       "status": "pass",
-      "detail": "168 Python tests and Node 64/64 passed, including Linux cancellation."
+      "detail": "The exact 2.0.1 runtime archive passed 175 Python tests and Node 64/64 on CT160."
     },
     {
-      "name": "agent_zero_no_tools_preflight",
+      "name": "ct160_device_binding",
       "status": "pass",
-      "detail": "No-tools preflight passed with agy/gemini-3.7-flash-high configured for chat and utility."
+      "detail": "The live API reports active_version 2.0.1 and device_id 7e99c478-d104-412c-aef0-adceca7b8718; seven Compose services are running, six with healthy status and the no-healthcheck proxy running."
     },
     {
-      "name": "example_com_worker_probe",
+      "name": "ct160_backup_before_upgrade",
       "status": "pass",
-      "detail": "CrawlSEO and SEOmator each crawled 1 page; CrawlSEO search_performance is not_configured."
+      "detail": "Snapshot 20260831T083623Z-c1aca096 passed verify and temporary restore-check before the upgrade."
     },
     {
-      "name": "ownership_confirmed_api_gate",
+      "name": "standards_archive_self_check",
       "status": "pass",
-      "detail": "A run without ownership confirmation was blocked."
+      "detail": "The pinned standards self-check passed against the extracted 2.0.1 runtime archive and went red after its negative-control mutation."
     },
     {
-      "name": "ct160_multi_page_workers",
+      "name": "standards_code_canon",
       "status": "pass",
-      "detail": "CrawlSEO and SEOmator each completed 25/25 pages on the public scraping fixture."
+      "detail": "The pinned check_code_canon gate reported no findings across 59 source files."
     },
     {
-      "name": "ct160_ssrf_defence_in_depth",
+      "name": "standards_product_surfaces",
       "status": "pass",
-      "detail": "Both workers blocked a private target and retained public-target operation."
-    },
-    {
-      "name": "ct160_v2_backup",
-      "status": "pass",
-      "detail": "The project-scoped v2 snapshot verified and passed temporary restore-check."
-    },
-    {
-      "name": "ct160_full_api_e2e",
-      "status": "pass",
-      "detail": "The 25-page ecommerce run finished ready: CrawlSEO 25, SEOmator 25 plus 5 browser samples, Agent Zero 10/10, and 10 tasks."
+      "detail": "Automation passport, waiting state, listing metadata, brand copy and generic state contract passed."
     }
   ],
   "negative_control": {
     "ran": true,
-    "without_ownership_confirmation": "blocked"
+    "mutation": "deploy/backup.py:create_snapshot",
+    "self_check_went_red": true
   },
-  "ct160_verification": "dist/ct160-verification-v2.json",
+  "ct160_deployment": {
+    "source_root": "/opt/extella-seo-release-v201-final",
+    "compose_project": "extella-seo-release-v2",
+    "loopback_api": "127.0.0.1:18092",
+    "device_id": "7e99c478-d104-412c-aef0-adceca7b8718",
+    "rollback_image": "sha256:903b86f292611677d1c14452cca2827d472eaacdf17d9970e84697aa2c912255",
+    "backup_snapshot": "/mnt/usbdata/extella-seo-backups-v2/20260831T083623Z-c1aca096"
+  },
   "not_verified": [
-    "An actual end-to-end audit of a user-owned domain",
-    "Agent Zero authentication mechanism and subscription"
+    "A clean Extella OS prerelease purchase and first-device installation",
+    "An authoritative first-device ID supplied to install.py by the platform",
+    "Acceptance of the two upstream standards gate corrections",
+    "An end-to-end audit of a user-owned domain",
+    "Agent Zero authentication through consumer subscription or BYOK"
   ]
 }

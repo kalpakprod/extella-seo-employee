@@ -15,6 +15,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).parents[1]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "experts"))
 
 
@@ -31,6 +32,7 @@ SERVER = load("extella_product_server", ROOT / "runtime" / "product" / "server.p
 BOOTSTRAP = load("extella_product_bootstrap", ROOT / "runtime" / "product" / "bootstrap.py")
 GATEWAY = load("extella_product_gateway", ROOT / "runtime" / "product" / "gateway.py")
 PREPARE = load("extella_deploy_prepare", ROOT / "deploy" / "prepare.py")
+INSTALL = load("extella_installer", ROOT / "install.py")
 from seo_employee_sources import CrawlSEOAdapter
 
 
@@ -180,6 +182,107 @@ class ContainerRuntimeTest(unittest.TestCase):
             token.write_text("a" * 16 + "\n", encoding="utf-8")
             PREPARE.ensure_generated_secret("agent_zero_api_key", 16)
             self.assertEqual(token.read_text(encoding="utf-8").strip(), "a" * 16)
+
+    def test_prepare_starts_restarts_and_checks_loopback_health(self) -> None:
+        compose = ("docker", "compose", "-f", str(PREPARE.COMPOSE))
+        with mock.patch.object(PREPARE, "run") as run, mock.patch.object(PREPARE, "wait_for_product_health") as health:
+            PREPARE.start_and_verify()
+        self.assertEqual(
+            run.call_args_list,
+            [
+                mock.call(*compose, "up", "-d"),
+                mock.call(*compose, "restart", "seo-employee", "api-gateway"),
+            ],
+        )
+        health.assert_called_once_with()
+
+    def test_prepare_health_probe_is_loopback_only(self) -> None:
+        response = mock.MagicMock()
+        response.__enter__.return_value.status = 200
+        with mock.patch.object(PREPARE.urllib.request, "urlopen", return_value=response) as open_url:
+            PREPARE.wait_for_product_health()
+        open_url.assert_called_once_with("http://127.0.0.1:8088/health", timeout=3)
+
+    def test_installer_reuses_device_binding_and_runs_prepare_without_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "installed"
+            binding = target / "deploy" / "bindings" / "device_binding.json"
+            binding.parent.mkdir(parents=True)
+            binding.write_text(
+                json.dumps(
+                    {
+                        "device_id": "device-seo-01",
+                        "host": "seo-host",
+                        "hosting_profile": "client_server",
+                        "since": "2026-08-31T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with (
+                mock.patch.object(INSTALL, "TARGET", target),
+                mock.patch.object(INSTALL.os, "name", "posix"),
+                mock.patch.object(INSTALL, "run_manifest_check", return_value=True),
+                mock.patch.object(INSTALL, "release_manifest", return_value={}),
+                mock.patch.object(INSTALL, "install_payload", return_value=None),
+                mock.patch.object(INSTALL.shutil, "which", return_value="/usr/bin/docker"),
+                mock.patch.object(INSTALL.subprocess, "run") as run,
+                mock.patch.dict(
+                    INSTALL.os.environ,
+                    {
+                        "EXTELLA_AGENT_ID": "agent_seo_employee",
+                        "EXTELLA_APP_NAME": "Extella SEO Employee",
+                        "EXTELLA_APP_VERSION": "2.0.1",
+                    },
+                    clear=False,
+                ),
+                mock.patch("sys.stdout", output),
+            ):
+                self.assertEqual(INSTALL.main(), 0)
+            commands = [call.args[0] for call in run.call_args_list]
+            self.assertEqual(commands[0], ("docker", "info"))
+            self.assertEqual(
+                commands[1],
+                (
+                    sys.executable,
+                    str(target / "deploy" / "prepare.py"),
+                    "--device-id",
+                    "device-seo-01",
+                    "--hosting-profile",
+                    "client_server",
+                    "--host",
+                    "seo-host",
+                    "--agent-id",
+                    "agent_seo_employee",
+                ),
+            )
+            self.assertEqual(run.call_args_list[1].kwargs["stdout"], INSTALL.subprocess.DEVNULL)
+            self.assertEqual(run.call_args_list[1].kwargs["stderr"], INSTALL.subprocess.DEVNULL)
+            self.assertEqual(json.loads(output.getvalue())["code"], "installed_and_healthy")
+
+    def test_installer_rejects_unbound_device_before_payload_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = io.StringIO()
+            with (
+                mock.patch.object(INSTALL, "TARGET", Path(directory) / "installed"),
+                mock.patch.object(INSTALL.os, "name", "posix"),
+                mock.patch.object(INSTALL, "run_manifest_check", return_value=True),
+                mock.patch.object(INSTALL, "install_payload") as install_payload,
+                mock.patch.dict(
+                    INSTALL.os.environ,
+                    {
+                        "EXTELLA_AGENT_ID": "agent_seo_employee",
+                        "EXTELLA_APP_NAME": "Extella SEO Employee",
+                        "EXTELLA_APP_VERSION": "2.0.1",
+                    },
+                    clear=False,
+                ),
+                mock.patch("sys.stdout", output),
+            ):
+                self.assertEqual(INSTALL.main(), 1)
+            install_payload.assert_not_called()
+            self.assertEqual(json.loads(output.getvalue())["code"], "extella_device_binding_required")
 
     def test_gateway_allows_only_canonical_multi_target_reads(self) -> None:
         self.assertEqual(GATEWAY.request_target("product", "GET", "/api/targets"), "/api/targets")

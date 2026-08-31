@@ -13,6 +13,8 @@ import stat
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 COMPOSE = pathlib.Path(__file__).with_name("compose.yaml")
@@ -125,6 +127,34 @@ def connect_external_agent_zero(container: str) -> None:
     if network not in attached: run("docker", "network", "connect", "--alias", "agent-zero", network, container)
     elif "agent-zero" not in (attached[network].get("Aliases") or []): raise RuntimeError("external Agent Zero is attached without the required network alias")
 
+
+def loopback_product_url() -> str:
+    value = os.environ.get("SEO_EMPLOYEE_PORT", "8088")
+    if not value.isdecimal() or not 1 <= int(value) <= 65535:
+        raise RuntimeError("SEO_EMPLOYEE_PORT is invalid")
+    return f"http://127.0.0.1:{value}/health"
+
+
+def wait_for_product_health(seconds: int = 120) -> None:
+    deadline = time.monotonic() + seconds
+    url = loopback_product_url()
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=3) as response:
+                if response.status == 200:
+                    return
+        except (OSError, urllib.error.HTTPError):
+            pass
+        time.sleep(1)
+    raise RuntimeError("product health endpoint did not become ready after restart")
+
+
+def start_and_verify() -> None:
+    compose = ("docker", "compose", "-f", str(COMPOSE))
+    run(*compose, "up", "-d")
+    run(*compose, "restart", "seo-employee", "api-gateway")
+    wait_for_product_health()
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--device-id", required=True)
@@ -153,6 +183,7 @@ def main() -> int:
         else:
             sync_managed_token(); mode = "managed"
         run("docker", "compose", "-f", str(COMPOSE), "config", "-q")
+        start_and_verify()
     except (OSError, RuntimeError, subprocess.CalledProcessError, UnicodeError, KeyError, json.JSONDecodeError):
         print(json.dumps({"status": "error", "code": "deployment_preparation_failed"})); return 1
     print(json.dumps({"status": "success", "agent_zero": mode, "compose": str(COMPOSE)})); return 0

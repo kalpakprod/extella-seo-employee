@@ -88,11 +88,8 @@ The product API listens only on `http://127.0.0.1:8088`. Hosting requires a sepa
 - [Investor deck](./docs/investor/deck.md)
 - [Third-party notices](./THIRD_PARTY_NOTICES.md)
 
-## 2.0.0 artifacts
+## Build and checksums
 
-| Artifact | SHA-256 |
-|---|---|
-| [`extella-seo-employee-runtime-2.0.0.zip`](./dist/extella-seo-employee-runtime-2.0.0.zip) | `fe460f2b2e7a282d1ba6c367c55d601ada416ce69a20f57c740551e277c253a4` |
-| [`extella-seo-employee-page-2.0.0.zip`](./dist/extella-seo-employee-page-2.0.0.zip) | `2e1530cc531b6ce3000b7193d3f89ccfc8b7974d4becfd2fcd387ec15befc832` |
+`python3 tools/build_release.py` creates deterministic page and runtime ZIPs. Exact filenames and SHA-256 values for the latest local build are written to `dist/build.json`; published immutable versions are available from [GitHub Releases](https://github.com/kalpakprod/extella-seo-employee/releases).
 
 Component licenses and terms are governed by their upstream projects. Required notices are preserved in [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md). A separate license review of the complete release bundle is required before commercial distribution.

@@ -2,7 +2,13 @@
 
 Требования: Linux `amd64`, Docker Engine с Compose v2, Python 3.11+ и Git.
 
-## Новый хост
+## Установка через Extella
+
+`install.py` не запрашивает ввода. Он получает только `EXTELLA_AGENT_ID`, `EXTELLA_APP_NAME` и `EXTELLA_APP_VERSION`, проверяет архив, автоматически вызывает `prepare.py`, поднимает Compose, перезапускает `seo-employee` и `api-gateway`, затем ждёт `GET http://127.0.0.1:8088/health`. Любая неуспешная команда или health-проверка возвращает ненулевой код, без вывода секретов.
+
+Платформа не документирует переменную окружения с `device_id`. Поэтому для безопасного автоматического запуска installer использует только уже существующий валидный `deploy/bindings/device_binding.json`. На первом устройстве без такой привязки он завершится с `extella_device_binding_required` до копирования payload: придумывать или выводить device ID нельзя.
+
+## Первичная привязка нового устройства
 
 ```sh
 cp deploy/.env.example deploy/.env
@@ -10,10 +16,9 @@ python3 deploy/prepare.py \
   --device-id '<Extella device id>' \
   --hosting-profile client_server \
   --agent-id '<agent_... from Extella>'
-docker compose --project-name extella-seo-release -f deploy/compose.yaml up -d
 ```
 
-`prepare.py` собирает три закреплённых образа, создаёт локальные secret-файлы с правами `600`, запускает Agent Zero и синхронизирует его внутренний API-токен без вывода значения. Затем владелец открывает `http://127.0.0.1:50081`, вручную подключает свой провайдер и выбирает модель. Код SEO Employee не ограничивает модель; живым E2E подтверждён только `agy/gemini-3.7-flash-high`, работа через пользовательскую подписку, BYOK и другие модели пока не подтверждена.
+`prepare.py` создаёт и перечитывает привязку устройства, собирает закреплённые образы, создаёт локальные secret-файлы с правами `600`, запускает Agent Zero и синхронизирует его внутренний API-токен без вывода значения. Затем он сам поднимает Compose, перезапускает продуктовые контейнеры и ждёт loopback health. Это однократный recovery/первичный путь для отсутствующей device binding; последующие установки через Extella запускают ту же последовательность автоматически. Затем владелец открывает `http://127.0.0.1:50081`, вручную подключает свой провайдер и выбирает модель. Код SEO Employee не ограничивает модель; живым E2E подтверждён только `agy/gemini-3.7-flash-high`, работа через пользовательскую подписку, BYOK и другие модели пока не подтверждена.
 
 ## Существующий Agent Zero
 
@@ -24,7 +29,6 @@ python3 deploy/prepare.py \
   --agent-id '<agent_... from Extella>' \
   --external-agent-zero-key /secure/path/agent_zero_api_key \
   --external-agent-zero-container existing-agent-zero
-docker compose --project-name extella-seo-release -f deploy/compose.yaml up -d
 ```
 
 Путь к ключу передаётся локально; значение не печатается и не попадает в образ. Скрипт проверяет закреплённый образ и подключает уже работающий Docker-контейнер к внутренней сети под алиасом `agent-zero`, без перезапуска. Agent Zero в этом режиме Compose не создаёт.

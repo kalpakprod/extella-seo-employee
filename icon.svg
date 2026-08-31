@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"
-     viewBox="0 0 512 512">
+     viewBox="0 0 512 512" role="img" aria-labelledby="icon-title">
+  <title id="icon-title">Extella SEO Employee</title>
   <defs>
     <linearGradient id="фон" gradientTransform="rotate(75 .5 .5)">
       <stop offset="0" stop-color="#FFFDF9"/>

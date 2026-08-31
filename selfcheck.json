@@ -7,14 +7,14 @@
   "artifact": {
     "kind": "archive",
     "name": "extella-seo-employee-runtime-2.0.2.zip",
-    "sha256": "7e20756b437638dda8342a43c1d3dc44f5bfb58cb08ab98ac5d047e6869a1a8f"
+    "sha256": "a1c0f75f423571002184309a30cd470435cbd881d781d72c76c03f457ecf17c7"
   },
   "page_artifact": {
     "kind": "archive",
     "name": "extella-seo-employee-page-2.0.2.zip",
     "sha256": "a9fc534a19211f679448468af1b4829add387a0d8b23a89eeff26f1f8ddb3e37"
   },
-  "ran_at": "2026-08-31T09:34:02Z",
+  "ran_at": "2026-08-31T09:53:33Z",
   "runner": {
     "where": "author-device and CT160",
     "runtime": "Python 3.11 and Node.js"
@@ -30,7 +30,7 @@
     {
       "name": "local_python_suite",
       "status": "pass",
-      "detail": "177 Python tests passed."
+      "detail": "181 Python tests passed."
     },
     {
       "name": "local_node_suite",
@@ -40,7 +40,7 @@
     {
       "name": "ct160_clean_runtime",
       "status": "pass",
-      "detail": "The exact 2.0.2 runtime archive passed 177 Python tests and Node 64/64 on CT160."
+      "detail": "The exact 2.0.2 runtime archive passed 181 Python tests and Node 64/64 on CT160."
     },
     {
       "name": "ct160_device_binding",
@@ -51,6 +51,11 @@
       "name": "ct160_backup_before_upgrade",
       "status": "pass",
       "detail": "Snapshot 20260831T092655Z-7f4341f1 passed verify and temporary restore-check before the 2.0.2 upgrade."
+    },
+    {
+      "name": "ct160_runtime_rollback_probe",
+      "status": "pass",
+      "detail": "The final archive captured the live Compose project, four image states and loopback port 18092, restored them idempotently, and returned health version 2.0.2."
     },
     {
       "name": "standards_archive_self_check",
@@ -75,12 +80,14 @@
   },
   "ct160_deployment": {
     "source_root": "/opt/extella-seo-release-v202",
+    "verified_archive_root": "/opt/extella-seo-release-v202-final",
     "compose_project": "extella-seo-release-v2",
     "loopback_api": "127.0.0.1:18092",
     "device_id": "7e99c478-d104-412c-aef0-adceca7b8718",
     "rollback_image": "sha256:34e153d6ba211e7840d6075df2a719cd90560c3c6cff4b0f5bdac349f3116cf6",
     "backup_snapshot": "/mnt/usbdata/extella-seo-backups-v2/20260831T092655Z-7f4341f1"
   },
+  "ct160_verification": "dist/ct160-verification-v202.json",
   "not_verified": [
     "A clean Extella OS prerelease purchase and first-device installation",
     "An authoritative first-device ID supplied to install.py by the platform",

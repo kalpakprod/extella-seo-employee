@@ -1,0 +1,65 @@
+{
+  "schema": "extella.seo_employee_ct160_verification.v202",
+  "verified_at": "2026-08-31T09:53:33Z",
+  "version": "2.0.2",
+  "artifacts": {
+    "runtime": {
+      "file": "extella-seo-employee-runtime-2.0.2.zip",
+      "sha256": "a1c0f75f423571002184309a30cd470435cbd881d781d72c76c03f457ecf17c7"
+    },
+    "page": {
+      "file": "extella-seo-employee-page-2.0.2.zip",
+      "sha256": "a9fc534a19211f679448468af1b4829add387a0d8b23a89eeff26f1f8ddb3e37"
+    }
+  },
+  "local_checks": {
+    "python_unittest": {"tests": 181, "passed": 181, "failed": 0},
+    "node_test": {"tests": 64, "passed": 62, "failed": 0, "skipped": 2, "skip_scope": "Linux process-group cancellation"},
+    "clean_windows_clone": {"release_manifest_mismatches": 0, "python_tests_passed": 181, "self_check": "ready"}
+  },
+  "ct160": {
+    "source_root": "/opt/extella-seo-release-v202",
+    "verified_archive_root": "/opt/extella-seo-release-v202-final",
+    "compose_project": "extella-seo-release-v2",
+    "loopback_api": "127.0.0.1:18092",
+    "api_version": "2.0.2",
+    "device_id": "7e99c478-d104-412c-aef0-adceca7b8718",
+    "services_running": 7,
+    "healthchecked_services_healthy": 6,
+    "product_image": "sha256:b7041d8096327c9d38789678222a9a2d8c9ab3ff43a21d5e1629cc2d051d21f0",
+    "clean_runtime": {
+      "python_unittest": {"tests": 181, "passed": 181, "failed": 0},
+      "node_test": {"tests": 64, "passed": 64, "failed": 0, "skipped": 0},
+      "self_check": "ready"
+    },
+    "backup": {
+      "snapshot": "/mnt/usbdata/extella-seo-backups-v2/20260831T092655Z-7f4341f1",
+      "verify": "pass",
+      "restore_check": "restore-check-ok",
+      "restore_check_scope": "temporary_only"
+    },
+    "runtime_rollback_probe": {
+      "schema": "extella.seo_employee_runtime_state.v1",
+      "project": "extella-seo-release-v2",
+      "health_url": "http://127.0.0.1:18092/health",
+      "captured_images": 4,
+      "restore": "pass",
+      "post_restore_health_version": "2.0.2"
+    },
+    "rollback_image": "sha256:34e153d6ba211e7840d6075df2a719cd90560c3c6cff4b0f5bdac349f3116cf6"
+  },
+  "standards": {
+    "baseline_commit": "b8a628cfcc1c5a4cbbf8faa5a1ac4c48590e2b58",
+    "archive_self_check": "pass",
+    "negative_control": "pass",
+    "h62_gate_patch": "forward-and-reverse-apply-pass",
+    "upstream_pr": "https://github.com/AnvarBakiyev/extella-agent-standards/pull/27",
+    "upstream_acceptance": "pending"
+  },
+  "not_verified": [
+    "A clean Extella OS prerelease purchase and first-device installation",
+    "A generic authoritative first-device ID supplied by the platform installer environment",
+    "An end-to-end audit of a user-owned domain",
+    "Agent Zero authentication through consumer subscription or BYOK"
+  ]
+}

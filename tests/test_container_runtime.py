@@ -204,6 +204,63 @@ class ContainerRuntimeTest(unittest.TestCase):
             PREPARE.wait_for_product_health()
         open_url.assert_called_once_with("http://127.0.0.1:8088/health", timeout=3)
 
+    def test_prepare_runtime_rollback_retains_old_images_and_restarts_prior_project(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            compose = Path(directory) / "compose.yaml"
+            compose.write_text("services: {}\n", encoding="utf-8")
+            state = {
+                "schema": PREPARE.RUNTIME_STATE_SCHEMA,
+                "project": "extella-seo-employee",
+                "images": [
+                    {"reference": "extella-seo-employee:2.0.1", "image_id": "sha256:" + "a" * 64},
+                    {"reference": "postgres@sha256:" + "b" * 64, "image_id": "sha256:" + "b" * 64},
+                ],
+                "health_url": "http://127.0.0.1:9191/health",
+            }
+            with mock.patch.object(PREPARE, "run") as run, mock.patch.object(PREPARE, "wait_for_product_health") as health:
+                PREPARE.restore_runtime_state(state, compose)
+        self.assertEqual(
+            run.call_args_list,
+            [
+                mock.call("docker", "tag", "sha256:" + "a" * 64, "extella-seo-employee:2.0.1"),
+                mock.call(
+                    "docker", "compose", "--project-name", "extella-seo-employee", "-f", str(compose), "up", "-d"
+                ),
+            ],
+        )
+        health.assert_called_once_with(url="http://127.0.0.1:9191/health")
+
+    def test_prepare_captures_the_existing_api_gateway_loopback_port(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            compose = Path(directory) / "compose.yaml"
+            compose.write_text("services: {}\n", encoding="utf-8")
+            with mock.patch.object(
+                PREPARE,
+                "run",
+                side_effect=[
+                    "container-id",
+                    '{"com.docker.compose.project":"extella-seo-employee","com.docker.compose.service":"api-gateway"}',
+                    '{"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"9191"}]}',
+                    "extella-seo-employee:2.0.1",
+                    "sha256:" + "a" * 64,
+                ],
+            ):
+                state = PREPARE.capture_runtime_state(compose)
+        self.assertEqual(state["health_url"], "http://127.0.0.1:9191/health")
+
+    def test_prepare_rejects_a_non_loopback_runtime_health_url(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            compose = Path(directory) / "compose.yaml"
+            compose.write_text("services: {}\n", encoding="utf-8")
+            state = {
+                "schema": PREPARE.RUNTIME_STATE_SCHEMA,
+                "project": "extella-seo-employee",
+                "images": [{"reference": "extella-seo-employee:2.0.1", "image_id": "sha256:" + "a" * 64}],
+                "health_url": "http://example.com:9191/health",
+            }
+            with self.assertRaisesRegex(RuntimeError, "loopback health URL"):
+                PREPARE.restore_runtime_state(state, compose)
+
     def test_installer_reuses_device_binding_and_runs_prepare_without_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "installed"
@@ -374,12 +431,19 @@ class ContainerRuntimeTest(unittest.TestCase):
             (bindings / "agent_binding.json").write_bytes(original_agent)
             output = io.StringIO()
             original_cwd = Path.cwd()
+            runtime_snapshot = root / "runtime-state.json"
 
             def fail_prepare(_device_binding: dict[str, str], _agent_id: str) -> None:
                 (bindings / "device_binding.json").write_bytes(b"changed device")
                 (bindings / "agent_binding.json").write_bytes(b"changed agent")
                 (bindings / "agent_zero_no_tools_profile.json").write_bytes(b"new assertion")
                 raise RuntimeError("simulated prepare failure")
+
+            def restore_after_files(snapshot: Path) -> None:
+                self.assertEqual(snapshot, runtime_snapshot)
+                self.assertEqual((target / "release-manifest.json").read_bytes(), b"old manifest")
+                self.assertEqual((bindings / "device_binding.json").read_bytes(), original_device)
+                self.assertEqual((bindings / "agent_binding.json").read_bytes(), original_agent)
 
             try:
                 with (
@@ -391,7 +455,9 @@ class ContainerRuntimeTest(unittest.TestCase):
                     mock.patch.object(INSTALL, "release_manifest", return_value={"existing.txt": "x", "new.txt": "y"}),
                     mock.patch.object(INSTALL.shutil, "which", return_value="/usr/bin/docker"),
                     mock.patch.object(INSTALL.subprocess, "run"),
+                    mock.patch.object(INSTALL, "capture_runtime_state", return_value=runtime_snapshot) as capture_runtime,
                     mock.patch.object(INSTALL, "prepare_and_start", side_effect=fail_prepare),
+                    mock.patch.object(INSTALL, "restore_runtime_state", side_effect=restore_after_files) as restore_runtime,
                     mock.patch.dict(
                         INSTALL.os.environ,
                         {
@@ -418,6 +484,63 @@ class ContainerRuntimeTest(unittest.TestCase):
             self.assertFalse((target / "new.txt").exists())
             self.assertFalse((bindings / "agent_zero_no_tools_profile.json").exists())
             self.assertEqual((backup / "release-manifest.json").read_bytes(), b"old manifest")
+            capture_runtime.assert_called_once()
+            restore_runtime.assert_called_once_with(runtime_snapshot)
+
+    def test_installer_reports_false_when_runtime_rollback_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            target = root / "installed"
+            source.mkdir()
+            (source / "release-manifest.json").write_bytes(b"new manifest")
+            bindings = target / "deploy" / "bindings"
+            bindings.mkdir(parents=True)
+            (bindings / "device_binding.json").write_text(
+                json.dumps(
+                    {
+                        "device_id": "device-seo-01",
+                        "host": "seo-host",
+                        "hosting_profile": "client_server",
+                        "since": "2026-08-31T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            original_cwd = Path.cwd()
+            try:
+                with (
+                    mock.patch.object(INSTALL, "HERE", source),
+                    mock.patch.object(INSTALL, "TARGET", target),
+                    mock.patch.object(INSTALL, "BACKUPS", root / "backups"),
+                    mock.patch.object(INSTALL.os, "name", "posix"),
+                    mock.patch.object(INSTALL, "run_manifest_check", return_value=True),
+                    mock.patch.object(INSTALL, "release_manifest", return_value={}),
+                    mock.patch.object(INSTALL, "capture_runtime_state", return_value=root / "runtime-state.json"),
+                    mock.patch.object(INSTALL.shutil, "which", return_value="/usr/bin/docker"),
+                    mock.patch.object(INSTALL.subprocess, "run"),
+                    mock.patch.object(INSTALL, "prepare_and_start", side_effect=RuntimeError("health failed")),
+                    mock.patch.object(INSTALL, "restore_runtime_state", side_effect=RuntimeError("restore failed")),
+                    mock.patch.dict(
+                        INSTALL.os.environ,
+                        {
+                            "EXTELLA_AGENT_ID": "agent_seo_employee",
+                            "EXTELLA_APP_NAME": "Extella SEO Employee",
+                            "EXTELLA_APP_VERSION": "2.0.2",
+                        },
+                        clear=False,
+                    ),
+                    mock.patch("sys.stdout", output),
+                ):
+                    self.assertEqual(INSTALL.main(), 1)
+            finally:
+                os.chdir(original_cwd)
+
+            result = json.loads(output.getvalue())
+            self.assertEqual(result["code"], "install_or_deployment_failed")
+            self.assertFalse(result["rolled_back"])
+            self.assertFalse(result["runtime_rolled_back"])
 
     def test_gateway_allows_only_canonical_multi_target_reads(self) -> None:
         self.assertEqual(GATEWAY.request_target("product", "GET", "/api/targets"), "/api/targets")

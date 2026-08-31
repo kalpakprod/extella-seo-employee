@@ -90,11 +90,7 @@ class InstallTransaction:
     def backup(self) -> pathlib.Path | None:
         return self._backup
 
-    def _backup_for(self, path: pathlib.Path) -> pathlib.Path:
-        try:
-            relative = path.relative_to(TARGET)
-        except ValueError as error:
-            raise RuntimeError("transaction path escapes install target") from error
+    def _ensure_backup(self) -> pathlib.Path:
         if self._backup is None:
             BACKUPS.mkdir(parents=True, exist_ok=True)
             base = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -108,7 +104,17 @@ class InstallTransaction:
                 except FileExistsError:
                     candidate = BACKUPS / f"{base}-{suffix}"
                     suffix += 1
-        return self._backup / relative
+        return self._backup
+
+    def _backup_for(self, path: pathlib.Path) -> pathlib.Path:
+        try:
+            relative = path.relative_to(TARGET)
+        except ValueError as error:
+            raise RuntimeError("transaction path escapes install target") from error
+        return self._ensure_backup() / relative
+
+    def runtime_snapshot_path(self) -> pathlib.Path:
+        return self._ensure_backup() / "runtime-state.json"
 
     def track(self, path: pathlib.Path) -> None:
         if path in self._replaced or path in self._created or path in self._secret_replaced:
@@ -250,6 +256,37 @@ def prepare_and_start(device_binding: dict[str, str], agent_id: str) -> None:
     subprocess.run(command, check=True, cwd=TARGET, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def capture_runtime_state(transaction: InstallTransaction) -> pathlib.Path | None:
+    compose = TARGET / "deploy" / "compose.yaml"
+    if not compose.is_file():
+        return None
+    snapshot = transaction.runtime_snapshot_path()
+    command = (
+        sys.executable,
+        str(HERE / "deploy" / "prepare.py"),
+        "--capture-runtime-state",
+        "--compose-file",
+        str(compose),
+        "--runtime-state",
+        str(snapshot),
+    )
+    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return snapshot
+
+
+def restore_runtime_state(snapshot: pathlib.Path) -> None:
+    command = (
+        sys.executable,
+        str(HERE / "deploy" / "prepare.py"),
+        "--restore-runtime-state",
+        "--compose-file",
+        str(TARGET / "deploy" / "compose.yaml"),
+        "--runtime-state",
+        str(snapshot),
+    )
+    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
 def main() -> int:
     os.chdir(HERE)
     if not run_manifest_check(HERE / "MANIFEST.yaml"):
@@ -274,21 +311,33 @@ def main() -> int:
     if shutil.which("docker") is None:
         return emit("error", "missing_docker", model_called=False, agent_called=False, paid=False)
     transaction = InstallTransaction()
+    runtime_snapshot: pathlib.Path | None = None
+    prepare_started = False
     try:
         subprocess.run(("docker", "info"), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        runtime_snapshot = capture_runtime_state(transaction)
         install_payload(release_manifest(HERE), transaction)
         write_agent_binding(agent_id, transaction)
         transaction.track_prepare_outputs()
+        prepare_started = True
         prepare_and_start(device_binding, agent_id)
         transaction.commit()
     except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError):
         try:
             transaction.rollback()
-            rolled_back = True
+            files_rolled_back = True
         except OSError:
-            rolled_back = False
+            files_rolled_back = False
+        runtime_rolled_back = True
+        if files_rolled_back and prepare_started and runtime_snapshot is not None:
+            try:
+                restore_runtime_state(runtime_snapshot)
+            except (OSError, RuntimeError, subprocess.CalledProcessError):
+                runtime_rolled_back = False
+        rolled_back = files_rolled_back and runtime_rolled_back
         return emit("error", "install_or_deployment_failed", backup=str(transaction.backup) if transaction.backup else None,
-                    rolled_back=rolled_back, model_called=False, agent_called=False, paid=False)
+                    rolled_back=rolled_back, runtime_rolled_back=runtime_rolled_back,
+                    model_called=False, agent_called=False, paid=False)
     return emit("success", "installed_and_healthy", version="2.0.2", backup=str(transaction.backup) if transaction.backup else None,
                 model_called=False, agent_called=False, paid=False)
 

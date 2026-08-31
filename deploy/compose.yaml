@@ -6,7 +6,7 @@ x-container-logging: &container_logging
 
 services:
   seo-employee:
-    image: extella-seo-employee:2.0.1
+    image: extella-seo-employee:2.0.2
     build:
       context: ..
       dockerfile: runtime/product/Dockerfile
@@ -59,7 +59,7 @@ services:
       start_period: 10s
 
   api-gateway:
-    image: extella-seo-employee:2.0.1
+    image: extella-seo-employee:2.0.2
     entrypoint: [python, /opt/extella-seo-employee/runtime/product/gateway.py]
     command: []
     user: "10001:10001"
@@ -88,7 +88,7 @@ services:
       retries: 12
 
   agent-zero-proxy:
-    image: extella-seo-employee:2.0.1
+    image: extella-seo-employee:2.0.2
     entrypoint: [python, /opt/extella-seo-employee/runtime/product/gateway.py]
     command: []
     user: "10001:10001"

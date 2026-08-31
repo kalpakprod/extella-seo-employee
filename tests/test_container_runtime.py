@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import os
 import sys
 import tempfile
 import threading
@@ -222,6 +223,7 @@ class ContainerRuntimeTest(unittest.TestCase):
             output = io.StringIO()
             with (
                 mock.patch.object(INSTALL, "TARGET", target),
+                mock.patch.object(INSTALL, "BACKUPS", Path(directory) / "backups"),
                 mock.patch.object(INSTALL.os, "name", "posix"),
                 mock.patch.object(INSTALL, "run_manifest_check", return_value=True),
                 mock.patch.object(INSTALL, "release_manifest", return_value={}),
@@ -233,7 +235,7 @@ class ContainerRuntimeTest(unittest.TestCase):
                     {
                         "EXTELLA_AGENT_ID": "agent_seo_employee",
                         "EXTELLA_APP_NAME": "Extella SEO Employee",
-                        "EXTELLA_APP_VERSION": "2.0.1",
+                        "EXTELLA_APP_VERSION": "2.0.2",
                     },
                     clear=False,
                 ),
@@ -274,7 +276,7 @@ class ContainerRuntimeTest(unittest.TestCase):
                     {
                         "EXTELLA_AGENT_ID": "agent_seo_employee",
                         "EXTELLA_APP_NAME": "Extella SEO Employee",
-                        "EXTELLA_APP_VERSION": "2.0.1",
+                        "EXTELLA_APP_VERSION": "2.0.2",
                     },
                     clear=False,
                 ),
@@ -283,6 +285,139 @@ class ContainerRuntimeTest(unittest.TestCase):
                 self.assertEqual(INSTALL.main(), 1)
             install_payload.assert_not_called()
             self.assertEqual(json.loads(output.getvalue())["code"], "extella_device_binding_required")
+
+    def test_installer_rolls_back_replaced_and_created_payload_files_after_copy_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            target = root / "installed"
+            source.mkdir()
+            (source / "existing.txt").write_bytes(b"new existing")
+            (source / "new.txt").write_bytes(b"new file")
+            (source / "release-manifest.json").write_bytes(b"new manifest")
+            (target / "deploy" / "bindings").mkdir(parents=True)
+            (target / "existing.txt").write_bytes(b"old existing")
+            (target / "deploy" / "bindings" / "device_binding.json").write_text(
+                json.dumps(
+                    {
+                        "device_id": "device-seo-01",
+                        "host": "seo-host",
+                        "hosting_profile": "client_server",
+                        "since": "2026-08-31T00:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            original_copy = INSTALL.atomic_copy
+            original_cwd = Path.cwd()
+
+            def fail_mid_copy(source_path: Path, destination: Path) -> None:
+                if source_path == source / "new.txt":
+                    raise OSError("simulated payload copy failure")
+                original_copy(source_path, destination)
+
+            try:
+                with (
+                    mock.patch.object(INSTALL, "HERE", source),
+                    mock.patch.object(INSTALL, "TARGET", target),
+                    mock.patch.object(INSTALL, "BACKUPS", root / "backups"),
+                    mock.patch.object(INSTALL.os, "name", "posix"),
+                    mock.patch.object(INSTALL, "run_manifest_check", return_value=True),
+                    mock.patch.object(INSTALL, "release_manifest", return_value={"existing.txt": "x", "new.txt": "y"}),
+                    mock.patch.object(INSTALL, "atomic_copy", side_effect=fail_mid_copy),
+                    mock.patch.object(INSTALL.shutil, "which", return_value="/usr/bin/docker"),
+                    mock.patch.object(INSTALL.subprocess, "run"),
+                    mock.patch.dict(
+                        INSTALL.os.environ,
+                        {
+                            "EXTELLA_AGENT_ID": "agent_seo_employee",
+                            "EXTELLA_APP_NAME": "Extella SEO Employee",
+                            "EXTELLA_APP_VERSION": "2.0.2",
+                        },
+                        clear=False,
+                    ),
+                    mock.patch("sys.stdout", output),
+                ):
+                    self.assertEqual(INSTALL.main(), 1)
+            finally:
+                os.chdir(original_cwd)
+
+            result = json.loads(output.getvalue())
+            backup = Path(result["backup"])
+            self.assertEqual(result["code"], "install_or_deployment_failed")
+            self.assertTrue(result["rolled_back"])
+            self.assertEqual((target / "existing.txt").read_bytes(), b"old existing")
+            self.assertFalse((target / "new.txt").exists())
+            self.assertEqual((backup / "existing.txt").read_bytes(), b"old existing")
+            self.assertEqual(json.loads((backup / "rollback.json").read_text(encoding="utf-8"))["created"], ["new.txt"])
+
+    def test_installer_restores_manifest_and_prepare_bindings_after_prepare_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            target = root / "installed"
+            source.mkdir()
+            (source / "existing.txt").write_bytes(b"new existing")
+            (source / "new.txt").write_bytes(b"new file")
+            (source / "release-manifest.json").write_bytes(b"new manifest")
+            bindings = target / "deploy" / "bindings"
+            bindings.mkdir(parents=True)
+            original_device = (
+                b'{"device_id":"device-seo-01","host":"seo-host",'
+                b'"hosting_profile":"client_server","since":"old"}\n'
+            )
+            original_agent = b'{"agent_id":"agent_previous"}\n'
+            (target / "existing.txt").write_bytes(b"old existing")
+            (target / "release-manifest.json").write_bytes(b"old manifest")
+            (bindings / "device_binding.json").write_bytes(original_device)
+            (bindings / "agent_binding.json").write_bytes(original_agent)
+            output = io.StringIO()
+            original_cwd = Path.cwd()
+
+            def fail_prepare(_device_binding: dict[str, str], _agent_id: str) -> None:
+                (bindings / "device_binding.json").write_bytes(b"changed device")
+                (bindings / "agent_binding.json").write_bytes(b"changed agent")
+                (bindings / "agent_zero_no_tools_profile.json").write_bytes(b"new assertion")
+                raise RuntimeError("simulated prepare failure")
+
+            try:
+                with (
+                    mock.patch.object(INSTALL, "HERE", source),
+                    mock.patch.object(INSTALL, "TARGET", target),
+                    mock.patch.object(INSTALL, "BACKUPS", root / "backups"),
+                    mock.patch.object(INSTALL.os, "name", "posix"),
+                    mock.patch.object(INSTALL, "run_manifest_check", return_value=True),
+                    mock.patch.object(INSTALL, "release_manifest", return_value={"existing.txt": "x", "new.txt": "y"}),
+                    mock.patch.object(INSTALL.shutil, "which", return_value="/usr/bin/docker"),
+                    mock.patch.object(INSTALL.subprocess, "run"),
+                    mock.patch.object(INSTALL, "prepare_and_start", side_effect=fail_prepare),
+                    mock.patch.dict(
+                        INSTALL.os.environ,
+                        {
+                            "EXTELLA_AGENT_ID": "agent_seo_employee",
+                            "EXTELLA_APP_NAME": "Extella SEO Employee",
+                            "EXTELLA_APP_VERSION": "2.0.2",
+                        },
+                        clear=False,
+                    ),
+                    mock.patch("sys.stdout", output),
+                ):
+                    self.assertEqual(INSTALL.main(), 1)
+            finally:
+                os.chdir(original_cwd)
+
+            result = json.loads(output.getvalue())
+            backup = Path(result["backup"])
+            self.assertEqual(result["code"], "install_or_deployment_failed")
+            self.assertTrue(result["rolled_back"])
+            self.assertEqual((target / "existing.txt").read_bytes(), b"old existing")
+            self.assertEqual((target / "release-manifest.json").read_bytes(), b"old manifest")
+            self.assertEqual((bindings / "device_binding.json").read_bytes(), original_device)
+            self.assertEqual((bindings / "agent_binding.json").read_bytes(), original_agent)
+            self.assertFalse((target / "new.txt").exists())
+            self.assertFalse((bindings / "agent_zero_no_tools_profile.json").exists())
+            self.assertEqual((backup / "release-manifest.json").read_bytes(), b"old manifest")
 
     def test_gateway_allows_only_canonical_multi_target_reads(self) -> None:
         self.assertEqual(GATEWAY.request_target("product", "GET", "/api/targets"), "/api/targets")

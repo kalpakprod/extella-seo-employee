@@ -31,6 +31,6 @@ The minimal, self-tested upstream correction is recorded in `patches/extella-age
 
 The documented Extella installer environment supplies `EXTELLA_AGENT_ID`, `EXTELLA_APP_NAME` and `EXTELLA_APP_VERSION`, but no stable device identifier. SEO Employee therefore cannot invent a first-device binding. Installation is fully automatic only after a verified `device_binding.json` exists; first-device enrollment remains an explicit `prepare.py --device-id ...` step until the platform supplies a documented device ID or another authoritative binding route.
 
-The CT160 `2.0.1` deployment used the explicitly verified local Extella value `7e99c478-d104-412c-aef0-adceca7b8718`. This closes that deployment's binding, but does not remove the generic first-install platform gap.
+The CT160 `2.0.2` deployment uses the explicitly verified local Extella value `7e99c478-d104-412c-aef0-adceca7b8718`. This closes that deployment's binding, but does not remove the generic first-install platform gap.
 
 No product code claims that this external blocker is closed.

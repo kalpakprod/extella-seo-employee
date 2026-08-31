@@ -1,5 +1,6 @@
 * text=auto eol=lf
 *.svg text eol=lf
-manifest_check.py -text
+manifest_check.py -text -eol -whitespace
+*.patch -whitespace
 *.png binary
 *.zip binary

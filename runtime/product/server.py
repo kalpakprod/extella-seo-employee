@@ -22,7 +22,7 @@ from seo_employee_schedule import CONFIG_PATH, seo_employee_schedule  # noqa: E4
 from seo_employee_state import list_target_states, seo_employee_state  # noqa: E402
 
 
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 MAX_BODY_BYTES = 16_384
 TOKEN_FILE = pathlib.Path(os.environ.get("EXTELLA_SEO_API_TOKEN_FILE", "/run/secrets/seo_employee_api_token"))
 RUN_DEADLINE_SECONDS = 180.0

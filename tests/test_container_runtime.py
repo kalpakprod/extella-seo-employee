@@ -217,17 +217,21 @@ class ContainerRuntimeTest(unittest.TestCase):
                 ],
                 "health_url": "http://127.0.0.1:9191/health",
             }
-            with mock.patch.object(PREPARE, "run") as run, mock.patch.object(PREPARE, "wait_for_product_health") as health:
+            with (
+                mock.patch.object(PREPARE, "run") as run,
+                mock.patch.object(PREPARE, "wait_for_product_health") as health,
+                mock.patch.dict(PREPARE.os.environ, {"SEO_EMPLOYEE_PORT": "8088"}, clear=False),
+            ):
                 PREPARE.restore_runtime_state(state, compose)
         self.assertEqual(
-            run.call_args_list,
-            [
-                mock.call("docker", "tag", "sha256:" + "a" * 64, "extella-seo-employee:2.0.1"),
-                mock.call(
-                    "docker", "compose", "--project-name", "extella-seo-employee", "-f", str(compose), "up", "-d"
-                ),
-            ],
+            run.call_args_list[0],
+            mock.call("docker", "tag", "sha256:" + "a" * 64, "extella-seo-employee:2.0.1"),
         )
+        self.assertEqual(
+            run.call_args_list[1].args,
+            ("docker", "compose", "--project-name", "extella-seo-employee", "-f", str(compose), "up", "-d"),
+        )
+        self.assertEqual(run.call_args_list[1].kwargs["env"]["SEO_EMPLOYEE_PORT"], "9191")
         health.assert_called_once_with(url="http://127.0.0.1:9191/health")
 
     def test_prepare_captures_the_existing_api_gateway_loopback_port(self) -> None:
@@ -292,7 +296,7 @@ class ContainerRuntimeTest(unittest.TestCase):
                     {
                         "EXTELLA_AGENT_ID": "agent_seo_employee",
                         "EXTELLA_APP_NAME": "Extella SEO Employee",
-                        "EXTELLA_APP_VERSION": "2.0.2",
+                        "EXTELLA_APP_VERSION": "2.0.3",
                     },
                     clear=False,
                 ),
@@ -333,7 +337,7 @@ class ContainerRuntimeTest(unittest.TestCase):
                     {
                         "EXTELLA_AGENT_ID": "agent_seo_employee",
                         "EXTELLA_APP_NAME": "Extella SEO Employee",
-                        "EXTELLA_APP_VERSION": "2.0.2",
+                        "EXTELLA_APP_VERSION": "2.0.3",
                     },
                     clear=False,
                 ),
@@ -390,7 +394,7 @@ class ContainerRuntimeTest(unittest.TestCase):
                         {
                             "EXTELLA_AGENT_ID": "agent_seo_employee",
                             "EXTELLA_APP_NAME": "Extella SEO Employee",
-                            "EXTELLA_APP_VERSION": "2.0.2",
+                            "EXTELLA_APP_VERSION": "2.0.3",
                         },
                         clear=False,
                     ),
@@ -463,7 +467,7 @@ class ContainerRuntimeTest(unittest.TestCase):
                         {
                             "EXTELLA_AGENT_ID": "agent_seo_employee",
                             "EXTELLA_APP_NAME": "Extella SEO Employee",
-                            "EXTELLA_APP_VERSION": "2.0.2",
+                            "EXTELLA_APP_VERSION": "2.0.3",
                         },
                         clear=False,
                     ),
@@ -527,7 +531,7 @@ class ContainerRuntimeTest(unittest.TestCase):
                         {
                             "EXTELLA_AGENT_ID": "agent_seo_employee",
                             "EXTELLA_APP_NAME": "Extella SEO Employee",
-                            "EXTELLA_APP_VERSION": "2.0.2",
+                            "EXTELLA_APP_VERSION": "2.0.3",
                         },
                         clear=False,
                     ),

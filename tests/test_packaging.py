@@ -36,7 +36,7 @@ class PackagingTest(unittest.TestCase):
 
     def test_runtime_payload_contains_installer_and_canonical_manifest_check(self) -> None:
         payload = RELEASE.payload_files()
-        self.assertEqual(RELEASE.VERSION, "2.0.2")
+        self.assertEqual(RELEASE.VERSION, "2.0.3")
         for relative in (
             ".gitattributes",
             "README.md",

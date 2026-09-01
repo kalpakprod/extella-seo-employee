@@ -180,7 +180,7 @@ def _state_document(
         "config": config,
         "last_report": None,
         "enabled": config is not None,
-        "active_version": "2.0.2",
+        "active_version": "2.0.3",
         "last_run": None,
         "last_result": "failed" if error else None,
         "last_error": error,
@@ -217,7 +217,7 @@ def _upgrade_state(
     result["config"] = config
     result.setdefault("last_report", None)
     result["enabled"] = config is not None
-    result["active_version"] = "2.0.2"
+    result["active_version"] = "2.0.3"
     result.setdefault(
         "last_run",
         {"at": updated_at, "kind": "unknown"} if isinstance(run_id, str) and run_id else None,

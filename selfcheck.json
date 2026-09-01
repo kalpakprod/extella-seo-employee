@@ -2,19 +2,19 @@
   "schema": "extella.selfcheck/v1",
   "product": {
     "name": "extella-seo-employee",
-    "version": "2.0.2"
+    "version": "2.0.3"
   },
   "artifact": {
     "kind": "archive",
-    "name": "extella-seo-employee-runtime-2.0.2.zip",
-    "sha256": "a1c0f75f423571002184309a30cd470435cbd881d781d72c76c03f457ecf17c7"
+    "name": "extella-seo-employee-runtime-2.0.3.zip",
+    "sha256": "c8beb28977c472de3a9e0554e07633d3ab597edb461b56a1190974e7a447566c"
   },
   "page_artifact": {
     "kind": "archive",
-    "name": "extella-seo-employee-page-2.0.2.zip",
-    "sha256": "a9fc534a19211f679448468af1b4829add387a0d8b23a89eeff26f1f8ddb3e37"
+    "name": "extella-seo-employee-page-2.0.3.zip",
+    "sha256": "7ccaf62c79761079b1e0d3304a83afa51dbe0900cab2584c28a3afd7a4ac5dba"
   },
-  "ran_at": "2026-08-31T09:53:33Z",
+  "ran_at": "2026-09-01T09:49:01Z",
   "runner": {
     "where": "author-device and CT160",
     "runtime": "Python 3.11 and Node.js"
@@ -25,74 +25,66 @@
     {
       "name": "archive_hashes_match_build",
       "status": "pass",
-      "detail": "The 2.0.2 runtime and page SHA-256 values match dist/build.json."
+      "detail": "The 2.0.3 runtime and page SHA-256 values match dist/build.json and reproduce across two builds."
     },
     {
-      "name": "local_python_suite",
+      "name": "local_release_suites",
       "status": "pass",
-      "detail": "181 Python tests passed."
+      "detail": "181 Python tests passed; 62 Node tests passed and 2 Linux-only cancellation tests were skipped on Windows."
     },
     {
-      "name": "local_node_suite",
+      "name": "ct160_exact_archive",
       "status": "pass",
-      "detail": "62 Node tests passed; 2 Linux-only cancellation tests were skipped on Windows."
+      "detail": "The exact 2.0.3 runtime archive passed its manifest check, self-check, 181 Python tests and Node 64/64 on CT160."
     },
     {
-      "name": "ct160_clean_runtime",
+      "name": "ct160_live_runtime",
       "status": "pass",
-      "detail": "The exact 2.0.2 runtime archive passed 181 Python tests and Node 64/64 on CT160."
-    },
-    {
-      "name": "ct160_device_binding",
-      "status": "pass",
-      "detail": "The live API reports active_version 2.0.2 and device_id 7e99c478-d104-412c-aef0-adceca7b8718; seven Compose services are running, six with healthy status and the no-healthcheck proxy running."
+      "detail": "The live API and state report version 2.0.3; state is ready, model preflight passed, seven Compose services are running and all six healthchecked services are healthy."
     },
     {
       "name": "ct160_backup_before_upgrade",
       "status": "pass",
-      "detail": "Snapshot 20260831T092655Z-7f4341f1 passed verify and temporary restore-check before the 2.0.2 upgrade."
+      "detail": "Snapshot 20260901T092906Z-6f417c1e passed verify and temporary restore-check before the 2.0.3 upgrade."
     },
     {
       "name": "ct160_runtime_rollback_probe",
       "status": "pass",
-      "detail": "The final archive captured the live Compose project, four image states and loopback port 18092, restored them idempotently, and returned health version 2.0.2."
+      "detail": "The exact archive captured four live image states and loopback port 18092, restored without a pre-set SEO_EMPLOYEE_PORT, and returned health version 2.0.3."
     },
     {
-      "name": "standards_archive_self_check",
+      "name": "standards_gates",
       "status": "pass",
-      "detail": "The pinned standards self-check passed against the extracted 2.0.2 runtime archive and went red after its negative-control mutation."
+      "detail": "The exact archive self-check protocol went red under its negative control; code canon passed across 19 source files and both README files passed the writing-style gate."
     },
     {
-      "name": "standards_code_canon",
+      "name": "omniroute_model_matrix",
       "status": "pass",
-      "detail": "The pinned check_code_canon gate reported no findings across 59 source files."
-    },
-    {
-      "name": "standards_product_surfaces",
-      "status": "pass",
-      "detail": "Automation passport, waiting state, listing metadata, brand copy and generic state contract passed."
+      "detail": "Sixteen canonical text models were probed through Agent Zero: one has full API E2E, eight additional routes passed one contract smoke test, one was unstable and six failed or timed out."
     }
   ],
   "negative_control": {
     "ran": true,
-    "mutation": "deploy/backup.py:create_snapshot",
+    "mutation": "exact runtime archive: deploy/backup.py:create_snapshot",
     "self_check_went_red": true
   },
   "ct160_deployment": {
-    "source_root": "/opt/extella-seo-release-v202",
-    "verified_archive_root": "/opt/extella-seo-release-v202-final",
+    "source_root": "/opt/extella-seo-release-v203-final-20260901/runtime",
+    "verified_archive_root": "/opt/extella-seo-release-v203-final-20260901/runtime",
     "compose_project": "extella-seo-release-v2",
     "loopback_api": "127.0.0.1:18092",
     "device_id": "7e99c478-d104-412c-aef0-adceca7b8718",
-    "rollback_image": "sha256:34e153d6ba211e7840d6075df2a719cd90560c3c6cff4b0f5bdac349f3116cf6",
-    "backup_snapshot": "/mnt/usbdata/extella-seo-backups-v2/20260831T092655Z-7f4341f1"
+    "product_image": "sha256:4248424ebbf7409cfd62c5141c7992514e2dc4073cee1a96c3143413f474e34a",
+    "backup_snapshot": "/mnt/usbdata/extella-seo-backups-v2/20260901T092906Z-6f417c1e"
   },
-  "ct160_verification": "dist/ct160-verification-v202.json",
+  "ct160_verification": "dist/ct160-verification-v203.json",
   "not_verified": [
     "A clean Extella OS prerelease purchase and first-device installation",
     "An authoritative first-device ID supplied to install.py by the platform",
-    "Acceptance of the two upstream standards gate corrections",
+    "Acceptance of the upstream standards gate corrections",
     "An end-to-end audit of a user-owned domain",
-    "Agent Zero authentication through consumer subscription or BYOK"
+    "A full product API E2E for models that passed only the contract smoke test",
+    "Agent Zero authentication through consumer subscription or BYOK",
+    "Market demand, unit economics and a public production SLA"
   ]
 }

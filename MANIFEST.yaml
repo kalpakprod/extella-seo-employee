@@ -1,5 +1,5 @@
 name: extella-seo-employee
-version: "2.0.2"
+version: "2.0.3"
 platform: linux-amd64/docker-compose
 install: python3 install.py
 self_check: python tools/selfcheck.py

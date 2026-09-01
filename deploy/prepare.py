@@ -36,8 +36,8 @@ AGENT_ZERO_IMAGE = "agent0ai/agent-zero@sha256:9b65805d59b3dab7e14a5e732f6738621
 PROFILE_FILES = ("plugins/_tool_access/config.json", "plugins/_skills/config.json")
 RUNTIME_STATE_SCHEMA = "extella.seo_employee_runtime_state.v1"
 
-def run(*args: str, capture: bool = False) -> str:
-    result = subprocess.run(args, check=True, text=True, capture_output=capture)
+def run(*args: str, capture: bool = False, env: dict[str, str] | None = None) -> str:
+    result = subprocess.run(args, check=True, text=True, capture_output=capture, env=env)
     return result.stdout.strip() if capture else ""
 
 def atomic_write(path: pathlib.Path, data: bytes, mode: int = 0o644) -> None:
@@ -206,6 +206,9 @@ def restore_runtime_state(state: object, compose: pathlib.Path) -> None:
     if not isinstance(project, str) or not PROJECT_RE.fullmatch(project) or not isinstance(images, list) or not images:
         raise RuntimeError("runtime rollback state is invalid")
     health_url = validate_loopback_health_url(health_url)
+    health_match = LOOPBACK_HEALTH_RE.fullmatch(health_url)
+    if health_match is None:
+        raise RuntimeError("runtime loopback health URL is invalid")
     for image in images:
         if not isinstance(image, dict):
             raise RuntimeError("runtime rollback image state is invalid")
@@ -214,7 +217,9 @@ def restore_runtime_state(state: object, compose: pathlib.Path) -> None:
             raise RuntimeError("runtime rollback image state is invalid")
         if "@sha256:" not in reference:
             run("docker", "tag", image_id, reference)
-    run(*compose_command(compose, project), "up", "-d")
+    environment = os.environ.copy()
+    environment["SEO_EMPLOYEE_PORT"] = health_match.group(2)
+    run(*compose_command(compose, project), "up", "-d", env=environment)
     wait_for_product_health(url=health_url)
 
 

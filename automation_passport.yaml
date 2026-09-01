@@ -1,5 +1,5 @@
 ---
-# Release contract v2.0.2. Живые доказательства перечисляются отдельно от обещаний.
+# Release contract v2.0.3. Живые доказательства перечисляются отдельно от обещаний.
 automation:
   automation_id: "extella_seo_employee"
   name:
@@ -7,7 +7,7 @@ automation:
     en: "SEO Employee: Audit and Monitoring"
   owner: "Максим"
   business_goal: "по запросу и раз в сутки выполнять подтверждаемый технический SEO-аудит нескольких целей до 100 страниц с пятью детерминированными профилями и выдавать проверяемые задачи"
-  version: "2.0.2"
+  version: "2.0.3"
   languages: ["ru", "en"]
   hosting_profile: "client_server"
   app_scopes: ["expert.run", "device.run"]

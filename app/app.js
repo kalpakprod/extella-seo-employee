@@ -1,6 +1,6 @@
 // ожидание: фоновая задача; состояние страницы обновляется одной ограниченной цепочкой.
 (() => {
-  const PANEL_VERSION = '2.0.2';
+  const PANEL_VERSION = '2.0.3';
   const EXPERT_RUN = 'seo_employee_run';
   const EXPERT_STATE = 'seo_employee_state';
   const STATE_VIEWS = ['empty', 'running', 'failed', 'result'];

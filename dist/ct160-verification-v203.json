@@ -1,0 +1,103 @@
+{
+  "schema": "extella.seo_employee_ct160_verification.v203",
+  "verified_at": "2026-09-01T09:49:01Z",
+  "version": "2.0.3",
+  "scope": "OmniRoute compatibility documentation and rollback port restoration",
+  "artifacts": {
+    "runtime": {
+      "file": "extella-seo-employee-runtime-2.0.3.zip",
+      "sha256": "c8beb28977c472de3a9e0554e07633d3ab597edb461b56a1190974e7a447566c"
+    },
+    "page": {
+      "file": "extella-seo-employee-page-2.0.3.zip",
+      "sha256": "7ccaf62c79761079b1e0d3304a83afa51dbe0900cab2584c28a3afd7a4ac5dba"
+    }
+  },
+  "local_checks": {
+    "python_unittest": {"tests": 181, "passed": 181, "failed": 0},
+    "node_test": {"tests": 64, "passed": 62, "failed": 0, "skipped": 2, "skip_scope": "Linux process-group cancellation"},
+    "deterministic_build": "pass",
+    "self_check": "ready"
+  },
+  "ct160": {
+    "source_root": "/opt/extella-seo-release-v203-final-20260901/runtime",
+    "compose_project": "extella-seo-release-v2",
+    "loopback_api": "127.0.0.1:18092",
+    "api_version": "2.0.3",
+    "device_id": "7e99c478-d104-412c-aef0-adceca7b8718",
+    "services_running": 7,
+    "healthchecked_services_healthy": 6,
+    "product_image": "sha256:4248424ebbf7409cfd62c5141c7992514e2dc4073cee1a96c3143413f474e34a",
+    "exact_archive": {
+      "manifest_check": "pass",
+      "self_check": "ready",
+      "python_unittest": {"tests": 181, "passed": 181, "failed": 0},
+      "node_test": {"tests": 64, "passed": 64, "failed": 0, "skipped": 0}
+    },
+    "live_probe": {
+      "health": "pass",
+      "state": "ready",
+      "last_result": "ok",
+      "model_preflight": "pass"
+    },
+    "backup": {
+      "snapshot": "/mnt/usbdata/extella-seo-backups-v2/20260901T092906Z-6f417c1e",
+      "verify": "pass",
+      "restore_check": "restore-check-ok",
+      "restore_check_scope": "temporary_only"
+    },
+    "runtime_rollback_probe": {
+      "schema": "extella.seo_employee_runtime_state.v1",
+      "project": "extella-seo-release-v2",
+      "health_url": "http://127.0.0.1:18092/health",
+      "captured_images": 4,
+      "restore_without_port_environment": "pass",
+      "post_restore_health_version": "2.0.3"
+    }
+  },
+  "model_matrix": {
+    "tested": 16,
+    "full_api_e2e": ["agy/gemini-3.7-flash-high"],
+    "contract_smoke_pass": [
+      "agy/gemini-3.7-flash-low",
+      "agy/gemini-3.1-pro-low",
+      "claude/claude-sonnet-5",
+      "claude/claude-opus-5",
+      "codex/gpt-5.6-luna-medium",
+      "codex/gpt-5.6-terra-medium",
+      "or/qwen/qwen3.7-flash",
+      "apipass/claude-opus-5"
+    ],
+    "unstable": ["gq/qwen/qwen3.6-27b"],
+    "failed_or_timed_out": [
+      "claude/claude-haiku-4-5-20251001",
+      "codex/gpt-5.6-sol-medium",
+      "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "qwen1/qwen3.7-plus",
+      "qwen2/qwen3.7-plus",
+      "xai-oauth/grok-4.5"
+    ],
+    "catalog_aliases_not_exhaustively_tested": 2299
+  },
+  "standards": {
+    "exact_archive_self_check": "pass",
+    "negative_control": "pass",
+    "code_canon_files": 19,
+    "code_canon": "pass",
+    "readme_writing_style": "pass",
+    "upstream_pr": "https://github.com/AnvarBakiyev/extella-agent-standards/pull/27",
+    "upstream_acceptance": "pending"
+  },
+  "predecessor_evidence": {
+    "record": "dist/ct160-verification-v202.json",
+    "note": "The SEO audit core is unchanged; v2.0.3 adds model-route evidence and fixes rollback restoration of a non-default loopback port."
+  },
+  "not_verified": [
+    "A clean Extella OS prerelease purchase and first-device installation",
+    "A generic authoritative first-device ID supplied by the platform installer environment",
+    "An end-to-end audit of a user-owned domain",
+    "A full product API E2E for the eight additional contract-smoke routes",
+    "Agent Zero authentication through consumer subscription or BYOK",
+    "Market demand, unit economics and a public production SLA"
+  ]
+}

@@ -14,13 +14,13 @@
 
 | Проверка | Результат |
 |---|---|
-| Локальные тесты | Python `168/168`; Node `62/64`, ещё 2 Linux-only теста пропущены на Windows |
-| Чистый запуск на CT160 | Python `168/168`; Node `64/64`; 7 сервисов healthy |
+| Локальные тесты | Python `181/181`; Node `62/64`, ещё 2 Linux-only теста пропущены на Windows |
+| Чистый запуск на CT160 | Python `181/181`; Node `64/64`; 7 сервисов работают, 6 healthchecked-сервисов healthy |
 | Полный API E2E | CrawlSEO `25/25`; SEOmator `25/25` + 5 browser samples; Agent Zero `10/10`; создано 10 задач |
 | Безопасность цели | Приватные адреса блокируются на фактической границе загрузки; владение сайтом подтверждается до аудита |
-| Независимая проверка | OpenExecutive: `SHIP_CLOSED_PILOT`, severity `low`; финальный Sol review: `REVIEW_APPROVED`, без P0/P1 |
+| Независимая проверка | OpenExecutive: `SHIP_CLOSED_PILOT`, severity `medium`; финальный Sol review: `REVIEW_APPROVED`, без P0/P1 |
 
-Полный протокол: [`dist/ct160-verification-v202.json`](https://github.com/kalpakprod/extella-seo-employee/blob/main/dist/ct160-verification-v202.json). Финальный аудит закрытого пилота: [`reviews/universal-seo-employee-v2-final-review.md`](./reviews/universal-seo-employee-v2-final-review.md).
+Полный протокол: [`dist/ct160-verification-v203.json`](https://github.com/kalpakprod/extella-seo-employee/blob/main/dist/ct160-verification-v203.json). Финальный аудит закрытого пилота: [`reviews/universal-seo-employee-v2-final-review.md`](./reviews/universal-seo-employee-v2-final-review.md).
 
 ## Что делает сотрудник
 
@@ -69,10 +69,24 @@ python3 deploy/probe.py state
 
 API продукта доступен только на `http://127.0.0.1:8088`. Для хостинга нужен отдельный TLS reverse proxy и внешняя аутентификация. Полная инструкция, включая подключение существующего Agent Zero: [`deploy/README.md`](./deploy/README.md).
 
+## Совместимость моделей OmniRoute
+
+1 сентября 2026 года 16 канонических текстовых моделей были проверены через реальный Agent Zero с профилем `seo_employee_no_tools` и точным JSON-контрактом model enrichment.
+
+| Статус | Модели |
+|---|---|
+| Полный API E2E | `agy/gemini-3.7-flash-high` |
+| Контрактный smoke-test пройден | `agy/gemini-3.7-flash-low`, `agy/gemini-3.1-pro-low`, `claude/claude-sonnet-5`, `claude/claude-opus-5`, `codex/gpt-5.6-luna-medium`, `codex/gpt-5.6-terra-medium`, `or/qwen/qwen3.7-flash`, `apipass/claude-opus-5` |
+| Нестабильно | `gq/qwen/qwen3.6-27b`: один ответ нарушил JSON-контракт, повторный вызов прошёл |
+| Ошибка маршрута или ответа | `claude/claude-haiku-4-5-20251001`: несовместимая thinking-конфигурация OmniRoute; `codex/gpt-5.6-sol-medium`: Agent Zero остановился после пяти непригодных ответов |
+| Timeout больше 90 секунд | `nvidia/nvidia/nemotron-3-super-120b-a12b`, `qwen1/qwen3.7-plus`, `qwen2/qwen3.7-plus`, `xai-oauth/grok-4.5` |
+
+Smoke-test подтверждает транспорт Agent Zero и формат одного model-enrichment ответа. Он не заменяет полный аудит через API продукта. Каталог OmniRoute содержит 2299 алиасов; batch-, effort-, image-, audio- и прочие дубли не проверялись. Все модели вне таблицы остаются неподтверждёнными.
+
 ## Границы релиза
 
 - Сотрудник **не** изменяет сайт, не публикует контент, не делает outreach и не покупает ссылки.
-- Подтверждён маршрут `agy/gemini-3.7-flash-high`. Любая модель, пользовательская подписка и BYOK остаются неподтверждёнными до отдельного E2E; автоматического fallback между моделями нет.
+- Полный API E2E подтверждён только для `agy/gemini-3.7-flash-high`. Другие успешные маршруты из матрицы требуют собственного полного E2E; пользовательская подписка и BYOK не подтверждены. Автоматического fallback между моделями нет.
 - OAuth для Google Search Console и DataForSEO, результаты на домене design partner, спрос, ROI, выручка и production SLA пока не подтверждены.
 - Вердикт относится к закрытому пилоту, а не к публичному production-запуску.
 

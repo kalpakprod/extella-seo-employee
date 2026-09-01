@@ -152,7 +152,7 @@ class InstallTransaction:
             return
         rollback = {
             "target": str(TARGET),
-            "release": "2.0.2",
+            "release": "2.0.3",
             "replaced": sorted(str(path.relative_to(TARGET)) for path in self._replaced),
             "created": sorted(str(path.relative_to(TARGET)) for path in self._created),
         }
@@ -338,7 +338,7 @@ def main() -> int:
         return emit("error", "install_or_deployment_failed", backup=str(transaction.backup) if transaction.backup else None,
                     rolled_back=rolled_back, runtime_rolled_back=runtime_rolled_back,
                     model_called=False, agent_called=False, paid=False)
-    return emit("success", "installed_and_healthy", version="2.0.2", backup=str(transaction.backup) if transaction.backup else None,
+    return emit("success", "installed_and_healthy", version="2.0.3", backup=str(transaction.backup) if transaction.backup else None,
                 model_called=False, agent_called=False, paid=False)
 
 

@@ -14,13 +14,13 @@ Status: **`SHIP_CLOSED_PILOT`**. The system is ready for a closed pilot, but is 
 
 | Check | Result |
 |---|---|
-| Local tests | Python `168/168`; Node `62/64`, with 2 Linux-only tests skipped on Windows |
-| Clean CT160 run | Python `168/168`; Node `64/64`; 7 services healthy |
+| Local tests | Python `181/181`; Node `62/64`, with 2 Linux-only tests skipped on Windows |
+| Clean CT160 run | Python `181/181`; Node `64/64`; 7 services running and all 6 healthchecked services healthy |
 | Full API E2E | CrawlSEO `25/25`; SEOmator `25/25` + 5 browser samples; Agent Zero `10/10`; 10 tasks created |
 | Target safety | Private addresses are blocked at the actual fetch boundary; site ownership is confirmed before an audit |
-| Independent review | OpenExecutive: `SHIP_CLOSED_PILOT`, severity `low`; final Sol review: `REVIEW_APPROVED`, no P0/P1 |
+| Independent review | OpenExecutive: `SHIP_CLOSED_PILOT`, severity `medium`; final Sol review: `REVIEW_APPROVED`, no P0/P1 |
 
-Full verification record: [`dist/ct160-verification-v202.json`](https://github.com/kalpakprod/extella-seo-employee/blob/main/dist/ct160-verification-v202.json). Closed-pilot final audit: [`reviews/universal-seo-employee-v2-final-review.md`](./reviews/universal-seo-employee-v2-final-review.md).
+Full verification record: [`dist/ct160-verification-v203.json`](https://github.com/kalpakprod/extella-seo-employee/blob/main/dist/ct160-verification-v203.json). Closed-pilot final audit: [`reviews/universal-seo-employee-v2-final-review.md`](./reviews/universal-seo-employee-v2-final-review.md).
 
 ## What the worker does
 
@@ -69,10 +69,24 @@ python3 deploy/probe.py state
 
 The product API listens only on `http://127.0.0.1:8088`. Hosting requires a separate TLS reverse proxy and external authentication. See [`deploy/README.md`](./deploy/README.md) for the complete procedure, including an existing Agent Zero deployment.
 
+## OmniRoute model compatibility
+
+On September 1, 2026, 16 canonical text models were tested through a live Agent Zero instance with the `seo_employee_no_tools` profile and the exact model-enrichment JSON contract.
+
+| Status | Models |
+|---|---|
+| Full API E2E | `agy/gemini-3.7-flash-high` |
+| Contract smoke test passed | `agy/gemini-3.7-flash-low`, `agy/gemini-3.1-pro-low`, `claude/claude-sonnet-5`, `claude/claude-opus-5`, `codex/gpt-5.6-luna-medium`, `codex/gpt-5.6-terra-medium`, `or/qwen/qwen3.7-flash`, `apipass/claude-opus-5` |
+| Unstable | `gq/qwen/qwen3.6-27b`: one response violated the JSON contract; the retry passed |
+| Route or response failure | `claude/claude-haiku-4-5-20251001`: incompatible OmniRoute thinking configuration; `codex/gpt-5.6-sol-medium`: Agent Zero stopped after five unusable responses |
+| Timeout over 90 seconds | `nvidia/nvidia/nemotron-3-super-120b-a12b`, `qwen1/qwen3.7-plus`, `qwen2/qwen3.7-plus`, `xai-oauth/grok-4.5` |
+
+The smoke test verifies Agent Zero transport and the format of one model-enrichment response. It does not replace a full audit through the product API. The OmniRoute catalog contains 2,299 aliases; batch, effort, image, audio, and other duplicates were not tested. Models outside this table remain unverified.
+
 ## Release boundaries
 
 - The worker does **not** change the website, publish content, perform outreach, or buy links.
-- Only `agy/gemini-3.7-flash-high` has a verified route. Arbitrary models, consumer subscriptions, and BYOK remain unverified until a separate E2E; there is no automatic model fallback.
+- Only `agy/gemini-3.7-flash-high` has passed a full API E2E. Other successful routes in the matrix still require their own full E2E; consumer subscriptions and BYOK remain unverified. There is no automatic model fallback.
 - Google Search Console and DataForSEO OAuth, design-partner domain results, demand, ROI, revenue, and production SLA are not verified yet.
 - The verdict covers a closed pilot, not a public production launch.
 

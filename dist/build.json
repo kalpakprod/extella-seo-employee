@@ -1,15 +1,15 @@
 {
   "artifacts": {
     "page": {
-      "file": "extella-seo-employee-page-2.0.2.zip",
-      "sha256": "a9fc534a19211f679448468af1b4829add387a0d8b23a89eeff26f1f8ddb3e37"
+      "file": "extella-seo-employee-page-2.0.3.zip",
+      "sha256": "7ccaf62c79761079b1e0d3304a83afa51dbe0900cab2584c28a3afd7a4ac5dba"
     },
     "runtime": {
-      "file": "extella-seo-employee-runtime-2.0.2.zip",
-      "sha256": "a1c0f75f423571002184309a30cd470435cbd881d781d72c76c03f457ecf17c7"
+      "file": "extella-seo-employee-runtime-2.0.3.zip",
+      "sha256": "c8beb28977c472de3a9e0554e07633d3ab597edb461b56a1190974e7a447566c"
     }
   },
   "payload_files": 89,
   "status": "success",
-  "version": "2.0.2"
+  "version": "2.0.3"
 }

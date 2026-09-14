@@ -1,0 +1,888 @@
+{
+ "config": {
+  "target_id": "target-books-toscrape-com-d142438e",
+  "target_name": "Toscrape Books",
+  "site_url": "https://books.toscrape.com/",
+  "profile": "service_b2b",
+  "language": "ru",
+  "region": "GLOBAL",
+  "site_type": "website",
+  "business_goal": "organic_visibility",
+  "daily_run_time": "03:00",
+  "timezone": "UTC",
+  "max_pages": 25,
+  "ownership_confirmed": true,
+  "mode": "full_audit"
+ },
+ "last_error": null,
+ "last_report": {
+  "comparison": {
+   "baseline": "not_compared",
+   "fixed": 0,
+   "fixed_items": [],
+   "new": 0,
+   "new_items": [],
+   "unchanged": 0,
+   "unchanged_items": []
+  },
+  "coverage": {
+   "categories": [
+    "core",
+    "technical",
+    "content",
+    "eeat",
+    "schema",
+    "perf",
+    "links",
+    "images",
+    "security",
+    "social",
+    "a11y",
+    "i18n",
+    "crawl",
+    "url",
+    "mobile",
+    "legal",
+    "redirect",
+    "geo",
+    "htmlval",
+    "js"
+   ],
+   "completed_sources": [
+    "CrawlSEO",
+    "PSI",
+    "SEOmator"
+   ],
+   "crawled_pages": 25,
+   "planned_pages": 25,
+   "sampled_pages": 5,
+   "sources": {
+    "CrawlSEO": {
+     "crawled_pages": 25,
+     "notes": [],
+     "sampled_pages": 0,
+     "status": "ok",
+     "unmapped_rules": []
+    },
+    "PSI": {
+     "crawled_pages": 1,
+     "notes": [
+      "psi api http_429: lab metrics unavailable",
+      "crux not_configured: field data unavailable without a key"
+     ],
+     "sampled_pages": 0,
+     "status": "ok",
+     "unmapped_rules": []
+    },
+    "SEOmator": {
+     "crawled_pages": 25,
+     "notes": [],
+     "sampled_pages": 5,
+     "status": "ok",
+     "unmapped_rules": []
+    }
+   },
+   "unavailable_sources": [],
+   "unmapped_rules": []
+  },
+  "missing_data": [],
+  "mode_result": {
+   "status": "completed"
+  },
+  "model_enrichment": {
+   "attempts": 16,
+   "enriched": 8,
+   "limitation": "One or more model enrichments are unavailable; deterministic evidence is preserved.",
+   "status": "unavailable",
+   "total": 10
+  },
+  "normalizer_version": "2.1.0",
+  "plan": {
+   "categories": [
+    "core",
+    "technical",
+    "content",
+    "eeat",
+    "schema",
+    "perf",
+    "links",
+    "images",
+    "security",
+    "social",
+    "a11y",
+    "i18n",
+    "crawl",
+    "url",
+    "mobile",
+    "legal",
+    "redirect",
+    "geo",
+    "htmlval",
+    "js"
+   ],
+   "max_pages": 25,
+   "mode": "full_audit",
+   "optional_sources": [
+    "GoogleSearchConsole",
+    "DataForSEO"
+   ],
+   "overall_timeout_seconds": 900,
+   "performance_sample_pages": 5,
+   "profile": "service_b2b",
+   "required_sources": [
+    "CrawlSEO",
+    "SEOmator"
+   ],
+   "source_timeout_seconds": 720
+  },
+  "run": {
+   "completed_at": "2026-09-14T12:15:19.979541Z",
+   "mode": "full_audit",
+   "profile": "service_b2b",
+   "requested_at": "2026-09-14T12:05:08.629811Z",
+   "run_id": "seo-f390612bda364a8abd2c53eb68316d53",
+   "site_url": "https://books.toscrape.com/",
+   "started_at": "2026-09-14T12:05:08.629811Z",
+   "target_id": "target-books-toscrape-com-d142438e",
+   "trigger": "manual"
+  },
+  "schema": "extella.seo_employee_report.v2",
+  "sources": [
+   {
+    "coverage": {
+     "categories": [
+      "core",
+      "technical",
+      "content",
+      "eeat",
+      "schema",
+      "perf",
+      "links",
+      "images",
+      "security",
+      "social",
+      "a11y",
+      "i18n",
+      "crawl",
+      "url",
+      "mobile",
+      "legal",
+      "redirect",
+      "geo",
+      "htmlval",
+      "js"
+     ],
+     "completed_sources": [
+      "CrawlSEO"
+     ],
+     "crawled_pages": 25,
+     "notes": [],
+     "planned_pages": 25,
+     "sampled_pages": 0,
+     "unavailable_sources": [],
+     "unmapped_rules": []
+    },
+    "name": "CrawlSEO",
+    "obtained_at": "2026-09-14T12:15:19.979541Z",
+    "status": "ok"
+   },
+   {
+    "coverage": {
+     "categories": [
+      "core",
+      "technical",
+      "content",
+      "eeat",
+      "schema",
+      "perf",
+      "links",
+      "images",
+      "security",
+      "social",
+      "a11y",
+      "i18n",
+      "crawl",
+      "url",
+      "mobile",
+      "legal",
+      "redirect",
+      "geo",
+      "htmlval",
+      "js"
+     ],
+     "completed_sources": [
+      "SEOmator"
+     ],
+     "crawled_pages": 25,
+     "notes": [],
+     "planned_pages": 25,
+     "sampled_pages": 5,
+     "unavailable_sources": [],
+     "unmapped_rules": []
+    },
+    "name": "SEOmator",
+    "obtained_at": "2026-09-14T12:15:19.979541Z",
+    "status": "ok"
+   },
+   {
+    "coverage": {
+     "categories": [
+      "core",
+      "technical",
+      "content",
+      "eeat",
+      "schema",
+      "perf",
+      "links",
+      "images",
+      "security",
+      "social",
+      "a11y",
+      "i18n",
+      "crawl",
+      "url",
+      "mobile",
+      "legal",
+      "redirect",
+      "geo",
+      "htmlval",
+      "js"
+     ],
+     "completed_sources": [
+      "PSI"
+     ],
+     "crawled_pages": 1,
+     "notes": [
+      "psi api http_429: lab metrics unavailable",
+      "crux not_configured: field data unavailable without a key"
+     ],
+     "planned_pages": 25,
+     "sampled_pages": 0,
+     "unavailable_sources": [],
+     "unmapped_rules": []
+    },
+    "name": "PSI",
+    "obtained_at": "2026-09-14T12:15:19.979541Z",
+    "status": "ok"
+   },
+   {
+    "coverage": {
+     "categories": [
+      "core",
+      "technical",
+      "content",
+      "eeat",
+      "schema",
+      "perf",
+      "links",
+      "images",
+      "security",
+      "social",
+      "a11y",
+      "i18n",
+      "crawl",
+      "url",
+      "mobile",
+      "legal",
+      "redirect",
+      "geo",
+      "htmlval",
+      "js"
+     ],
+     "completed_sources": [],
+     "crawled_pages": 0,
+     "planned_pages": 25,
+     "sampled_pages": 0,
+     "unavailable_sources": [
+      "GoogleSearchConsole"
+     ],
+     "unmapped_rules": []
+    },
+    "instruction": "Connect this optional source before requesting search-performance data.",
+    "message_en": "The source is not configured. Connect it before requesting search-performance data.",
+    "message_ru": "Источник не настроен. Подключите его перед запросом данных поисковой эффективности.",
+    "name": "GoogleSearchConsole",
+    "obtained_at": "2026-09-14T12:15:19.979541Z",
+    "reason": "not_configured",
+    "status": "not_configured"
+   },
+   {
+    "coverage": {
+     "categories": [
+      "core",
+      "technical",
+      "content",
+      "eeat",
+      "schema",
+      "perf",
+      "links",
+      "images",
+      "security",
+      "social",
+      "a11y",
+      "i18n",
+      "crawl",
+      "url",
+      "mobile",
+      "legal",
+      "redirect",
+      "geo",
+      "htmlval",
+      "js"
+     ],
+     "completed_sources": [],
+     "crawled_pages": 0,
+     "planned_pages": 25,
+     "sampled_pages": 0,
+     "unavailable_sources": [
+      "DataForSEO"
+     ],
+     "unmapped_rules": []
+    },
+    "instruction": "Connect this optional source before requesting search-performance data.",
+    "message_en": "The source is not configured. Connect it before requesting search-performance data.",
+    "message_ru": "Источник не настроен. Подключите его перед запросом данных поисковой эффективности.",
+    "name": "DataForSEO",
+    "obtained_at": "2026-09-14T12:15:19.979541Z",
+    "reason": "not_configured",
+    "status": "not_configured"
+   }
+  ],
+  "state": "ready",
+  "target": {
+   "business_goal": "organic_visibility",
+   "daily_run_time": "03:00",
+   "language": "ru",
+   "max_pages": 25,
+   "mode": "full_audit",
+   "ownership_confirmed": true,
+   "profile": "service_b2b",
+   "region": "GLOBAL",
+   "site_type": "website",
+   "site_url": "https://books.toscrape.com/",
+   "target_id": "target-books-toscrape-com-d142438e",
+   "target_name": "Toscrape Books",
+   "timezone": "UTC"
+  },
+  "tasks": [
+   {
+    "action_proposal": {
+     "change": "Добавьте на https://books.toscrape.com/ тег <link rel=\"canonical\"> с корректным canonical URL и обеспечьте его присутствие после выполнения JS.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "No canonical tag",
+       "source": "CrawlSEO",
+       "source_rule": "MISSING_CANONICAL"
+      },
+      {
+       "fact": "No <link rel=\"canonical\"> tag found in the document",
+       "source": "SEOmator",
+       "source_rule": "core-canonical-present"
+      }
+     ],
+     "expires_at": "2026-09-21T12:15:19.979541Z",
+     "operation": "manual_change",
+     "preview": "Добавьте на https://books.toscrape.com/ тег <link rel=\"canonical\"> с корректным canonical URL и обеспечьте его присутствие после выполнения JS.",
+     "proposal_id": "proposal-e007397d16e47dda",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "8649a167d2b2f65f"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "Для https://books.toscrape.com/ подтверждено отсутствие тега <link rel=\"canonical\">, что является критическим нарушением правила core-canonical-present.",
+    "confirmed_fact": "No canonical tag",
+    "evidence": [
+     {
+      "fact": "No canonical tag",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_CANONICAL"
+     },
+     {
+      "fact": "No <link rel=\"canonical\"> tag found in the document",
+      "source": "SEOmator",
+      "source_rule": "core-canonical-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "minimal_fix": "Добавьте на https://books.toscrape.com/ тег <link rel=\"canonical\"> с корректным canonical URL и обеспечьте его присутствие после выполнения JS.",
+    "rule_key": "core-canonical-present",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "8649a167d2b2f65f",
+    "url": "https://books.toscrape.com/",
+    "verification": "Repeat CrawlSEO rule MISSING_CANONICAL and confirm it no longer fails."
+   },
+   {
+    "action_proposal": {
+     "change": "Добавьте для этой страницы корректный (при необходимости уникальный) meta description, чтобы исправить нарушение.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "Missing meta description",
+       "source": "CrawlSEO",
+       "source_rule": "MISSING_DESCRIPTION"
+      },
+      {
+       "fact": "Meta description tag exists but has no content",
+       "source": "SEOmator",
+       "source_rule": "core-description-present"
+      }
+     ],
+     "expires_at": "2026-09-21T12:15:19.979541Z",
+     "operation": "manual_change",
+     "preview": "Добавьте для этой страницы корректный (при необходимости уникальный) meta description, чтобы исправить нарушение.",
+     "proposal_id": "proposal-7a05ddbedefb0dce",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "56a092fb2378d23c"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "На странице https://books.toscrape.com/ подтверждено правило meta-description-missing в критичном статусе: у страницы отсутствует meta description.",
+    "confirmed_fact": "На странице отсутствует meta description.",
+    "evidence": [
+     {
+      "fact": "Missing meta description",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_DESCRIPTION"
+     },
+     {
+      "fact": "Meta description tag exists but has no content",
+      "source": "SEOmator",
+      "source_rule": "core-description-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "minimal_fix": "Добавьте для этой страницы корректный (при необходимости уникальный) meta description, чтобы исправить нарушение.",
+    "rule_key": "meta-description-missing",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "56a092fb2378d23c",
+    "url": "https://books.toscrape.com/",
+    "verification": "Повторить проверку и убедиться, что правило больше не срабатывает."
+   },
+   {
+    "affected_pages_count": 1,
+    "confirmed_fact": "No canonical tag",
+    "evidence": [
+     {
+      "fact": "No canonical tag",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_CANONICAL"
+     },
+     {
+      "fact": "No <link rel=\"canonical\"> tag found in the document",
+      "source": "SEOmator",
+      "source_rule": "core-canonical-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "rule_key": "core-canonical-present",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "17fb16a1a9ad9631",
+    "url": "https://books.toscrape.com/catalogue/category/books/add-a-comment_18/index.html",
+    "verification": "Repeat CrawlSEO rule MISSING_CANONICAL and confirm it no longer fails."
+   },
+   {
+    "affected_pages_count": 1,
+    "confirmed_fact": "No canonical tag",
+    "evidence": [
+     {
+      "fact": "No canonical tag",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_CANONICAL"
+     },
+     {
+      "fact": "No <link rel=\"canonical\"> tag found in the document",
+      "source": "SEOmator",
+      "source_rule": "core-canonical-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "rule_key": "core-canonical-present",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "80b3c5e7e1811b4d",
+    "url": "https://books.toscrape.com/catalogue/category/books/childrens_11/index.html",
+    "verification": "Repeat CrawlSEO rule MISSING_CANONICAL and confirm it no longer fails."
+   },
+   {
+    "action_proposal": {
+     "change": "Добавьте корректный тег <link rel='canonical'> с правильным canonical URL в сгенерированный HTML этой страницы.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "No canonical tag",
+       "source": "CrawlSEO",
+       "source_rule": "MISSING_CANONICAL"
+      },
+      {
+       "fact": "No <link rel=\"canonical\"> tag found in the document",
+       "source": "SEOmator",
+       "source_rule": "core-canonical-present"
+      }
+     ],
+     "expires_at": "2026-09-21T12:15:19.979541Z",
+     "operation": "manual_change",
+     "preview": "Добавьте корректный тег <link rel='canonical'> с правильным canonical URL в сгенерированный HTML этой страницы.",
+     "proposal_id": "proposal-fe5e7376d4537f52",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "d19211913f6f303d"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "По подтвержденному факту на странице обнаружено критическое нарушение: отсутствует тег <link rel='canonical'>.",
+    "confirmed_fact": "No canonical tag",
+    "evidence": [
+     {
+      "fact": "No canonical tag",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_CANONICAL"
+     },
+     {
+      "fact": "No <link rel=\"canonical\"> tag found in the document",
+      "source": "SEOmator",
+      "source_rule": "core-canonical-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "minimal_fix": "Добавьте корректный тег <link rel='canonical'> с правильным canonical URL в сгенерированный HTML этой страницы.",
+    "rule_key": "core-canonical-present",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "d19211913f6f303d",
+    "url": "https://books.toscrape.com/catalogue/category/books/classics_6/index.html",
+    "verification": "Repeat CrawlSEO rule MISSING_CANONICAL and confirm it no longer fails."
+   },
+   {
+    "action_proposal": {
+     "change": "Добавьте в итоговый DOM корректный тег <link rel='canonical'> с правильным canonical URL этой страницы.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "No canonical tag",
+       "source": "CrawlSEO",
+       "source_rule": "MISSING_CANONICAL"
+      },
+      {
+       "fact": "No <link rel=\"canonical\"> tag found in the document",
+       "source": "SEOmator",
+       "source_rule": "core-canonical-present"
+      }
+     ],
+     "expires_at": "2026-09-21T12:15:19.979541Z",
+     "operation": "manual_change",
+     "preview": "Добавьте в итоговый DOM корректный тег <link rel='canonical'> с правильным canonical URL этой страницы.",
+     "proposal_id": "proposal-b84a2e19ede7f311",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "d765799fdce65c11"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "Отсутствие тега <link rel='canonical'> на странице подтверждено как критическое нарушение.",
+    "confirmed_fact": "No canonical tag",
+    "evidence": [
+     {
+      "fact": "No canonical tag",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_CANONICAL"
+     },
+     {
+      "fact": "No <link rel=\"canonical\"> tag found in the document",
+      "source": "SEOmator",
+      "source_rule": "core-canonical-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "minimal_fix": "Добавьте в итоговый DOM корректный тег <link rel='canonical'> с правильным canonical URL этой страницы.",
+    "rule_key": "core-canonical-present",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "d765799fdce65c11",
+    "url": "https://books.toscrape.com/catalogue/category/books/default_15/index.html",
+    "verification": "Repeat CrawlSEO rule MISSING_CANONICAL and confirm it no longer fails."
+   },
+   {
+    "action_proposal": {
+     "change": "Добавьте на страницу корректный тег <link rel='canonical'> с подходящим canonical URL в итоговом DOM.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "No canonical tag",
+       "source": "CrawlSEO",
+       "source_rule": "MISSING_CANONICAL"
+      },
+      {
+       "fact": "No <link rel=\"canonical\"> tag found in the document",
+       "source": "SEOmator",
+       "source_rule": "core-canonical-present"
+      }
+     ],
+     "expires_at": "2026-09-21T12:15:19.979541Z",
+     "operation": "manual_change",
+     "preview": "Добавьте на страницу корректный тег <link rel='canonical'> с подходящим canonical URL в итоговом DOM.",
+     "proposal_id": "proposal-6f79ba0cca365993",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "e73cf8ad8c898ca3"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "Подтверждено критическое нарушение: на этой странице отсутствует тег <link rel='canonical'.",
+    "confirmed_fact": "No canonical tag",
+    "evidence": [
+     {
+      "fact": "No canonical tag",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_CANONICAL"
+     },
+     {
+      "fact": "No <link rel=\"canonical\"> tag found in the document",
+      "source": "SEOmator",
+      "source_rule": "core-canonical-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "minimal_fix": "Добавьте на страницу корректный тег <link rel='canonical'> с подходящим canonical URL в итоговом DOM.",
+    "rule_key": "core-canonical-present",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "e73cf8ad8c898ca3",
+    "url": "https://books.toscrape.com/catalogue/category/books/fantasy_19/index.html",
+    "verification": "Repeat CrawlSEO rule MISSING_CANONICAL and confirm it no longer fails."
+   },
+   {
+    "action_proposal": {
+     "change": "Добавьте в секцию head страницы корректный тег <link rel='canonical'> с правильным canonical URL.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "No canonical tag",
+       "source": "CrawlSEO",
+       "source_rule": "MISSING_CANONICAL"
+      },
+      {
+       "fact": "No <link rel=\"canonical\"> tag found in the document",
+       "source": "SEOmator",
+       "source_rule": "core-canonical-present"
+      }
+     ],
+     "expires_at": "2026-09-21T12:15:19.979541Z",
+     "operation": "manual_change",
+     "preview": "Добавьте в секцию head страницы корректный тег <link rel='canonical'> с правильным canonical URL.",
+     "proposal_id": "proposal-5587d9af1fabb970",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "6d79b8a3bfc68262"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "Подтверждено критическое нарушение правила core-canonical-present: на странице отсутствует тег <link rel='canonical'>.",
+    "confirmed_fact": "No canonical tag",
+    "evidence": [
+     {
+      "fact": "No canonical tag",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_CANONICAL"
+     },
+     {
+      "fact": "No <link rel=\"canonical\"> tag found in the document",
+      "source": "SEOmator",
+      "source_rule": "core-canonical-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "minimal_fix": "Добавьте в секцию head страницы корректный тег <link rel='canonical'> с правильным canonical URL.",
+    "rule_key": "core-canonical-present",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "6d79b8a3bfc68262",
+    "url": "https://books.toscrape.com/catalogue/category/books/fiction_10/index.html",
+    "verification": "Repeat CrawlSEO rule MISSING_CANONICAL and confirm it no longer fails."
+   },
+   {
+    "action_proposal": {
+     "change": "Добавьте в секцию <head> страницы корректный тег <link rel='canonical'> с правильным canonical URL.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "No canonical tag",
+       "source": "CrawlSEO",
+       "source_rule": "MISSING_CANONICAL"
+      },
+      {
+       "fact": "No <link rel=\"canonical\"> tag found in the document",
+       "source": "SEOmator",
+       "source_rule": "core-canonical-present"
+      }
+     ],
+     "expires_at": "2026-09-21T12:15:19.979541Z",
+     "operation": "manual_change",
+     "preview": "Добавьте в секцию <head> страницы корректный тег <link rel='canonical'> с правильным canonical URL.",
+     "proposal_id": "proposal-73a0a055eaa675da",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "805d3e13980346c4"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "Отсутствие тега <link rel='canonical'> на проверенной странице является критическим нарушением правила core-canonical-present.",
+    "confirmed_fact": "No canonical tag",
+    "evidence": [
+     {
+      "fact": "No canonical tag",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_CANONICAL"
+     },
+     {
+      "fact": "No <link rel=\"canonical\"> tag found in the document",
+      "source": "SEOmator",
+      "source_rule": "core-canonical-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "minimal_fix": "Добавьте в секцию <head> страницы корректный тег <link rel='canonical'> с правильным canonical URL.",
+    "rule_key": "core-canonical-present",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "805d3e13980346c4",
+    "url": "https://books.toscrape.com/catalogue/category/books/historical-fiction_4/index.html",
+    "verification": "Repeat CrawlSEO rule MISSING_CANONICAL and confirm it no longer fails."
+   },
+   {
+    "action_proposal": {
+     "change": "Добавьте в HTML этой страницы корректный тег <link rel='canonical'> с правильным каноническим URL.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "No canonical tag",
+       "source": "CrawlSEO",
+       "source_rule": "MISSING_CANONICAL"
+      },
+      {
+       "fact": "No <link rel=\"canonical\"> tag found in the document",
+       "source": "SEOmator",
+       "source_rule": "core-canonical-present"
+      }
+     ],
+     "expires_at": "2026-09-21T12:15:19.979541Z",
+     "operation": "manual_change",
+     "preview": "Добавьте в HTML этой страницы корректный тег <link rel='canonical'> с правильным каноническим URL.",
+     "proposal_id": "proposal-7e258784905e1715",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "79445270b9fad728"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "Подтверждено: для проверенной страницы отсутствует тег <link rel='canonical'>, и это отмечено как критичный факт.",
+    "confirmed_fact": "No canonical tag",
+    "evidence": [
+     {
+      "fact": "No canonical tag",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_CANONICAL"
+     },
+     {
+      "fact": "No <link rel=\"canonical\"> tag found in the document",
+      "source": "SEOmator",
+      "source_rule": "core-canonical-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "minimal_fix": "Добавьте в HTML этой страницы корректный тег <link rel='canonical'> с правильным каноническим URL.",
+    "rule_key": "core-canonical-present",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "79445270b9fad728",
+    "url": "https://books.toscrape.com/catalogue/category/books/music_14/index.html",
+    "verification": "Repeat CrawlSEO rule MISSING_CANONICAL and confirm it no longer fails."
+   }
+  ]
+ },
+ "queue": {
+  "items": [
+   {
+    "queue_id": "queue-89095888f6a14f0387854120e94bd23c",
+    "run_id": "seo-b9ff257f403c4e16bbf7220c5cf41bda",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "trigger": "manual",
+    "mode": "full_audit",
+    "requested_at": "2026-09-14T10:21:42.046273Z",
+    "status": "completed",
+    "attempts": 0
+   },
+   {
+    "queue_id": "queue-711f2ed3f75545ffb36375664c7aaf38",
+    "run_id": "seo-c690f30f0ec0458096958ca1bbeedae0",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "trigger": "daily",
+    "mode": "full_audit",
+    "requested_at": "2026-09-14T10:22:31.089464Z",
+    "status": "completed",
+    "attempts": 0
+   },
+   {
+    "queue_id": "queue-8d51b27cbe724d5296f6a075f548834c",
+    "run_id": "seo-a49ad020c7ea4cedbfb006ede3393f4f",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "trigger": "manual",
+    "mode": "full_audit",
+    "requested_at": "2026-09-14T10:32:05.074377Z",
+    "status": "completed",
+    "attempts": 0
+   },
+   {
+    "queue_id": "queue-a9337790f91f4645b9a5c4d1ebd1972e",
+    "run_id": "seo-18a8e0fd90514534bca46bc48cccf1a2",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "trigger": "manual",
+    "mode": "full_audit",
+    "requested_at": "2026-09-14T12:05:08.624715Z",
+    "status": "completed",
+    "attempts": 0
+   }
+  ],
+  "position": null
+ },
+ "state": "ready",
+ "target_id": null,
+ "captured_at": "2026-09-14T13:32:28Z"
+}

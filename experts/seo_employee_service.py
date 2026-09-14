@@ -41,7 +41,7 @@ import sys
 
 sys.modules.setdefault("seo_employee_profiles", _seo_employee_profiles)
 sys.modules.setdefault("seo_employee_rules", _seo_employee_rules)
-from experts.seo_employee_sources import Coverage, CrawlSEOAdapter, SEOmatorAdapter, SourceResult, required_sources_satisfied
+from experts.seo_employee_sources import Coverage, CrawlSEOAdapter, PSIAdapter, SEOmatorAdapter, SourceResult, required_sources_satisfied
 
 
 ROOT_PATH = Path(__file__).resolve().parents[1]
@@ -69,12 +69,15 @@ CRAWLSEO_EXECUTABLE = Path(
 SEOMATOR_EXECUTABLE = Path(
     os.environ.get("EXTELLA_SEOMATOR_EXECUTABLE", str(ROOT_PATH / "runtime" / "container" / "run_seomator"))
 )
+PSI_EXECUTABLE = Path(
+    os.environ.get("EXTELLA_PSI_EXECUTABLE", str(ROOT_PATH / "runtime" / "container" / "run_psi"))
+)
 DNS_RESOLVER_URL = os.environ.get("EXTELLA_DNS_RESOLVER_URL", "")
 
 REPORT_SCHEMA = "extella.seo_employee_report.v2"
 STATE_SCHEMA = "extella.seo_employee_state.v2"
 CONFIG_SCHEMA = TARGET_CONFIG_SCHEMA
-NORMALIZER_VERSION = "2.0.0"
+NORMALIZER_VERSION = "2.1.0"
 ACTIVE_VERSION = "2.0.0"
 MODEL_FIELDS = frozenset(
     {
@@ -105,6 +108,7 @@ _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 _DEVICE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$")
 _AGENT_ID_RE = re.compile(r"^agent_[A-Za-z0-9_][A-Za-z0-9_-]{2,127}$")
 _SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
+_SEVERITY_DOWNGRADE = {"critical": "warning", "warning": "info", "info": "info"}
 _EVIDENCE_ORDER = {"verified": 0, "supported": 1, "unverified": 2}
 _ALLOWED_FACT_WHITESPACE = frozenset({" ", "\t", "\n", "\r"})
 _SAFE_SOURCE_REASONS = frozenset(
@@ -337,7 +341,8 @@ def sanitize_url_for_model(value: str) -> str:
         raise ModelInputError("model input URL is invalid")
     if ":" in host and not host.startswith("["):
         host = f"[{host}]"
-    netloc = host if port is None else f"{host}:{port}"
+    default_port = {"http": 80, "https": 443}[parsed.scheme]
+    netloc = host if port is None or port == default_port else f"{host}:{port}"
     return urllib.parse.urlunsplit((parsed.scheme, netloc, parsed.path or "/", "", ""))
 
 
@@ -382,15 +387,27 @@ def _source_payload_is_valid(
     return adapter is not None and adapter.parse(payload, selected_plan).status == "ok"
 
 
-def prioritize_findings(findings: Iterable[Mapping[str, object]], limit: int = 10) -> list[dict[str, object]]:
+def prioritize_findings(
+    findings: Iterable[Mapping[str, object]],
+    limit: int = 10,
+    *,
+    category_priority: Sequence[str] | None = None,
+) -> list[dict[str, object]]:
     if limit <= 0:
         raise SeoEmployeeError("task limit must be positive")
+    order = {category: index for index, category in enumerate(category_priority or ())}
+    catalog = load_rule_catalog() if order else {}
+    def _category_index(item: Mapping[str, object]) -> int:
+        definition = catalog.get(str(item.get("rule_key")))
+        category = definition.category if definition is not None else ""
+        return order.get(category, len(order))
     verified = [dict(item) for item in findings if item.get("evidence_level") != "unverified"]
     return sorted(
         verified,
         key=lambda item: (
             _SEVERITY_ORDER.get(str(item.get("severity")), 99),
             _EVIDENCE_ORDER.get(str(item.get("evidence_level")), 99),
+            _category_index(item),
             -int(item.get("affected_pages_count", 0)),
             str(item.get("url", "")),
             str(item.get("rule_key", "")),
@@ -902,6 +919,13 @@ def _worker_plan(plan: AuditPlan) -> dict[str, object]:
     }
 
 
+def _worker_psi_plan(plan: AuditPlan) -> dict[str, object]:
+    return {
+        "max_urls": plan.psi_max_urls,
+        "timeout_ms": plan.source_timeout_seconds * 1000,
+    }
+
+
 def _run_v2_source_wrapper(
     source: str,
     executable: Path,
@@ -912,15 +936,18 @@ def _run_v2_source_wrapper(
     runner: Callable[..., object],
     obtained_at: str,
     timeout_seconds: float,
+    best_effort: bool = False,
 ) -> tuple[dict[str, object], SourceResult]:
-    adapter = CrawlSEOAdapter() if source == "CrawlSEO" else SEOmatorAdapter()
+    adapters = {"CrawlSEO": CrawlSEOAdapter(), "SEOmator": SEOmatorAdapter(), "PSI": PSIAdapter()}
+    adapter = adapters[source]
+    worker_plan = _worker_psi_plan(plan) if source == "PSI" else _worker_plan(plan)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plan_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=output_path.parent, prefix=".plan.", suffix=".json", delete=False) as handle:
             plan_path = Path(handle.name)
             os.chmod(plan_path, 0o600)
-            json.dump(_worker_plan(plan), handle, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            json.dump(worker_plan, handle, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
             handle.flush()
             os.fsync(handle.fileno())
         try:
@@ -938,9 +965,14 @@ def _run_v2_source_wrapper(
             result = SourceResult(source, "unavailable", adapter.parse({"status": "unavailable", "reason": "waf"}, plan).coverage, reason="wrapper_unavailable")
             return _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict()), result
         if getattr(completed, "returncode", 1) != 0:
+            if best_effort:
+                result = SourceResult(source, "unavailable", adapter.parse({"status": "unavailable", "reason": "timeout"}, plan).coverage, reason="worker_unavailable")
+                return _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict()), result
             result = SourceResult(source, "failed", adapter.parse({"status": "failed", "reason": "audit_failed"}, plan).coverage, reason="audit_failed")
             return _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict()), result
         result = _parse_source_payload(source, adapter, _read_json_object(output_path), plan)
+        if best_effort and result.status == "failed":
+            result = SourceResult(source, "unavailable", result.coverage, result.occurrences, result.reason, result.mode_result)
         status = _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict())
         return status, result
     finally:
@@ -960,6 +992,7 @@ def collect_sources(
     runner: Callable[..., object] = subprocess.run,
     crawlseo_executable: Path = CRAWLSEO_EXECUTABLE,
     seomator_executable: Path = SEOMATOR_EXECUTABLE,
+    psi_executable: Path = PSI_EXECUTABLE,
     obtained_at: str | None = None,
     deadline: RunDeadline | None = None,
 ) -> tuple[list[dict[str, object]], dict[str, SourceResult]]:
@@ -967,13 +1000,18 @@ def collect_sources(
     timestamp = obtained_at or _utc_now()
     budget = deadline or RunDeadline(selected_plan.overall_timeout_seconds)
     run_dir = evidence_dir / run_id
-    definitions = (("CrawlSEO", crawlseo_executable, "crawlseo.json"), ("SEOmator", seomator_executable, "seomator.json"))
+    definitions = (
+        ("CrawlSEO", crawlseo_executable, "crawlseo.json", False),
+        ("SEOmator", seomator_executable, "seomator.json", False),
+        ("PSI", psi_executable, "psi.json", True),
+    )
     statuses: list[dict[str, object]] = []
     results: dict[str, SourceResult] = {}
-    for source, executable, filename in definitions:
+    for source, executable, filename, best_effort in definitions:
         status, result = _run_v2_source_wrapper(
             source, executable, site_url, run_dir / filename, selected_plan, runner=runner,
             obtained_at=timestamp, timeout_seconds=budget.remaining(selected_plan.source_timeout_seconds),
+            best_effort=best_effort,
         )
         statuses.append(status)
         results[source] = result
@@ -1066,6 +1104,16 @@ def _aggregate_coverage(plan: AuditPlan, results: Mapping[str, SourceResult]) ->
         "completed_sources": sorted(item.source for item in values if item.status == "ok"),
         "unavailable_sources": sorted(item.source for item in values if item.status != "ok"),
         "unmapped_rules": sorted({rule for item in values for rule in item.coverage.unmapped_rules}),
+        "sources": {
+            item.source: {
+                "status": item.status,
+                "crawled_pages": item.coverage.crawled_pages,
+                "sampled_pages": item.coverage.sampled_pages,
+                "unmapped_rules": list(item.coverage.unmapped_rules),
+                "notes": list(item.coverage.notes),
+            }
+            for item in sorted(values, key=lambda item: item.source)
+        },
     }
 
 
@@ -1090,6 +1138,7 @@ def normalize_findings(target_id: str, payloads: Mapping[str, Mapping[str, objec
 
 def _normalize_v2_results(target_id: str, plan: AuditPlan, results: Mapping[str, SourceResult]) -> list[dict[str, object]]:
     merged: dict[tuple[str, str, str], dict[str, object]] = {}
+    failed: set[tuple[str, str, str]] = set()
     catalog = load_rule_catalog()
     for result in results.values():
         for occurrence in result.occurrences:
@@ -1111,12 +1160,16 @@ def _normalize_v2_results(target_id: str, plan: AuditPlan, results: Mapping[str,
                 "confirmed_fact": definition.confirmed_fact or _bounded_fact(occurrence.fact),
                 "verification": definition.verification or f"Repeat {occurrence.source} rule {occurrence.source_rule} and confirm it no longer fails.",
             })
+            if occurrence.status == "fail":
+                failed.add(key)
             evidence = {"source": occurrence.source, "source_rule": occurrence.source_rule, "fact": _bounded_fact(occurrence.fact)}
             if evidence not in finding["evidence"]:
                 finding["evidence"].append(evidence)
     findings: list[dict[str, object]] = []
-    for finding in merged.values():
+    for key, finding in merged.items():
         definition = catalog[str(finding["rule_key"])]
+        if key not in failed:
+            finding["severity"] = _SEVERITY_DOWNGRADE.get(definition.severity, definition.severity)
         sources = [str(item["source"]) for item in finding["evidence"] if isinstance(item, Mapping)]
         finding["evidence"] = sorted(finding["evidence"], key=lambda item: (str(item["source"]), str(item["source_rule"]), str(item["fact"])))
         finding["evidence_level"] = evidence_level(definition, sources)
@@ -1144,7 +1197,8 @@ def validate_model_input(value: Mapping[str, object]) -> None:
     if set(value) != MODEL_FIELDS:
         raise ModelInputError("model input fields do not match SC-SEO-031")
     definition = load_rule_catalog().get(str(value.get("rule_key")))
-    if definition is None or value.get("severity") != definition.severity or value.get("evidence_level") not in {"verified", "supported"}:
+    allowed_severities = {definition.severity, _SEVERITY_DOWNGRADE.get(definition.severity, definition.severity)} if definition is not None else set()
+    if definition is None or value.get("severity") not in allowed_severities or value.get("evidence_level") not in {"verified", "supported"}:
         raise ModelInputError("model input is invalid")
     sources = value.get("sources")
     if not isinstance(sources, list) or not sources or sources != sorted(set(sources)) or any(source not in definition.source_rules for source in sources):
@@ -1225,6 +1279,9 @@ def _action_proposal(
     }
 
 
+_ENRICH_ATTEMPTS = 3
+
+
 def _build_tasks(
     findings: Sequence[Mapping[str, object]],
     *,
@@ -1236,35 +1293,49 @@ def _build_tasks(
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     tasks: list[dict[str, object]] = []
     enriched_count = 0
+    total_attempts = 0
     failed = False
     for finding in findings:
         task: dict[str, object] = {"task_id": _task_identity(finding), **finding}
         try:
             model_input = build_model_input(finding)
-            enriched = (
-                enrich_with_agent_zero(model_input, timeout_seconds=deadline.remaining(AGENT_ZERO_TIMEOUT_SECONDS))
-                if enricher is enrich_with_agent_zero and deadline is not None
-                else _validate_enrichment(enricher(model_input))
-            )
-            task.update(enriched)
-            enriched_count += 1
         except (SeoEmployeeError, OSError, RuntimeError, ImportError):
             failed = True
+            model_input = None
+        if model_input is not None:
+            enriched_ok = False
+            for _ in range(_ENRICH_ATTEMPTS):
+                total_attempts += 1
+                try:
+                    enriched = (
+                        enrich_with_agent_zero(model_input, timeout_seconds=deadline.remaining(AGENT_ZERO_TIMEOUT_SECONDS))
+                        if enricher is enrich_with_agent_zero and deadline is not None
+                        else _validate_enrichment(enricher(model_input))
+                    )
+                    task.update(enriched)
+                    enriched_count += 1
+                    enriched_ok = True
+                    break
+                except (SeoEmployeeError, OSError, RuntimeError, ImportError):
+                    continue
+            if not enriched_ok:
+                failed = True
         proposal = _action_proposal(task, target_id=target_id, site_url=site_url, expires_at=expires_at)
         if proposal is not None:
             task["action_proposal"] = proposal
         tasks.append(task)
     total = len(tasks)
     if total == 0:
-        return tasks, {"status": "not_needed", "limitation": "No deterministic findings require explanation.", "enriched": 0, "total": 0}
+        return tasks, {"status": "not_needed", "limitation": "No deterministic findings require explanation.", "enriched": 0, "total": 0, "attempts": 0}
     if failed:
         return tasks, {
             "status": "unavailable",
             "limitation": "One or more model enrichments are unavailable; deterministic evidence is preserved.",
             "enriched": enriched_count,
             "total": total,
+            "attempts": total_attempts,
         }
-    return tasks, {"status": "ok", "limitation": "", "enriched": enriched_count, "total": total}
+    return tasks, {"status": "ok", "limitation": "", "enriched": enriched_count, "total": total, "attempts": total_attempts}
 
 
 def _mode_result(plan: AuditPlan, results: Mapping[str, SourceResult]) -> dict[str, object]:
@@ -1294,7 +1365,9 @@ def _build_v2_report(
     deadline: RunDeadline | None = None,
 ) -> tuple[dict[str, object], dict[str, object] | None]:
     target_id = str(target["target_id"])
-    findings = prioritize_findings(_normalize_v2_results(target_id, plan, results))
+    findings = prioritize_findings(
+        _normalize_v2_results(target_id, plan, results), category_priority=plan.categories
+    )
     tasks, model_status = _build_tasks(
         findings,
         target_id=target_id,

@@ -27,6 +27,7 @@ class AuditMode(StrEnum):
 
 DEFAULT_MAX_PAGES = 25
 HARD_MAX_PAGES = 100
+PSI_MAX_URLS = 3
 _CATEGORIES = (
     "core", "technical", "perf", "links", "images", "security", "schema", "social",
     "content", "a11y", "i18n", "crawl", "url", "mobile", "legal", "eeat", "redirect",
@@ -52,6 +53,7 @@ class AuditPlan:
     performance_sample_pages: int
     overall_timeout_seconds: int
     source_timeout_seconds: int
+    psi_max_urls: int
 
 
 def _as_profile(value: IndustryProfile | str) -> IndustryProfile:
@@ -96,4 +98,5 @@ def build_audit_plan(
         performance_sample_pages=min(max_pages, 5),
         overall_timeout_seconds=180 if single_page else 900,
         source_timeout_seconds=120 if single_page else 720,
+        psi_max_urls=PSI_MAX_URLS,
     )

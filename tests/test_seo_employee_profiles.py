@@ -21,6 +21,7 @@ class AuditPlanTests(unittest.TestCase):
                 self.assertEqual(plan.optional_sources, ("GoogleSearchConsole", "DataForSEO"))
                 self.assertEqual(len(plan.categories), 20)
                 self.assertTrue(1 <= plan.performance_sample_pages <= 5)
+                self.assertEqual(plan.psi_max_urls, 3)
 
     def test_pilot_cap_cannot_be_bypassed(self) -> None:
         with self.assertRaises(ProfileError):

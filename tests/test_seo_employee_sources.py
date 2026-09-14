@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "experts"))
 
 from seo_employee_sources import (
     CrawlSEOAdapter,
+    PSIAdapter,
     SEOmatorAdapter,
     missing_sources,
     required_sources_satisfied,
@@ -23,13 +24,21 @@ PLAN = SimpleNamespace(
     categories=("core", "links"),
     performance_sample_pages=5,
     required_sources=("CrawlSEO", "SEOmator"),
+    psi_max_urls=3,
 )
 RULE = SimpleNamespace(rule_key="meta-description-missing", severity="warning")
 
 
 def crawlseo_payload(
-    *, pages: int = 25, max_pages: int = 25, issue_type: str = "MISSING_DESCRIPTION"
+    *,
+    pages: int = 25,
+    max_pages: int = 25,
+    issue_type: str = "MISSING_DESCRIPTION",
+    severity: str | None = "warning",
 ) -> dict[str, object]:
+    issue: dict[str, object] = {"type": issue_type, "url": "https://example.com/"}
+    if severity is not None:
+        issue["severity"] = severity
     return {
         "schema": "extella.crawlseo_source.v1",
         "source": "CrawlSEO",
@@ -43,7 +52,7 @@ def crawlseo_payload(
             "sampled_pages": 0,
             "categories": ["core", "links"],
         },
-        "issues": [{"type": issue_type, "severity": "warning", "url": "https://example.com/"}],
+        "issues": [issue],
     }
 
 
@@ -70,6 +79,31 @@ def seomator_payload(
             },
             {"categoryId": "links", "results": []},
         ],
+    }
+
+
+def psi_payload(
+    *,
+    urls: list[str] | None = None,
+    metrics: list[dict[str, object]] | None = None,
+    robots: str | None = "User-agent: *\nDisallow:\n",
+    sitemap: str | None = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://example.com/</loc></url></urlset>',
+    html: str | None = '<html><head><script type="application/ld+json">{"@type": "WebSite"}</script></head></html>',
+) -> dict[str, object]:
+    probed = urls if urls is not None else ["https://example.com/"]
+    return {
+        "schema": "extella.psi_source.v1",
+        "source": "PSI",
+        "site_url": "https://example.com/",
+        "probed_urls": probed,
+        "metrics": metrics if metrics is not None else [],
+        "psi_api": {"status": "ok", "reason": None},
+        "crux": {"status": "not_configured", "reason": None},
+        "sitefiles": {
+            "robots_txt": {"http_status": 200, "truncated": False, "content": robots or ""},
+            "sitemap_xml": {"http_status": 200, "truncated": False, "content": sitemap or ""},
+            "homepage_html": {"http_status": 200, "truncated": False, "content": html or ""},
+        },
     }
 
 
@@ -111,6 +145,190 @@ class SourceAdaptersTest(unittest.TestCase):
         }
         result = CrawlSEOAdapter().parse(payload, PLAN)
         self.assertEqual((result.status, result.reason), ("failed", "invalid_payload"))
+
+    def test_crawlseo_e2e_corpus_types_are_all_mapped(self) -> None:
+        payload = crawlseo_payload()
+        payload["issues"] = [
+            {"type": issue_type, "severity": "warning", "url": "https://example.com/"}
+            for issue_type in (
+                "DUPLICATE_DESCRIPTION", "DUPLICATE_TITLE", "MISSING_CANONICAL",
+                "MISSING_ROBOTS", "MISSING_SCHEMA", "MISSING_SITEMAP", "MIXED_CONTENT",
+            )
+        ]
+        result = CrawlSEOAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.coverage.unmapped_rules, ())
+        self.assertEqual(len(result.occurrences), 7)
+        self.assertEqual(
+            {occurrence.rule_key for occurrence in result.occurrences},
+            {
+                "content-duplicate-description", "core-title-unique", "core-canonical-present",
+                "technical-robots-txt-exists", "schema-present", "technical-sitemap-exists",
+                "security-mixed-content",
+            },
+        )
+
+    def test_crawlseo_issue_severity_maps_to_occurrence_status(self) -> None:
+        cases = {
+            "ERROR": "fail",
+            "error": "fail",
+            "CRITICAL": "fail",
+            "WARNING": "warn",
+            "warning": "warn",
+            "INFO": "warn",
+            "info": "warn",
+            "mystery-grade": "warn",
+        }
+        for raw, expected in cases.items():
+            with self.subTest(severity=raw):
+                with mock.patch("seo_employee_sources.canonical_rule", return_value=RULE):
+                    result = CrawlSEOAdapter().parse(
+                        crawlseo_payload(severity=raw), PLAN
+                    )
+                self.assertEqual(result.status, "ok")
+                self.assertEqual(len(result.occurrences), 1)
+                self.assertEqual(result.occurrences[0].status, expected)
+        with mock.patch("seo_employee_sources.canonical_rule", return_value=RULE):
+            result = CrawlSEOAdapter().parse(crawlseo_payload(severity=None), PLAN)
+        self.assertEqual(result.occurrences[0].status, "warn")
+
+    def test_seomator_warn_is_ingested_with_warn_status(self) -> None:
+        payload = seomator_payload()
+        payload["categoryResults"][0]["results"][0]["status"] = "warn"
+        with mock.patch("seo_employee_sources.canonical_rule", return_value=RULE):
+            result = SEOmatorAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(len(result.occurrences), 1)
+        self.assertEqual(result.occurrences[0].status, "warn")
+        self.assertEqual(result.coverage.unmapped_rules, ())
+
+    def test_seomator_warn_with_unusable_rule_fails_the_source(self) -> None:
+        payload = seomator_payload()
+        payload["categoryResults"][0]["results"][0]["status"] = "warn"
+        del payload["categoryResults"][0]["results"][0]["ruleId"]
+        result = SEOmatorAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "failed")
+
+    def test_psi_clean_corpus_emits_no_occurrences(self) -> None:
+        result = PSIAdapter().parse(psi_payload(), PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.occurrences, ())
+        self.assertEqual(result.coverage.unmapped_rules, ())
+
+    def test_psi_thresholds_emit_graded_occurrences(self) -> None:
+        payload = psi_payload(metrics=[
+            {"url": "https://example.com/", "metric": "lcp", "lab": 5000, "field_p75": 3100},
+            {"url": "https://example.com/", "metric": "cls", "lab": 0.15, "field_p75": None},
+            {"url": "https://example.com/", "metric": "inp", "lab": 100, "field_p75": 150},
+        ])
+        result = PSIAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        by_rule = {item.rule_key: item for item in result.occurrences}
+        self.assertEqual(set(by_rule), {"psi-lcp", "psi-cls"})
+        self.assertEqual(by_rule["psi-lcp"].status, "fail")
+        self.assertIn("5.0s", by_rule["psi-lcp"].fact)
+        self.assertIn("3.1s", by_rule["psi-lcp"].fact)
+        self.assertEqual(by_rule["psi-cls"].status, "warn")
+        self.assertIn("0.15", by_rule["psi-cls"].fact)
+
+    def test_psi_field_p75_can_fail_when_lab_passes(self) -> None:
+        payload = psi_payload(metrics=[
+            {"url": "https://example.com/", "metric": "lcp", "lab": 2000, "field_p75": 4500},
+        ])
+        result = PSIAdapter().parse(payload, PLAN)
+        by_rule = {item.rule_key: item for item in result.occurrences}
+        self.assertEqual(by_rule["psi-lcp"].status, "fail")
+        self.assertIn("field p75", by_rule["psi-lcp"].fact)
+
+    def test_psi_rejects_over_cap_foreign_and_unprobed_urls(self) -> None:
+        over = psi_payload(urls=[f"https://example.com/{index}" for index in range(4)])
+        self.assertEqual(PSIAdapter().parse(over, PLAN).status, "failed")
+        foreign = psi_payload(urls=["https://example.com/", "https://other.test/"])
+        self.assertEqual(PSIAdapter().parse(foreign, PLAN).status, "failed")
+        stray = psi_payload(metrics=[
+            {"url": "https://example.com/stray", "metric": "lcp", "lab": 5000, "field_p75": None},
+        ])
+        self.assertEqual(PSIAdapter().parse(stray, PLAN).status, "failed")
+
+    def test_psi_robots_parser_flags_orphan_rule_and_bad_line(self) -> None:
+        orphan = PSIAdapter().parse(psi_payload(robots="Disallow: /tmp/\n"), PLAN)
+        self.assertEqual(
+            [(item.source_rule, item.status) for item in orphan.occurrences],
+            [("ROBOTS_TXT_INVALID", "fail")],
+        )
+        self.assertIn("line 1", orphan.occurrences[0].fact)
+        bad_line = PSIAdapter().parse(psi_payload(robots="User-agent: *\njust some words\n"), PLAN)
+        self.assertEqual(len(bad_line.occurrences), 1)
+        self.assertIn("line 2", bad_line.occurrences[0].fact)
+
+    def test_psi_sitemap_parser_flags_malformed_and_doctype(self) -> None:
+        malformed = PSIAdapter().parse(psi_payload(sitemap="<urlset><oops"), PLAN)
+        self.assertEqual(
+            [(item.source_rule, item.status) for item in malformed.occurrences],
+            [("SITEMAP_INVALID", "fail")],
+        )
+        doctype = PSIAdapter().parse(
+            psi_payload(sitemap='<!DOCTYPE urlset [<!ENTITY x "y">]><urlset/>'), PLAN
+        )
+        self.assertEqual(len(doctype.occurrences), 1)
+        self.assertIn("DOCTYPE", doctype.occurrences[0].fact)
+
+    def test_psi_schema_parser_flags_broken_jsonld_only(self) -> None:
+        broken = PSIAdapter().parse(
+            psi_payload(html='<html><head><script type="application/ld+json">{oops</script></head></html>'),
+            PLAN,
+        )
+        self.assertEqual(
+            [(item.source_rule, item.status) for item in broken.occurrences],
+            [("SCHEMA_INVALID", "fail")],
+        )
+        bare = PSIAdapter().parse(psi_payload(html="<html><head></head></html>"), PLAN)
+        self.assertEqual(bare.occurrences, ())
+        payload = psi_payload(html="<html><head>" + "x" * 100 + "</head></html>")
+        payload["sitefiles"]["homepage_html"]["truncated"] = True
+        truncated = PSIAdapter().parse(payload, PLAN)
+        self.assertEqual(truncated.occurrences, ())
+
+    def test_psi_skips_unfetched_sitefiles(self) -> None:
+        payload = psi_payload()
+        for section in payload["sitefiles"].values():
+            section["http_status"] = 404
+            section["content"] = ""
+        result = PSIAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.occurrences, ())
+
+    def test_psi_degraded_sections_surface_as_coverage_notes(self) -> None:
+        payload = psi_payload()
+        payload["psi_api"] = {"status": "degraded", "reason": "http_429"}
+        payload["crux"] = {"status": "unavailable", "reason": "timeout"}
+        result = PSIAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(
+            result.coverage.notes,
+            (
+                "psi api http_429: lab metrics unavailable",
+                "crux timeout: field data unavailable",
+            ),
+        )
+        self.assertEqual(result.coverage.as_dict()["notes"], list(result.coverage.notes))
+        clean = PSIAdapter().parse(psi_payload(), PLAN)
+        self.assertEqual(
+            clean.coverage.notes, ("crux not_configured: field data unavailable without a key",)
+        )
+
+    def test_psi_rejects_malformed_status_blocks(self) -> None:
+        payload = psi_payload()
+        payload["psi_api"] = {"status": "degraded", "reason": "bogus"}
+        self.assertEqual(PSIAdapter().parse(payload, PLAN).status, "failed")
+        payload = psi_payload()
+        del payload["crux"]
+        self.assertEqual(PSIAdapter().parse(payload, PLAN).status, "failed")
+
+    def test_psi_declared_unavailable_passes_through(self) -> None:
+        result = PSIAdapter().parse({"status": "unavailable", "reason": "timeout"}, PLAN)
+        self.assertEqual(result.status, "unavailable")
+        self.assertEqual(result.reason, "timeout")
 
     def test_seomator_unknown_rule_is_counted_not_emitted_as_task(self) -> None:
         with mock.patch("seo_employee_sources.canonical_rule", return_value=None):

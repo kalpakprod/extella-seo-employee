@@ -65,6 +65,8 @@ def plan_payload(max_pages: int, source: str) -> dict[str, object]:
 def runner(calls: list[list[str]], *, fail: set[str] = set()):
     def run(argv: list[str], **_kwargs: object) -> SimpleNamespace:
         calls.append(argv)
+        if argv[0].endswith("run_psi"):
+            return SimpleNamespace(returncode=1)
         plan = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
         source = "CrawlSEO" if argv[0].endswith("run_crawlseo") else "SEOmator"
         if source in fail:
@@ -132,12 +134,15 @@ class ServiceV2Tests(unittest.TestCase):
                     site_url="", target_id=target_id, config_path=config_path, process_runner=runner(calls), resolver=public_resolver, now_provider=now,
                 )
                 self.assertEqual(result["state"], "ready")
-                self.assertEqual(len(calls), 2)
+                self.assertEqual(len(calls), 3)
                 for argv in calls:
                     self.assertEqual(len(argv), 4)
                     self.assertEqual(argv[1], "https://example.com/")
                     self.assertFalse(Path(argv[2]).exists())
-                    self.assertEqual(Path(argv[3]).name, "crawlseo.json" if argv[0].endswith("run_crawlseo") else "seomator.json")
+                    self.assertEqual(
+                        Path(argv[3]).name,
+                        "crawlseo.json" if argv[0].endswith("run_crawlseo") else "psi.json" if argv[0].endswith("run_psi") else "seomator.json",
+                    )
                 self.assertEqual(result["report"]["plan"]["max_pages"], max_pages)
                 self.assertEqual(result["report"]["plan"]["source_timeout_seconds"] * 1000, timeout)
 
@@ -147,7 +152,7 @@ class ServiceV2Tests(unittest.TestCase):
         seo = plan_payload(1, "SEOmator")
         crawl["issues"].append({"type": "UNKNOWN", "url": "https://example.com/", "message": "ignored"})
         findings, coverage = service.normalize_v2_findings("target-example-com-0f115db0", plan, {"CrawlSEO": crawl, "SEOmator": seo})
-        self.assertEqual(len(service.load_rule_catalog()), 251)
+        self.assertEqual(len(service.load_rule_catalog()), 254)
         self.assertTrue(all(service.canonical_rule(source, source_rule) is definition for definition in service.load_rule_catalog().values() for source, source_rule in definition.source_rules.items()))
         levels = {item["rule_key"]: item["evidence_level"] for item in findings}
         self.assertEqual(levels["meta-description-missing"], "verified")
@@ -213,6 +218,8 @@ class ServiceV2Tests(unittest.TestCase):
 
             def invalid_runner(invalid: set[str]):
                 def run(argv: list[str], **_kwargs: object) -> SimpleNamespace:
+                    if argv[0].endswith("run_psi"):
+                        return SimpleNamespace(returncode=1)
                     plan = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
                     source = "CrawlSEO" if argv[0].endswith("run_crawlseo") else "SEOmator"
                     payload = {"malformed": True} if source in invalid else plan_payload(plan["max_pages"], source)
@@ -386,16 +393,18 @@ class ServiceV2Tests(unittest.TestCase):
             def mixed(_value: object) -> dict[str, str]:
                 nonlocal calls
                 calls += 1
-                if calls == 1:
+                if calls <= 3:
                     raise RuntimeError("offline")
                 return {"business_impact": "Проверенный факт требует внимания.", "minimal_fix": "Исправить подтверждённую проблему вручную."}
             report = service.run_seo_employee(
                 site_url="", target_id=target_id, config_path=config_path, process_runner=runner([]),
                 resolver=public_resolver, now_provider=now, enricher=mixed,
             )["report"]
+            # The first task exhausts all 3 attempts, the second recovers on retry.
             self.assertEqual(report["model_enrichment"]["status"], "unavailable")
             self.assertEqual(report["model_enrichment"]["enriched"], 1)
             self.assertEqual(report["model_enrichment"]["total"], 2)
+            self.assertEqual(report["model_enrichment"]["attempts"], 4)
 
     def test_all_profiles_run_with_exact_worker_plan_keys_and_ten_task_cap(self) -> None:
         profiles = ("service_b2b", "ecommerce", "local_business", "content_media", "saas_marketplace")
@@ -405,6 +414,8 @@ class ServiceV2Tests(unittest.TestCase):
             worker_plans: list[dict[str, object]] = []
 
             def profile_runner(argv: list[str], **_kwargs: object) -> SimpleNamespace:
+                if argv[0].endswith("run_psi"):
+                    return SimpleNamespace(returncode=1)
                 plan = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
                 worker_plans.append(plan)
                 categories = plan["categories"]

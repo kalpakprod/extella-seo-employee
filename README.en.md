@@ -52,12 +52,15 @@ Requirements: Linux `amd64`, Docker Engine with Compose v2, Python 3.11+, and Gi
 ```sh
 python3 tools/selfcheck.py
 cp deploy/.env.example deploy/.env
-python3 deploy/prepare.py \
+sudo python3 deploy/prepare.py \
   --device-id '<Extella device id>' \
   --hosting-profile client_server \
   --agent-id '<agent_... from Extella>'
 docker compose --project-name extella-seo-release -f deploy/compose.yaml up -d
 ```
+
+`prepare.py` runs as root: secrets and bindings must be root-owned, otherwise
+capability-dropped containers cannot read them (`prepare_requires_root`).
 
 After startup, the owner opens Agent Zero at `http://127.0.0.1:50081`, connects a provider, and selects a model. Check the services with:
 

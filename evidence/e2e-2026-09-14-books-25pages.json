@@ -1,0 +1,700 @@
+{
+ "captured_at": "2026-09-14T10:41:48.919091Z",
+ "config": {
+  "business_goal": "organic_visibility",
+  "daily_run_time": "03:00",
+  "language": "ru",
+  "max_pages": 25,
+  "mode": "full_audit",
+  "ownership_confirmed": true,
+  "profile": "service_b2b",
+  "region": "GLOBAL",
+  "site_type": "website",
+  "site_url": "https://books.toscrape.com/",
+  "target_id": "target-books-toscrape-com-d142438e",
+  "target_name": "Toscrape Books",
+  "timezone": "UTC"
+ },
+ "last_error": null,
+ "last_report": {
+  "comparison": {
+   "baseline": "not_compared",
+   "fixed": 0,
+   "fixed_items": [],
+   "new": 0,
+   "new_items": [],
+   "unchanged": 0,
+   "unchanged_items": []
+  },
+  "coverage": {
+   "categories": [
+    "core",
+    "technical",
+    "content",
+    "eeat",
+    "schema",
+    "perf",
+    "links",
+    "images",
+    "security",
+    "social",
+    "a11y",
+    "i18n",
+    "crawl",
+    "url",
+    "mobile",
+    "legal",
+    "redirect",
+    "geo",
+    "htmlval",
+    "js"
+   ],
+   "completed_sources": [
+    "CrawlSEO",
+    "SEOmator"
+   ],
+   "crawled_pages": 25,
+   "planned_pages": 25,
+   "sampled_pages": 5,
+   "unavailable_sources": [],
+   "unmapped_rules": [
+    "DUPLICATE_DESCRIPTION",
+    "DUPLICATE_TITLE",
+    "MISSING_CANONICAL",
+    "MISSING_ROBOTS",
+    "MISSING_SCHEMA",
+    "MISSING_SITEMAP",
+    "MIXED_CONTENT"
+   ]
+  },
+  "missing_data": [],
+  "mode_result": {
+   "status": "completed"
+  },
+  "model_enrichment": {
+   "enriched": 6,
+   "limitation": "One or more model enrichments are unavailable; deterministic evidence is preserved.",
+   "status": "unavailable",
+   "total": 10
+  },
+  "normalizer_version": "2.0.0",
+  "plan": {
+   "categories": [
+    "core",
+    "technical",
+    "content",
+    "eeat",
+    "schema",
+    "perf",
+    "links",
+    "images",
+    "security",
+    "social",
+    "a11y",
+    "i18n",
+    "crawl",
+    "url",
+    "mobile",
+    "legal",
+    "redirect",
+    "geo",
+    "htmlval",
+    "js"
+   ],
+   "max_pages": 25,
+   "mode": "full_audit",
+   "optional_sources": [
+    "GoogleSearchConsole",
+    "DataForSEO"
+   ],
+   "overall_timeout_seconds": 900,
+   "performance_sample_pages": 5,
+   "profile": "service_b2b",
+   "required_sources": [
+    "CrawlSEO",
+    "SEOmator"
+   ],
+   "source_timeout_seconds": 720
+  },
+  "run": {
+   "completed_at": "2026-09-14T10:41:48.919091Z",
+   "mode": "full_audit",
+   "profile": "service_b2b",
+   "requested_at": "2026-09-14T10:32:05.078028Z",
+   "run_id": "seo-122cfc9fc9f74724a476c3dd29eb195b",
+   "site_url": "https://books.toscrape.com/",
+   "started_at": "2026-09-14T10:32:05.078028Z",
+   "target_id": "target-books-toscrape-com-d142438e",
+   "trigger": "manual"
+  },
+  "schema": "extella.seo_employee_report.v2",
+  "sources": [
+   {
+    "coverage": {
+     "categories": [
+      "core",
+      "technical",
+      "content",
+      "eeat",
+      "schema",
+      "perf",
+      "links",
+      "images",
+      "security",
+      "social",
+      "a11y",
+      "i18n",
+      "crawl",
+      "url",
+      "mobile",
+      "legal",
+      "redirect",
+      "geo",
+      "htmlval",
+      "js"
+     ],
+     "completed_sources": [
+      "CrawlSEO"
+     ],
+     "crawled_pages": 25,
+     "planned_pages": 25,
+     "sampled_pages": 0,
+     "unavailable_sources": [],
+     "unmapped_rules": [
+      "DUPLICATE_DESCRIPTION",
+      "DUPLICATE_TITLE",
+      "MISSING_CANONICAL",
+      "MISSING_ROBOTS",
+      "MISSING_SCHEMA",
+      "MISSING_SITEMAP",
+      "MIXED_CONTENT"
+     ]
+    },
+    "name": "CrawlSEO",
+    "obtained_at": "2026-09-14T10:41:48.919091Z",
+    "status": "ok"
+   },
+   {
+    "coverage": {
+     "categories": [
+      "core",
+      "technical",
+      "content",
+      "eeat",
+      "schema",
+      "perf",
+      "links",
+      "images",
+      "security",
+      "social",
+      "a11y",
+      "i18n",
+      "crawl",
+      "url",
+      "mobile",
+      "legal",
+      "redirect",
+      "geo",
+      "htmlval",
+      "js"
+     ],
+     "completed_sources": [
+      "SEOmator"
+     ],
+     "crawled_pages": 25,
+     "planned_pages": 25,
+     "sampled_pages": 5,
+     "unavailable_sources": [],
+     "unmapped_rules": []
+    },
+    "name": "SEOmator",
+    "obtained_at": "2026-09-14T10:41:48.919091Z",
+    "status": "ok"
+   },
+   {
+    "coverage": {
+     "categories": [
+      "core",
+      "technical",
+      "content",
+      "eeat",
+      "schema",
+      "perf",
+      "links",
+      "images",
+      "security",
+      "social",
+      "a11y",
+      "i18n",
+      "crawl",
+      "url",
+      "mobile",
+      "legal",
+      "redirect",
+      "geo",
+      "htmlval",
+      "js"
+     ],
+     "completed_sources": [],
+     "crawled_pages": 0,
+     "planned_pages": 25,
+     "sampled_pages": 0,
+     "unavailable_sources": [
+      "GoogleSearchConsole"
+     ],
+     "unmapped_rules": []
+    },
+    "instruction": "Connect this optional source before requesting search-performance data.",
+    "message_en": "The source is not configured. Connect it before requesting search-performance data.",
+    "message_ru": "Источник не настроен. Подключите его перед запросом данных поисковой эффективности.",
+    "name": "GoogleSearchConsole",
+    "obtained_at": "2026-09-14T10:41:48.919091Z",
+    "reason": "not_configured",
+    "status": "not_configured"
+   },
+   {
+    "coverage": {
+     "categories": [
+      "core",
+      "technical",
+      "content",
+      "eeat",
+      "schema",
+      "perf",
+      "links",
+      "images",
+      "security",
+      "social",
+      "a11y",
+      "i18n",
+      "crawl",
+      "url",
+      "mobile",
+      "legal",
+      "redirect",
+      "geo",
+      "htmlval",
+      "js"
+     ],
+     "completed_sources": [],
+     "crawled_pages": 0,
+     "planned_pages": 25,
+     "sampled_pages": 0,
+     "unavailable_sources": [
+      "DataForSEO"
+     ],
+     "unmapped_rules": []
+    },
+    "instruction": "Connect this optional source before requesting search-performance data.",
+    "message_en": "The source is not configured. Connect it before requesting search-performance data.",
+    "message_ru": "Источник не настроен. Подключите его перед запросом данных поисковой эффективности.",
+    "name": "DataForSEO",
+    "obtained_at": "2026-09-14T10:41:48.919091Z",
+    "reason": "not_configured",
+    "status": "not_configured"
+   }
+  ],
+  "state": "ready",
+  "target": {
+   "business_goal": "organic_visibility",
+   "daily_run_time": "03:00",
+   "language": "ru",
+   "max_pages": 25,
+   "mode": "full_audit",
+   "ownership_confirmed": true,
+   "profile": "service_b2b",
+   "region": "GLOBAL",
+   "site_type": "website",
+   "site_url": "https://books.toscrape.com/",
+   "target_id": "target-books-toscrape-com-d142438e",
+   "target_name": "Toscrape Books",
+   "timezone": "UTC"
+  },
+  "tasks": [
+   {
+    "action_proposal": {
+     "change": "Добавьте для страницы https://books.toscrape.com/ корректный meta description.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "Missing meta description",
+       "source": "CrawlSEO",
+       "source_rule": "MISSING_DESCRIPTION"
+      },
+      {
+       "fact": "Meta description tag exists but has no content",
+       "source": "SEOmator",
+       "source_rule": "core-description-present"
+      }
+     ],
+     "expires_at": "2026-09-21T10:41:48.919091Z",
+     "operation": "manual_change",
+     "preview": "Добавьте для страницы https://books.toscrape.com/ корректный meta description.",
+     "proposal_id": "proposal-7a05ddbedefb0dce",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "56a092fb2378d23c"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "На странице https://books.toscrape.com/ по правилу meta-description-missing зафиксировано критическое отсутствие meta description.",
+    "confirmed_fact": "На странице отсутствует meta description.",
+    "evidence": [
+     {
+      "fact": "Missing meta description",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_DESCRIPTION"
+     },
+     {
+      "fact": "Meta description tag exists but has no content",
+      "source": "SEOmator",
+      "source_rule": "core-description-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "minimal_fix": "Добавьте для страницы https://books.toscrape.com/ корректный meta description.",
+    "rule_key": "meta-description-missing",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "56a092fb2378d23c",
+    "url": "https://books.toscrape.com/",
+    "verification": "Повторить проверку и убедиться, что правило больше не срабатывает."
+   },
+   {
+    "action_proposal": {
+     "change": "Для этой страницы добавьте корректный meta description.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "Missing meta description",
+       "source": "CrawlSEO",
+       "source_rule": "MISSING_DESCRIPTION"
+      },
+      {
+       "fact": "Meta description tag exists but has no content",
+       "source": "SEOmator",
+       "source_rule": "core-description-present"
+      }
+     ],
+     "expires_at": "2026-09-21T10:41:48.919091Z",
+     "operation": "manual_change",
+     "preview": "Для этой страницы добавьте корректный meta description.",
+     "proposal_id": "proposal-e09bb5677165bf8c",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "1d11f7d12ad1cb27"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "На странице https://books.toscrape.com/index.html подтверждено критическое нарушение правила meta-description-missing: отсутствует meta description.",
+    "confirmed_fact": "На странице отсутствует meta description.",
+    "evidence": [
+     {
+      "fact": "Missing meta description",
+      "source": "CrawlSEO",
+      "source_rule": "MISSING_DESCRIPTION"
+     },
+     {
+      "fact": "Meta description tag exists but has no content",
+      "source": "SEOmator",
+      "source_rule": "core-description-present"
+     }
+    ],
+    "evidence_level": "verified",
+    "minimal_fix": "Для этой страницы добавьте корректный meta description.",
+    "rule_key": "meta-description-missing",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "1d11f7d12ad1cb27",
+    "url": "https://books.toscrape.com/index.html",
+    "verification": "Повторить проверку и убедиться, что правило больше не срабатывает."
+   },
+   {
+    "action_proposal": {
+     "change": "На странице https://books.toscrape.com/ добавьте в раздел head корректный meta description.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "Page has no meta description",
+       "source": "SEOmator",
+       "source_rule": "content-duplicate-description"
+      }
+     ],
+     "expires_at": "2026-09-21T10:41:48.919091Z",
+     "operation": "manual_change",
+     "preview": "На странице https://books.toscrape.com/ добавьте в раздел head корректный meta description.",
+     "proposal_id": "proposal-8f517e3959d26aea",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "5379766bc7209679"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "На странице https://books.toscrape.com/ по правилу content-duplicate-description критично зафиксировано отсутствие meta description.",
+    "confirmed_fact": "Page has no meta description",
+    "evidence": [
+     {
+      "fact": "Page has no meta description",
+      "source": "SEOmator",
+      "source_rule": "content-duplicate-description"
+     }
+    ],
+    "evidence_level": "supported",
+    "minimal_fix": "На странице https://books.toscrape.com/ добавьте в раздел head корректный meta description.",
+    "rule_key": "content-duplicate-description",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "5379766bc7209679",
+    "url": "https://books.toscrape.com/",
+    "verification": "Repeat SEOmator rule content-duplicate-description and confirm it no longer fails."
+   },
+   {
+    "action_proposal": {
+     "change": "Для этой страницы добавьте тег <link rel=\"canonical\"> с корректным каноническим URL.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "No <link rel=\"canonical\"> tag found in the document",
+       "source": "SEOmator",
+       "source_rule": "core-canonical-present"
+      }
+     ],
+     "expires_at": "2026-09-21T10:41:48.919091Z",
+     "operation": "manual_change",
+     "preview": "Для этой страницы добавьте тег <link rel=\"canonical\"> с корректным каноническим URL.",
+     "proposal_id": "proposal-e007397d16e47dda",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "8649a167d2b2f65f"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "На странице https://books.toscrape.com/ выявлено критическое нарушение правила core-canonical-present: отсутствует тег <link rel=\"canonical\">.",
+    "confirmed_fact": "No <link rel=\"canonical\"> tag found in the document",
+    "evidence": [
+     {
+      "fact": "No <link rel=\"canonical\"> tag found in the document",
+      "source": "SEOmator",
+      "source_rule": "core-canonical-present"
+     }
+    ],
+    "evidence_level": "supported",
+    "minimal_fix": "Для этой страницы добавьте тег <link rel=\"canonical\"> с корректным каноническим URL.",
+    "rule_key": "core-canonical-present",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "8649a167d2b2f65f",
+    "url": "https://books.toscrape.com/",
+    "verification": "Repeat SEOmator rule core-canonical-present and confirm it no longer fails."
+   },
+   {
+    "action_proposal": {
+     "change": "На этой странице добавьте тег <link rel=\"canonical\"> с корректным каноническим URL после выполнения JavaScript.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "Canonical link tag is missing in the rendered DOM after JavaScript execution",
+       "source": "SEOmator",
+       "source_rule": "js-rendered-canonical"
+      }
+     ],
+     "expires_at": "2026-09-21T10:41:48.919091Z",
+     "operation": "manual_change",
+     "preview": "На этой странице добавьте тег <link rel=\"canonical\"> с корректным каноническим URL после выполнения JavaScript.",
+     "proposal_id": "proposal-a2c1f6eb4f2ee981",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "c9394575766f295a"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "На странице https://books.toscrape.com/ по правилу js-rendered-canonical критически отсутствует тег <link rel=\"canonical\"> в рендеренном DOM после выполнения JavaScript.",
+    "confirmed_fact": "Canonical link tag is missing in the rendered DOM after JavaScript execution",
+    "evidence": [
+     {
+      "fact": "Canonical link tag is missing in the rendered DOM after JavaScript execution",
+      "source": "SEOmator",
+      "source_rule": "js-rendered-canonical"
+     }
+    ],
+    "evidence_level": "supported",
+    "minimal_fix": "На этой странице добавьте тег <link rel=\"canonical\"> с корректным каноническим URL после выполнения JavaScript.",
+    "rule_key": "js-rendered-canonical",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "c9394575766f295a",
+    "url": "https://books.toscrape.com/",
+    "verification": "Repeat SEOmator rule js-rendered-canonical and confirm it no longer fails."
+   },
+   {
+    "action_proposal": {
+     "change": "Для страницы https://books.toscrape.com/ замените найденный HTTP-ресурс на HTTPS или безопасный альтернативный источник.",
+     "confirmation": "required",
+     "evidence": [
+      {
+       "fact": "Found 1 HTTP resource(s) on HTTPS page",
+       "source": "SEOmator",
+       "source_rule": "security-mixed-content"
+      }
+     ],
+     "expires_at": "2026-09-21T10:41:48.919091Z",
+     "operation": "manual_change",
+     "preview": "Для страницы https://books.toscrape.com/ замените найденный HTTP-ресурс на HTTPS или безопасный альтернативный источник.",
+     "proposal_id": "proposal-2d9e3d51fe7441e5",
+     "rollback": "Revert the manual change using the site's normal change history.",
+     "status": "proposed",
+     "target": {
+      "site_url": "https://books.toscrape.com/",
+      "target_id": "target-books-toscrape-com-d142438e"
+     },
+     "target_id": "target-books-toscrape-com-d142438e",
+     "task_id": "0628dc9b8c6e0944"
+    },
+    "affected_pages_count": 1,
+    "business_impact": "На странице https://books.toscrape.com/ по правилу security-mixed-content подтвержден критичный факт: на HTTPS-странице найден HTTP-ресурс.",
+    "confirmed_fact": "Found 1 HTTP resource(s) on HTTPS page",
+    "evidence": [
+     {
+      "fact": "Found 1 HTTP resource(s) on HTTPS page",
+      "source": "SEOmator",
+      "source_rule": "security-mixed-content"
+     }
+    ],
+    "evidence_level": "supported",
+    "minimal_fix": "Для страницы https://books.toscrape.com/ замените найденный HTTP-ресурс на HTTPS или безопасный альтернативный источник.",
+    "rule_key": "security-mixed-content",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "0628dc9b8c6e0944",
+    "url": "https://books.toscrape.com/",
+    "verification": "Repeat SEOmator rule security-mixed-content and confirm it no longer fails."
+   },
+   {
+    "affected_pages_count": 1,
+    "confirmed_fact": "Page has no meta description",
+    "evidence": [
+     {
+      "fact": "Page has no meta description",
+      "source": "SEOmator",
+      "source_rule": "content-duplicate-description"
+     }
+    ],
+    "evidence_level": "supported",
+    "rule_key": "content-duplicate-description",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "65ff12b91562271d",
+    "url": "https://books.toscrape.com/catalogue/category/books/add-a-comment_18/index.html",
+    "verification": "Repeat SEOmator rule content-duplicate-description and confirm it no longer fails."
+   },
+   {
+    "affected_pages_count": 1,
+    "confirmed_fact": "No <link rel=\"canonical\"> tag found in the document",
+    "evidence": [
+     {
+      "fact": "No <link rel=\"canonical\"> tag found in the document",
+      "source": "SEOmator",
+      "source_rule": "core-canonical-present"
+     }
+    ],
+    "evidence_level": "supported",
+    "rule_key": "core-canonical-present",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "17fb16a1a9ad9631",
+    "url": "https://books.toscrape.com/catalogue/category/books/add-a-comment_18/index.html",
+    "verification": "Repeat SEOmator rule core-canonical-present and confirm it no longer fails."
+   },
+   {
+    "affected_pages_count": 1,
+    "confirmed_fact": "Canonical link tag is missing in the rendered DOM after JavaScript execution",
+    "evidence": [
+     {
+      "fact": "Canonical link tag is missing in the rendered DOM after JavaScript execution",
+      "source": "SEOmator",
+      "source_rule": "js-rendered-canonical"
+     }
+    ],
+    "evidence_level": "supported",
+    "rule_key": "js-rendered-canonical",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "dab1c0f927586d83",
+    "url": "https://books.toscrape.com/catalogue/category/books/add-a-comment_18/index.html",
+    "verification": "Repeat SEOmator rule js-rendered-canonical and confirm it no longer fails."
+   },
+   {
+    "affected_pages_count": 1,
+    "confirmed_fact": "На странице отсутствует meta description.",
+    "evidence": [
+     {
+      "fact": "Meta description tag exists but has no content",
+      "source": "SEOmator",
+      "source_rule": "core-description-present"
+     }
+    ],
+    "evidence_level": "supported",
+    "rule_key": "meta-description-missing",
+    "severity": "critical",
+    "target_id": "target-books-toscrape-com-d142438e",
+    "task_id": "6a09516b8951e47c",
+    "url": "https://books.toscrape.com/catalogue/category/books/add-a-comment_18/index.html",
+    "verification": "Повторить проверку и убедиться, что правило больше не срабатывает."
+   }
+  ]
+ },
+ "queue": [
+  {
+   "attempts": 0,
+   "mode": "full_audit",
+   "queue_id": "queue-89095888f6a14f0387854120e94bd23c",
+   "requested_at": "2026-09-14T10:21:42.046273Z",
+   "run_id": "seo-b9ff257f403c4e16bbf7220c5cf41bda",
+   "status": "completed",
+   "target_id": "target-books-toscrape-com-d142438e",
+   "trigger": "manual"
+  },
+  {
+   "attempts": 0,
+   "mode": "full_audit",
+   "queue_id": "queue-711f2ed3f75545ffb36375664c7aaf38",
+   "requested_at": "2026-09-14T10:22:31.089464Z",
+   "run_id": "seo-c690f30f0ec0458096958ca1bbeedae0",
+   "status": "completed",
+   "target_id": "target-books-toscrape-com-d142438e",
+   "trigger": "daily"
+  },
+  {
+   "attempts": 0,
+   "mode": "full_audit",
+   "queue_id": "queue-8d51b27cbe724d5296f6a075f548834c",
+   "requested_at": "2026-09-14T10:32:05.074377Z",
+   "run_id": "seo-a49ad020c7ea4cedbfb006ede3393f4f",
+   "status": "completed",
+   "target_id": "target-books-toscrape-com-d142438e",
+   "trigger": "manual"
+  }
+ ],
+ "state": "ready",
+ "target_id": "target-books-toscrape-com-d142438e"
+}

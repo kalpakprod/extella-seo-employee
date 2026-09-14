@@ -1,0 +1,59 @@
+name: release-gate
+
+on:
+  push:
+    branches: [main, "release/*"]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Python suite
+        run: python3 -m unittest discover -s tests -p "test_*.py"
+
+      - name: Node suite
+        run: node --test tests/safe_fetch.test.mjs tests/worker_plan.test.mjs tests/ui/ui_contract.test.mjs
+
+      - name: Deterministic build
+        run: |
+          python3 tools/build_release.py
+          python3 -c "import json; d=json.load(open('dist/build.json')); assert d['status']=='success', d; print('build OK:', d['version'])"
+          git status --porcelain -- dist/ | grep . && { echo 'BUILD DRIFT: rebuild differs from committed dist/'; exit 1; } || echo 'no drift'
+
+      - name: Self-check and manifest
+        run: |
+          python3 manifest_check.py
+          python3 tools/selfcheck.py
+
+      - name: Compose config
+        run: docker compose -f deploy/compose.yaml config -q
+
+      - name: Upstream Extella gates (pinned)
+        run: |
+          git clone --depth 1 https://github.com/AnvarBakiyev/extella-agent-standards.git /tmp/extella-agent-standards
+          test "$(git -C /tmp/extella-agent-standards rev-parse HEAD)" = "d6118bd55310261ae9aeb1aa0ed4df58e4d57cb6"
+          cd /tmp/extella-agent-standards
+          P="$GITHUB_WORKSPACE"
+          python3 tools/check_code_canon.py "$P"
+          python3 tools/check_ui_api_contract.py "$P"
+          python3 tools/check_self_check.py "$P"
+          python3 tools/check_app_scopes.py "$P"
+          python3 tools/check_listing_meta.py "$P"
+          python3 tools/check_ready_for_publish.py "$P"
+          python3 tools/check_canon_numbers.py "$P"
+          python3 tools/check_single_source.py "$P"
+          python3 tools/check_automation_passport.py "$P/automation_passport.yaml"
+          python3 tools/check_brand_copy.py "$P/app/index.html" "$P/app/app.js" "$P/app/styles.css" "$P/app/extella-bridge.js"
+          python3 tools/check_waiting_state.py "$P/app/index.html" "$P/app/app.js"
+          python3 tools/check_state_contract.py "$P/evidence/extella.seo_employee_state.v1.json"

@@ -52,12 +52,16 @@ Google Search Console и DataForSEO предусмотрены как опцио
 ```sh
 python3 tools/selfcheck.py
 cp deploy/.env.example deploy/.env
-python3 deploy/prepare.py \
+sudo python3 deploy/prepare.py \
   --device-id '<Extella device id>' \
   --hosting-profile client_server \
   --agent-id '<agent_... from Extella>'
 docker compose --project-name extella-seo-release -f deploy/compose.yaml up -d
 ```
+
+`prepare.py` запускается от root: секреты и привязки должны принадлежать root,
+иначе контейнеры без capabilities не прочитают их (код ошибки
+`prepare_requires_root`).
 
 После запуска владелец открывает Agent Zero на `http://127.0.0.1:50081`, подключает провайдер и выбирает модель. Проверка сервисов:
 

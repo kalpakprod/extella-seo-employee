@@ -103,6 +103,50 @@ class ContainerRuntimeTest(unittest.TestCase):
             server.server_close()
             thread.join(timeout=2)
 
+    def test_source_proxy_posts_psi_plan_to_psi_worker(self) -> None:
+        server = ThreadingHTTPServer(("127.0.0.1", 0), _SourceStub)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "psi.json"
+                plan = Path(directory) / "plan.json"
+                plan.write_text(
+                    json.dumps({"max_urls": 2, "timeout_ms": 120000}), encoding="utf-8"
+                )
+                with mock.patch.dict(
+                    PROXY.ENDPOINTS,
+                    {"PSI": f"http://127.0.0.1:{server.server_port}/run"},
+                ):
+                    PROXY.proxy_source("PSI", "https://example.com/", plan, output)
+                self.assertEqual(
+                    _SourceStub.received,
+                    {
+                        "site_url": "https://example.com/",
+                        "plan": {"max_urls": 2, "timeout_ms": 120000},
+                    },
+                )
+                self.assertTrue(output.is_file())
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_source_proxy_rejects_an_invalid_psi_plan_before_network_io(self) -> None:
+        for bad in (
+            {"max_urls": 4, "timeout_ms": 120000},
+            {"max_urls": 0, "timeout_ms": 120000},
+            {"timeout_ms": 120000},
+            {"max_urls": 2, "timeout_ms": 120000, "extra": True},
+        ):
+            with self.subTest(plan=bad), tempfile.TemporaryDirectory() as directory:
+                plan = Path(directory) / "plan.json"
+                plan.write_text(json.dumps(bad), encoding="utf-8")
+                with mock.patch("urllib.request.urlopen") as open_url:
+                    with self.assertRaisesRegex(ValueError, "plan is invalid"):
+                        PROXY.proxy_source("PSI", "https://example.com/", plan, Path(directory) / "output.json")
+                open_url.assert_not_called()
+
     def test_source_proxy_rejects_an_invalid_plan_before_network_io(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             plan = Path(directory) / "plan.json"
@@ -681,7 +725,7 @@ class ContainerRuntimeTest(unittest.TestCase):
         compose = (ROOT / "deploy" / "compose.yaml").read_text(encoding="utf-8")
         product = compose.split("\n  api-gateway:", 1)[0]
         self.assertNotIn("\n    ports:", product)
-        self.assertIn("networks: [control, crawlseo_control, resolver_control, seomator_control]", product)
+        self.assertIn("networks: [control, crawlseo_control, resolver_control, seomator_control, psi_control]", product)
         self.assertIn("EXTELLA_DNS_RESOLVER_URL: http://dns-resolver:8083/resolve", product)
         self.assertIn("dns-resolver:\n        condition: service_healthy", product)
         self.assertIn("- ./bindings:/run/bindings:ro", product)
@@ -722,6 +766,19 @@ class ContainerRuntimeTest(unittest.TestCase):
         self.assertIn("resolver_control:\n    internal: true", compose)
         self.assertIn("resolver_egress: {}", compose)
         self.assertIn("networks: [seomator_control, seomator_egress]", compose)
+        psi = compose.split("\n  psi:\n", 1)[1].split("\nnetworks:", 1)[0]
+        self.assertIn("image: extella-seo-psi:2.1.0", psi)
+        self.assertIn("dockerfile: runtime/psi/Dockerfile", psi)
+        self.assertIn("networks: [psi_control, psi_egress]", psi)
+        self.assertIn("read_only: true", psi)
+        self.assertIn("cap_drop: [ALL]", psi)
+        self.assertIn("security_opt: [no-new-privileges:true]", psi)
+        self.assertIn("http://127.0.0.1:8084/health", psi)
+        self.assertNotIn("ports:", psi)
+        self.assertNotIn("secrets:", psi)
+        self.assertNotIn("volumes:", psi)
+        self.assertIn("psi_control:\n    internal: true", compose)
+        self.assertIn("psi_egress: {}", compose)
         self.assertNotIn("\n  egress:", compose)
         self.assertIn("cpus:", compose)
         self.assertIn("mem_limit:", compose)

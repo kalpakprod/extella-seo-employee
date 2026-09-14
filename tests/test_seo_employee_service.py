@@ -150,11 +150,31 @@ def _configure(paths: dict[str, object]) -> None:
     )
 
 
+def _psi() -> dict[str, object]:
+    return {
+        "schema": "extella.psi_source.v1",
+        "source": "PSI",
+        "site_url": "https://example.com/",
+        "probed_urls": ["https://example.com/"],
+        "metrics": [
+            {"url": "https://example.com/", "metric": "lcp", "lab": 5000, "field_p75": None},
+        ],
+        "psi_api": {"status": "ok", "reason": None},
+        "crux": {"status": "not_configured", "reason": None},
+        "sitefiles": {
+            "robots_txt": {"http_status": 200, "truncated": False, "content": "User-agent: *\nDisallow:\n"},
+            "sitemap_xml": {"http_status": 404, "truncated": False, "content": ""},
+            "homepage_html": {"http_status": 200, "truncated": False, "content": "<html><head></head></html>"},
+        },
+    }
+
+
 def _source_runner(
     calls: list[list[str]],
     *,
     crawl: dict[str, object] | None = None,
     seomator: dict[str, object] | None = None,
+    psi: dict[str, object] | None = None,
     failures: set[str] | None = None,
 ):
     failures = failures or set()
@@ -162,6 +182,11 @@ def _source_runner(
     def run(args: list[str], **kwargs: object) -> SimpleNamespace:
         calls.append(args)
         executable, _url, _plan, output = args
+        if executable.endswith("run_psi"):
+            if psi is None or "PSI" in failures:
+                return SimpleNamespace(returncode=1)
+            Path(output).write_text(json.dumps(psi), encoding="utf-8")
+            return SimpleNamespace(returncode=0)
         name = "CrawlSEO" if executable.endswith("run_crawlseo") else "SEOmator"
         self_payload = (crawl or _crawlseo()) if name == "CrawlSEO" else (seomator or _seomator())
         if name in failures:
@@ -195,7 +220,7 @@ class SeoEmployeeContractTest(unittest.TestCase):
             self.assertEqual(first["state"], "ready")
             self.assertTrue(second["duplicate"])
             self.assertEqual(second["run_id"], first["run_id"])
-            self.assertEqual(len(calls), 2)
+            self.assertEqual(len(calls), 3)
             self.assertEqual(list(paths["lock_dir"].glob("*.lock")), [])
 
             state = SERVICE.make_state("ready", checked_at="2026-08-29T18:00:00Z", config=SERVICE.load_configuration(paths["config_path"]))
@@ -300,7 +325,12 @@ class SeoEmployeeContractTest(unittest.TestCase):
 
             def runner(args: list[str], **kwargs: object) -> SimpleNamespace:
                 calls.append((args, kwargs))
-                payload = _crawlseo() if args[0].endswith("run_crawlseo") else _seomator()
+                if args[0].endswith("run_crawlseo"):
+                    payload: dict[str, object] = _crawlseo()
+                elif args[0].endswith("run_psi"):
+                    payload = _psi()
+                else:
+                    payload = _seomator()
                 Path(args[3]).write_text(json.dumps(payload), encoding="utf-8")
                 return SimpleNamespace(returncode=0)
 
@@ -310,13 +340,14 @@ class SeoEmployeeContractTest(unittest.TestCase):
                 evidence_dir=Path(directory),
                 runner=runner,
             )
-            self.assertEqual([item["status"] for item in statuses], ["ok", "ok", "not_configured", "not_configured"])
-            self.assertEqual(set(payloads), {"CrawlSEO", "SEOmator"})
+            self.assertEqual([item["status"] for item in statuses], ["ok", "ok", "ok", "not_configured", "not_configured"])
+            self.assertEqual(set(payloads), {"CrawlSEO", "SEOmator", "PSI"})
             self.assertEqual(
                 [call[0][0] for call in calls],
                 [
                     str(SERVICE.CRAWLSEO_EXECUTABLE),
                     str(SERVICE.SEOMATOR_EXECUTABLE),
+                    str(SERVICE.PSI_EXECUTABLE),
                 ],
             )
             self.assertTrue(all(len(call[0]) == 4 for call in calls))
@@ -469,7 +500,13 @@ class SeoEmployeeContractTest(unittest.TestCase):
             self.assertEqual(next_ready["state"], "ready")
             self.assertEqual(next_ready["report"]["comparison"]["new"], 0)
             self.assertEqual(next_ready["report"]["comparison"]["fixed"], 0)
-            self.assertEqual(next_ready["report"]["comparison"]["unchanged"], 2)
+            # DQ-1: the fixture MISSING_SCHEMA issue now maps to schema-present
+            # instead of being dropped as unmapped, so three findings persist.
+            self.assertEqual(next_ready["report"]["comparison"]["unchanged"], 3)
+            self.assertEqual(
+                {task["rule_key"] for task in next_ready["report"]["tasks"]},
+                {"meta-description-missing", "core-canonical-present", "schema-present"},
+            )
 
     def test_baseline_preserves_full_fixed_cards_and_legacy_minimal_cards(self) -> None:
         fixed = {
@@ -573,13 +610,18 @@ class SeoEmployeeContractTest(unittest.TestCase):
 
             def runner(args: list[str], **_kwargs: object) -> SimpleNamespace:
                 observed.append(json.loads(paths["state_path"].read_text(encoding="utf-8"))["state"])
-                payload = _crawlseo() if args[0].endswith("run_crawlseo") else _seomator()
+                if args[0].endswith("run_crawlseo"):
+                    payload: dict[str, object] = _crawlseo()
+                elif args[0].endswith("run_psi"):
+                    payload = _psi()
+                else:
+                    payload = _seomator()
                 Path(args[3]).write_text(json.dumps(payload), encoding="utf-8")
                 return SimpleNamespace(returncode=0)
 
             paths["process_runner"] = runner
             result = SERVICE.run_seo_employee(site_url="", **paths)
-            self.assertEqual(observed, ["running", "running"])
+            self.assertEqual(observed, ["running", "running", "running"])
             self.assertEqual(
                 json.loads(paths["state_path"].read_text(encoding="utf-8"))["state"],
                 "ready",
@@ -642,7 +684,7 @@ class SeoEmployeeContractTest(unittest.TestCase):
             paths["process_runner"] = timeout_runner
             result = SERVICE.run_seo_employee(site_url="", **paths)
             self.assertEqual(result["state"], "failed")
-            self.assertEqual(len(calls), 2)
+            self.assertEqual(len(calls), 3)
             self.assertEqual(list(paths["lock_dir"].glob("*.lock")), [])
 
     def test_http_semantics_keep_partial_successful_and_duplicate_accepted(self) -> None:
@@ -664,11 +706,13 @@ class SeoEmployeeContractTest(unittest.TestCase):
         self.assertTrue(payload["duplicate"])
 
     def test_ct_sc_010_ready_partial_failed_and_model_partial_are_terminal(self) -> None:
+        # PSI doubles as a missing worker (returncode 1), so the best-effort
+        # lane is honestly listed in missing_data without blocking the run.
         cases = (
-            (set(), _enrich, "ready", []),
-            ({"SEOmator"}, _enrich, "partial", ["SEOmator"]),
-            ({"CrawlSEO", "SEOmator"}, _enrich, "failed", ["CrawlSEO", "SEOmator"]),
-            (set(), lambda _value: (_ for _ in ()).throw(RuntimeError("route down")), "ready", []),
+            (set(), _enrich, "ready", ["PSI"]),
+            ({"SEOmator"}, _enrich, "partial", ["SEOmator", "PSI"]),
+            ({"CrawlSEO", "SEOmator"}, _enrich, "failed", ["CrawlSEO", "SEOmator", "PSI"]),
+            (set(), lambda _value: (_ for _ in ()).throw(RuntimeError("route down")), "ready", ["PSI"]),
         )
         for failures, enricher, expected, missing in cases:
             with self.subTest(expected=expected, missing=missing), tempfile.TemporaryDirectory() as directory:
@@ -680,7 +724,7 @@ class SeoEmployeeContractTest(unittest.TestCase):
                 paths["enricher"] = enricher
                 result = SERVICE.run_seo_employee(site_url="", **paths)
                 self.assertEqual(result["state"], expected)
-                self.assertEqual(len(calls), 2)
+                self.assertEqual(len(calls), 3)
                 report = result["report"]
                 self.assertEqual(report["missing_data"], missing)
                 if expected == "failed":
@@ -690,6 +734,80 @@ class SeoEmployeeContractTest(unittest.TestCase):
                     self.assertNotIn("business_impact", report["tasks"][0])
                     self.assertNotIn("minimal_fix", report["tasks"][0])
                     self.assertEqual(report["model_enrichment"]["status"], "unavailable")
+
+    def _enrichable_finding(self, rule_key: str = "meta-description-missing") -> dict[str, object]:
+        return {
+            "target_id": "target-example-com-0f115db0",
+            "url": "https://example.com/",
+            "rule_key": rule_key,
+            "severity": "critical",
+            "affected_pages_count": 1,
+            "evidence": [
+                {"source": "CrawlSEO", "source_rule": "MISSING_DESCRIPTION", "fact": "Missing meta description"},
+                {"source": "SEOmator", "source_rule": "core-description-present", "fact": "No meta description tag"},
+            ],
+            "confirmed_fact": "На странице отсутствует meta description.",
+            "evidence_level": "verified",
+        }
+
+    def test_enrichment_retries_twice_before_fallback(self) -> None:
+        calls: list[object] = []
+
+        def flaky(value: object) -> Mapping[str, str]:
+            calls.append(value)
+            if len(calls) < 3:
+                raise SERVICE.SeoEmployeeError("route down")
+            return {"business_impact": "Влияние подтверждено данными.", "minimal_fix": "Добавить meta description."}
+
+        tasks, status = SERVICE._build_tasks(
+            [self._enrichable_finding()],
+            target_id="target-example-com-0f115db0",
+            site_url="https://example.com/",
+            expires_at="2026-09-21T00:00:00Z",
+            enricher=flaky,
+        )
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(status["status"], "ok")
+        self.assertEqual(status["enriched"], 1)
+        self.assertEqual(status["attempts"], 3)
+        self.assertIn("business_impact", tasks[0])
+
+    def test_enrichment_fallback_preserved_after_exhausted_retries(self) -> None:
+        calls: list[object] = []
+
+        def down(value: object) -> Mapping[str, str]:
+            calls.append(value)
+            raise RuntimeError("route down")
+
+        tasks, status = SERVICE._build_tasks(
+            [self._enrichable_finding(), self._enrichable_finding()],
+            target_id="target-example-com-0f115db0",
+            site_url="https://example.com/",
+            expires_at="2026-09-21T00:00:00Z",
+            enricher=down,
+        )
+        self.assertEqual(len(calls), 6)
+        self.assertEqual(status["status"], "unavailable")
+        self.assertEqual(status["enriched"], 0)
+        self.assertEqual(status["total"], 2)
+        self.assertEqual(status["attempts"], 6)
+        self.assertNotIn("business_impact", tasks[0])
+        self.assertTrue(tasks[0]["confirmed_fact"])
+
+    def test_psi_lane_contributes_findings_when_worker_answers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = _service_paths(root)
+            _configure(paths)
+            calls: list[list[str]] = []
+            paths["process_runner"] = _source_runner(calls, psi=_psi())
+            paths["enricher"] = _enrich
+            result = SERVICE.run_seo_employee(site_url="", **paths)
+            self.assertEqual(result["state"], "ready")
+            self.assertEqual(len(calls), 3)
+            self.assertNotIn("PSI", result["report"]["missing_data"])
+            rules = {task["rule_key"] for task in result["report"]["tasks"]}
+            self.assertIn("psi-lcp", rules)
 
     def test_ct_sc_011_writes_atomically_and_refuses_secret_fields(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -744,8 +862,11 @@ class SeoEmployeeContractTest(unittest.TestCase):
                     resolver=_public_resolver,
                     enricher=enrich,
                 )
-            self.assertEqual(len(calls), 2)
-            self.assertEqual(len(value["tasks"]), 2)
+            # DQ-1: MISSING_SCHEMA now yields a schema-present finding, so the
+            # enricher runs three times instead of two.
+            self.assertEqual(len(calls), 3)
+            self.assertEqual(len(value["tasks"]), 3)
+            self.assertIn("schema-present", {task["rule_key"] for task in value["tasks"]})
             state_value = json.loads(state.read_text(encoding="utf-8"))
             self.assertEqual(state_value["schema"], "extella.seo_employee_state.v2")
             self.assertEqual(state_value["last_report"], value)
@@ -780,6 +901,140 @@ class SeoEmployeeContractTest(unittest.TestCase):
                 resolver=_public_resolver,
             )
             self.assertEqual(config["targets"][0]["site_url"], "https://example.com/path")
+
+    def test_warn_only_finding_is_downgraded_one_step(self) -> None:
+        plan = SERVICE.build_audit_plan("service_b2b", requested_max_pages=1)
+        crawl = _crawlseo()
+        crawl["issues"] = [
+            {
+                "type": "MISSING_SCHEMA",
+                "severity": "WARNING",
+                "url": "https://example.com/",
+                "message": "No structured data",
+            }
+        ]
+        seo = _seomator()
+        seo["categoryResults"] = [
+            {"categoryId": category["categoryId"], "results": []}
+            for category in seo["categoryResults"]
+        ]
+        results = {
+            "CrawlSEO": SERVICE.CrawlSEOAdapter().parse(crawl, plan),
+            "SEOmator": SERVICE.SEOmatorAdapter().parse(seo, plan),
+        }
+        self.assertEqual(results["CrawlSEO"].status, "ok")
+        findings = SERVICE._normalize_v2_results("example-com", plan, results)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["rule_key"], "schema-present")
+        self.assertEqual(findings[0]["severity"], "info")
+        self.assertEqual(findings[0]["evidence_level"], "supported")
+
+    def test_mixed_fail_and_warn_keeps_catalog_severity(self) -> None:
+        plan = SERVICE.build_audit_plan("service_b2b", requested_max_pages=1)
+        results = {
+            "CrawlSEO": SERVICE.CrawlSEOAdapter().parse(_crawlseo(), plan),
+            "SEOmator": SERVICE.SEOmatorAdapter().parse(_seomator(), plan),
+        }
+        findings = {
+            finding["rule_key"]: finding
+            for finding in SERVICE._normalize_v2_results("example-com", plan, results)
+        }
+        # CrawlSEO WARNING + SEOmator fail -> fail wins, catalog severity kept.
+        self.assertEqual(findings["meta-description-missing"]["severity"], "critical")
+        self.assertEqual(findings["core-canonical-present"]["severity"], "critical")
+        # CrawlSEO-only INFO advisory -> downgraded warning -> info.
+        self.assertEqual(findings["schema-present"]["severity"], "info")
+
+    def test_model_input_accepts_only_the_documented_downgrade(self) -> None:
+        plan = SERVICE.build_audit_plan("service_b2b", requested_max_pages=1)
+        crawl = _crawlseo()
+        crawl["issues"] = [
+            {
+                "type": "MISSING_DESCRIPTION",
+                "severity": "WARNING",
+                "url": "https://example.com/",
+                "message": "Missing meta description",
+            }
+        ]
+        seo = _seomator()
+        seo["categoryResults"] = [
+            {"categoryId": category["categoryId"], "results": []}
+            for category in seo["categoryResults"]
+        ]
+        results = {
+            "CrawlSEO": SERVICE.CrawlSEOAdapter().parse(crawl, plan),
+            "SEOmator": SERVICE.SEOmatorAdapter().parse(seo, plan),
+        }
+        findings = SERVICE._normalize_v2_results("example-com", plan, results)
+        self.assertEqual(findings[0]["severity"], "warning")
+        value = SERVICE.build_model_input(findings[0])
+        SERVICE.validate_model_input(value)
+        # Catalog severity stays accepted (the validator allows the documented
+        # pair without tracking warn/fail provenance); anything else is rejected.
+        SERVICE.validate_model_input({**value, "severity": "critical"})
+        with self.assertRaises(SERVICE.ModelInputError):
+            SERVICE.validate_model_input({**value, "severity": "info"})
+
+    def test_aggregate_coverage_breaks_down_pages_per_source(self) -> None:
+        plan = SERVICE.build_audit_plan("service_b2b", requested_max_pages=1)
+        _, coverage = SERVICE.normalize_v2_findings(
+            "example-com", plan, {"CrawlSEO": _crawlseo(), "SEOmator": _seomator()}
+        )
+        self.assertEqual(coverage["planned_pages"], 1)
+        self.assertEqual(coverage["crawled_pages"], 1)
+        sources = coverage["sources"]
+        self.assertEqual(set(sources), {"CrawlSEO", "SEOmator"})
+        self.assertEqual(sources["CrawlSEO"]["crawled_pages"], 1)
+        self.assertEqual(sources["SEOmator"]["crawled_pages"], 1)
+        self.assertEqual(sources["CrawlSEO"]["status"], "ok")
+        self.assertEqual(sources["CrawlSEO"]["unmapped_rules"], [])
+        self.assertEqual(sources["CrawlSEO"]["sampled_pages"], 0)
+        self.assertEqual(sources["SEOmator"]["sampled_pages"], 1)
+
+    def test_url_identity_strips_default_ports_only(self) -> None:
+        sanitize = SERVICE.sanitize_url_for_model
+        self.assertEqual(sanitize("https://example.com:443/path"), "https://example.com/path")
+        self.assertEqual(sanitize("http://example.com:80/path"), "http://example.com/path")
+        self.assertEqual(
+            sanitize("https://example.com:8443/path"), "https://example.com:8443/path"
+        )
+        self.assertEqual(
+            sanitize("https://example.com/page?x=1#frag"), "https://example.com/page"
+        )
+        self.assertEqual(
+            sanitize("https://user:pass@example.com/"), "https://example.com/"
+        )
+
+    def test_prioritize_breaks_ties_by_profile_category_priority(self) -> None:
+        def finding(rule_key: str) -> dict[str, object]:
+            return {
+                "url": "https://example.com/",
+                "rule_key": rule_key,
+                "severity": "warning",
+                "evidence_level": "supported",
+                "affected_pages_count": 1,
+            }
+        pair = [finding("core-title-present"), finding("content-duplicate-description")]
+        content_first = SERVICE.prioritize_findings(
+            pair, category_priority=("content", "core")
+        )
+        self.assertEqual(
+            [item["rule_key"] for item in content_first],
+            ["content-duplicate-description", "core-title-present"],
+        )
+        core_first = SERVICE.prioritize_findings(pair, category_priority=("core", "content"))
+        self.assertEqual(
+            [item["rule_key"] for item in core_first],
+            ["core-title-present", "content-duplicate-description"],
+        )
+        # Severity still outranks the profile tiebreak.
+        critical = finding("core-title-present")
+        critical["severity"] = "critical"
+        ranked = SERVICE.prioritize_findings(
+            [finding("content-duplicate-description"), critical],
+            category_priority=("content", "core"),
+        )
+        self.assertEqual(ranked[0]["rule_key"], "core-title-present")
 
     def test_ct_sc_014_is_provider_neutral_and_preflight_is_fixed(self) -> None:
         source = (ROOT / "experts" / "seo_employee_service.py").read_text(encoding="utf-8").lower()

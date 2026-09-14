@@ -66,6 +66,25 @@ python3 deploy/probe.py state
 
 Для обычной проверки API используйте `GET /health` без токена и `GET /api/state` с `Authorization: Bearer <локальный токен>`.
 
+## PSI lane и ключ Google API
+
+PSI-лейн (PageSpeed + CrUX + проверка robots/sitemap/schema) работает всегда, но его
+секции зависят от доступа к Google:
+
+- Без ключа: PageSpeed вызывается keyless (общая квота, может быть исчерпана —
+  тогда в отчёте честно `psi api http_429: lab metrics unavailable`), CrUX пропущен
+  (`crux not_configured`), sitefiles проверяются как обычно.
+- С ключом: `PSI_API_KEY=<ключ>` в окружении Compose-проекта (Google Cloud Console,
+  PageSpeed Insights API + Chrome UX Report API; бесплатных квот хватает на пилот).
+  Ключ уходит только в `*.googleapis.com`, никогда не пишется в логи и отчёты.
+
+```sh
+PSI_API_KEY=<ключ> docker compose --project-name extella-seo-release -f deploy/compose.yaml up -d psi
+```
+
+Проверить: следующий аудит должен показать в `coverage.sources.PSI.notes` пустой
+список вместо `http_429`, а при медленных страницах — задачи `psi-lcp`/`psi-cls`/`psi-inp`.
+
 ## Ротация API-токена
 
 Токен читается сервером один раз при старте, поэтому ротация — это замена файла плюс

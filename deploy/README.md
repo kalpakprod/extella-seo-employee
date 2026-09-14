@@ -12,18 +12,22 @@
 
 ```sh
 cp deploy/.env.example deploy/.env
-python3 deploy/prepare.py \
+sudo python3 deploy/prepare.py \
   --device-id '<Extella device id>' \
   --hosting-profile client_server \
   --agent-id '<agent_... from Extella>'
 ```
+
+`prepare.py` требует root: секреты и привязки должны принадлежать root, иначе
+контейнеры без capabilities не прочитают bind-mounted файлы с правами `600`.
+Без root скрипт сразу завершается кодом `prepare_requires_root`.
 
 `prepare.py` создаёт и перечитывает привязку устройства, собирает закреплённые образы, создаёт локальные secret-файлы с правами `600`, запускает Agent Zero и синхронизирует его внутренний API-токен без вывода значения. Затем он сам поднимает Compose, перезапускает продуктовые контейнеры и ждёт loopback health. Это однократный recovery/первичный путь для отсутствующей device binding; последующие установки через Extella запускают ту же последовательность автоматически. Затем владелец открывает `http://127.0.0.1:50081`, вручную подключает свой провайдер и выбирает модель. Код SEO Employee не ограничивает модель; живым E2E подтверждён только `agy/gemini-3.7-flash-high`, работа через пользовательскую подписку, BYOK и другие модели пока не подтверждена.
 
 ## Существующий Agent Zero
 
 ```sh
-python3 deploy/prepare.py \
+sudo python3 deploy/prepare.py \
   --device-id '<Extella device id>' \
   --hosting-profile client_server \
   --agent-id '<agent_... from Extella>' \
@@ -50,3 +54,25 @@ python3 deploy/probe.py state
 ```
 
 Для обычной проверки API используйте `GET /health` без токена и `GET /api/state` с `Authorization: Bearer <локальный токен>`.
+
+## Ротация API-токена
+
+Токен читается сервером один раз при старте, поэтому ротация — это замена файла плюс
+рестарт контейнеров. Имя файла печатается, значение — никогда.
+
+```sh
+# 1. Заменить секрет новым случайным значением (только root):
+sudo python3 deploy/prepare.py --rotate-secret seo_employee_api_token
+# {"status": "success", "rotated": "seo_employee_api_token"}
+
+# 2. Перезапустить контур тем же --project-name, что при запуске:
+docker compose --project-name extella-seo-release -f deploy/compose.yaml restart seo-employee api-gateway
+
+# 3. Проверка: старый токен -> 401, новый -> 200:
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer <старый>" http://127.0.0.1:8088/api/state?target_id=<id>  # 401
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(sudo cat deploy/secrets/seo_employee_api_token)" http://127.0.0.1:8088/api/state?target_id=<id>  # 200
+```
+
+Ротируется только `seo_employee_api_token`. Пароль БД (`crawlseo_db_password`) и ключ
+Agent Zero (`agent_zero_api_key`) через эту команду не меняются: первый рассинхронизирует
+PostgreSQL, второй принадлежит Agent Zero и пересоздаётся его `sync_managed_token`.

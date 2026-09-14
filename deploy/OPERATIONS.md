@@ -104,3 +104,19 @@ python3 deploy/backup.py prune --backup-dir /secure/extella-backups --keep 7 --a
 
 Malformed or unsafe snapshots are retained and reported as
 `invalid_retained`; they are never selected for deletion.
+
+## Schedule, RPO, RTO
+
+- **Schedule:** daily `create` + `verify` at 04:00 host time (systemd timer or cron),
+  weekly `restore-check` (stage only) on Sundays, monthly `--apply` drill on a
+  maintenance window. Example timer unit runs:
+  `python3 deploy/backup.py create --backup-dir /secure/extella-backups
+  --compose-file deploy/compose.yaml --project-name <name>` followed by `verify` and
+  `prune --keep 14 --apply`.
+- **RPO:** 24 hours (last nightly snapshot). Intraday audits are re-runnable from
+  config; only intraday reports/queue deltas can be lost.
+- **RTO:** 30 minutes for volume+database restore on the same host (staging drill
+  2026-09-14: snapshot+verify+apply completed inside one maintenance window, contour
+  healthy afterwards). Secrets, bindings and Agent Zero data are NOT in the snapshot
+  and must be restored from their own stores first (see Scope).
+- **Drill transcript:** [`../evidence/backup-drill-2026-09-14.md`](../evidence/backup-drill-2026-09-14.md).

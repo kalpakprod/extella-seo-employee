@@ -9,6 +9,7 @@ import os
 import pathlib
 import sys
 import threading
+import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -57,6 +58,34 @@ def _backend_payload(route: str, value: object) -> dict[str, object]:
     elif value.get("state") not in {"partial", "duplicate"}:
         raise BackendResponseError("invalid execution response")
     return value
+
+
+def access_record(method: str, target: str, status: int, client: str) -> str:
+    try:
+        route = urllib.parse.urlsplit(target).path or "-"
+    except ValueError:
+        route = "-"
+    return json.dumps({
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "client": client,
+        "method": method,
+        "route": route,
+        "status": status,
+    }, ensure_ascii=False)
+
+
+def health_payload() -> dict[str, object]:
+    queue: dict[str, object] = {"depth": "unknown", "consumer": "unknown"}
+    consumer = QUEUE_CONSUMER
+    if consumer is not None:
+        try:
+            items = consumer.queue.snapshot()
+            queue["depth"] = sum(1 for item in items if item.status in {"queued", "running"})
+            thread = consumer.thread
+            queue["consumer"] = "alive" if thread is not None and thread.is_alive() else "stopped"
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            pass
+    return {"status": "ok", "version": VERSION, "queue": queue}
 
 
 def read_token(path: pathlib.Path = TOKEN_FILE) -> str:
@@ -175,6 +204,13 @@ def handler(api_token: str) -> type[BaseHTTPRequestHandler]:
             self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(body)
+            try:
+                sys.stderr.write(
+                    access_record(self.command, self.path, status, self.client_address[0]) + "\n"
+                )
+                sys.stderr.flush()
+            except OSError:
+                pass
 
         def _authorized(self) -> bool:
             bearer = self.headers.get("Authorization", "")
@@ -204,7 +240,7 @@ def handler(api_token: str) -> type[BaseHTTPRequestHandler]:
 
         def do_GET(self) -> None:
             if self.path == "/health":
-                self._send(200, {"status": "ok", "version": VERSION})
+                self._send(200, health_payload())
                 return
             if not self._authorized():
                 self._send(401, {"status": "error", "code": "unauthorized"})

@@ -6,6 +6,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -15,6 +18,63 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 MAX_BODY_BYTES = 65_536
 MAX_RESPONSE_BYTES = 2_000_000
 RUN_DEADLINE_SECONDS = 180.0
+DEFAULT_RATE_LIMIT_PER_MINUTE = 120
+RATE_LIMIT_WINDOW_SECONDS = 60.0
+MAX_TRACKED_CLIENTS = 4096
+
+
+def parse_rate_limit(value: str | None) -> int:
+    if value is None or not value.strip():
+        return DEFAULT_RATE_LIMIT_PER_MINUTE
+    try:
+        limit = int(value.strip(), 10)
+    except ValueError:
+        raise ValueError("rate limit is invalid") from None
+    if limit < 1:
+        raise ValueError("rate limit is invalid")
+    return limit
+
+
+class RateLimiter:
+    """Per-client fixed-window limiter. Rejected routes count too."""
+
+    def __init__(self, per_minute: int, window_seconds: float = RATE_LIMIT_WINDOW_SECONDS) -> None:
+        self.per_minute = per_minute
+        self.window = window_seconds
+        self._lock = threading.Lock()
+        self._hits: dict[str, list[float]] = {}
+
+    def allow(self, key: str) -> tuple[bool, int]:
+        now = time.monotonic()
+        with self._lock:
+            if len(self._hits) > MAX_TRACKED_CLIENTS:
+                self._hits = {
+                    tracked: seen
+                    for tracked, seen in self._hits.items()
+                    if seen[0] + self.window > now
+                }
+            window_start, count = self._hits.get(key, (now, 0))
+            if window_start + self.window <= now:
+                window_start, count = now, 0
+            count += 1
+            self._hits[key] = [window_start, count]
+            if count > self.per_minute:
+                return False, max(1, int(window_start + self.window - now))
+            return True, 0
+
+
+def access_record(method: str, target: str, status: int, client: str) -> str:
+    try:
+        route = urllib.parse.urlsplit(target).path or "-"
+    except ValueError:
+        route = "-"
+    return json.dumps({
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "client": client,
+        "method": method,
+        "route": route,
+        "status": status,
+    }, ensure_ascii=False)
 ROUTES = {
     "product": {
         ("GET", "/health"),
@@ -75,18 +135,45 @@ def request_target(mode: str, method: str, value: str) -> str:
     return parsed.path + "?" + urllib.parse.urlencode({"target_id": values[0]})
 
 
-def handler(mode: str, upstream: str) -> type[BaseHTTPRequestHandler]:
+def handler(
+    mode: str, upstream: str, rate_limit_per_minute: int = DEFAULT_RATE_LIMIT_PER_MINUTE
+) -> type[BaseHTTPRequestHandler]:
+    limiter = RateLimiter(rate_limit_per_minute)
+
     class Handler(BaseHTTPRequestHandler):
-        def _send(self, status: int, body: bytes, content_type: str = "application/json") -> None:
+        def _send(
+            self,
+            status: int,
+            body: bytes,
+            content_type: str = "application/json",
+            extra_headers: dict[str, str] | None = None,
+        ) -> None:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            for name, value in (extra_headers or {}).items():
+                self.send_header(name, value)
             self.end_headers()
             self.wfile.write(body)
+            try:
+                sys.stderr.write(
+                    access_record(self.command, self.path, status, self.client_address[0]) + "\n"
+                )
+                sys.stderr.flush()
+            except OSError:
+                pass
 
         def _proxy(self) -> None:
+            allowed, retry_after = limiter.allow(self.client_address[0])
+            if not allowed:
+                self._send(
+                    429,
+                    b'{"status":"error","code":"rate_limited"}',
+                    extra_headers={"Retry-After": str(retry_after)},
+                )
+                return
             try:
                 target = request_target(mode, self.command, self.path)
             except ValueError:
@@ -135,13 +222,14 @@ def main() -> int:
     try:
         mode = os.environ["EXTELLA_PROXY_MODE"]
         upstream = validate_upstream(mode, os.environ["EXTELLA_PROXY_UPSTREAM"])
+        rate_limit = parse_rate_limit(os.environ.get("EXTELLA_RATE_LIMIT_PER_MINUTE"))
         port = int(os.environ.get("PORT", "8080"))
         if not 1 <= port <= 65535:
             raise ValueError
     except (KeyError, ValueError):
         print(json.dumps({"status": "error", "code": "proxy_configuration_invalid"}))
         return 1
-    server = ThreadingHTTPServer(("0.0.0.0", port), handler(mode, upstream))
+    server = ThreadingHTTPServer(("0.0.0.0", port), handler(mode, upstream, rate_limit))
     server.daemon_threads = True
     server.serve_forever()
     return 0

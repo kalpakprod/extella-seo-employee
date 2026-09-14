@@ -54,11 +54,24 @@ def atomic_write(path: pathlib.Path, data: bytes, mode: int = 0o644) -> None:
 def write_json(path: pathlib.Path, value: object) -> None:
     atomic_write(path, (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8"))
 
+def running_as_root() -> bool:
+    geteuid = getattr(os, "geteuid", None)
+    return geteuid is None or geteuid() == 0
+
+
+def own_by_root(path: pathlib.Path) -> None:
+    # File secrets bind-mount with host ownership. Capped containers run as a
+    # root that lost DAC_OVERRIDE, so only root-owned files stay readable.
+    if running_as_root() and hasattr(os, "chown"):
+        os.chown(path, 0, 0)
+
+
 def write_secret(path: pathlib.Path, value: str) -> None:
     value = value.strip()
     if not value or "\n" in value or "\r" in value:
         raise RuntimeError("secret value is invalid")
     atomic_write(path, (value + "\n").encode("utf-8"), 0o600)
+    own_by_root(path)
 
 def ensure_generated_secret(name: str, minimum: int = 32) -> None:
     path = SECRETS / name
@@ -66,8 +79,22 @@ def ensure_generated_secret(name: str, minimum: int = 32) -> None:
         if path.is_symlink() or not path.is_file() or len(path.read_text(encoding="utf-8").strip()) < minimum:
             raise RuntimeError("secret file is invalid")
         os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
+        own_by_root(path)
         return
     write_secret(path, secrets.token_urlsafe(32))
+
+ROTATABLE_SECRETS = {"seo_employee_api_token": 32}
+
+
+def rotate_generated_secret(name: str) -> None:
+    minimum = ROTATABLE_SECRETS.get(name)
+    if minimum is None:
+        raise RuntimeError("secret is not rotatable")
+    path = SECRETS / name
+    if path.is_symlink() or not path.is_file() or len(path.read_text(encoding="utf-8").strip()) < minimum:
+        raise RuntimeError("secret file is missing or invalid")
+    write_secret(path, secrets.token_urlsafe(32))
+
 
 def copy_external_token(source: pathlib.Path) -> None:
     source = source.resolve(strict=True)
@@ -89,6 +116,8 @@ def write_bindings(device_id: str, hosting_profile: str, host: str, agent_id: st
     since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     write_json(BINDINGS / "device_binding.json", {"device_id": device_id, "host": host, "hosting_profile": hosting_profile, "since": since})
     write_json(BINDINGS / "agent_binding.json", {"agent_id": agent_id})
+    own_by_root(BINDINGS / "device_binding.json")
+    own_by_root(BINDINGS / "agent_binding.json")
 
 def provision_no_tools_profile(container: str) -> None:
     if not CONTAINER_RE.fullmatch(container): raise RuntimeError("Agent Zero container name is invalid")
@@ -107,7 +136,10 @@ def sync_managed_token() -> str:
     run(*compose, "up", "-d", "agent-zero")
     container = run(*compose, "ps", "-q", "agent-zero", capture=True)
     if not container: raise RuntimeError("managed Agent Zero container is unavailable")
-    command = (*compose, "exec", "-T", "agent-zero", "python", "-c", "from helpers.settings import create_auth_token; print(create_auth_token())")
+    # The pinned image has no `python` on PATH and workdir /; the venv
+    # interpreter plus /a0 cwd is the only working combination (digest-pinned).
+    command = (*compose, "exec", "-T", "agent-zero", "sh", "-c",
+               "cd /a0 && exec /opt/venv-a0/bin/python -c 'from helpers.settings import create_auth_token; print(create_auth_token())'")
     for _ in range(45):
         result = subprocess.run(command, text=True, capture_output=True)
         token = result.stdout.strip()
@@ -260,6 +292,7 @@ def main() -> int:
     parser.add_argument("--external-agent-zero-container")
     parser.add_argument("--capture-runtime-state", action="store_true")
     parser.add_argument("--restore-runtime-state", action="store_true")
+    parser.add_argument("--rotate-secret")
     parser.add_argument("--compose-file", type=pathlib.Path)
     parser.add_argument("--runtime-state", type=pathlib.Path)
     args = parser.parse_args()
@@ -274,8 +307,20 @@ def main() -> int:
         except (OSError, RuntimeError, subprocess.CalledProcessError, UnicodeError, json.JSONDecodeError):
             print(json.dumps({"status": "error", "code": "runtime_rollback_failed"})); return 1
         return 0
+    if args.rotate_secret is not None:
+        if args.rotate_secret not in ROTATABLE_SECRETS:
+            parser.error("--rotate-secret accepts only: seo_employee_api_token")
+        if not running_as_root():
+            print(json.dumps({"status": "error", "code": "prepare_requires_root"})); return 1
+        try:
+            rotate_generated_secret(args.rotate_secret)
+        except (OSError, RuntimeError, UnicodeError):
+            print(json.dumps({"status": "error", "code": "secret_rotation_failed"})); return 1
+        print(json.dumps({"status": "success", "rotated": args.rotate_secret})); return 0
     if args.device_id is None or args.hosting_profile is None or args.agent_id is None:
         parser.error("--device-id, --hosting-profile, and --agent-id are required for deployment preparation")
+    if not running_as_root():
+        print(json.dumps({"status": "error", "code": "prepare_requires_root"})); return 1
     try:
         if bool(args.external_agent_zero_key) != bool(args.external_agent_zero_container): raise RuntimeError("external Agent Zero requires both key file and container name")
         for command in ("docker", "git"):

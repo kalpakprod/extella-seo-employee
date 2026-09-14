@@ -184,6 +184,122 @@ class ContainerRuntimeTest(unittest.TestCase):
             PREPARE.ensure_generated_secret("agent_zero_api_key", 16)
             self.assertEqual(token.read_text(encoding="utf-8").strip(), "a" * 16)
 
+    def test_prepare_refuses_non_root_deploy_user(self) -> None:
+        argv = [
+            "prepare.py",
+            "--device-id", "device-seo-01",
+            "--hosting-profile", "client_server",
+            "--agent-id", "agent_seo_employee",
+        ]
+        output = io.StringIO()
+        with (
+            mock.patch.object(PREPARE.os, "geteuid", return_value=1000, create=True),
+            mock.patch.object(PREPARE.sys, "argv", argv),
+            mock.patch("sys.stdout", output),
+        ):
+            self.assertEqual(PREPARE.main(), 1)
+        self.assertEqual(json.loads(output.getvalue())["code"], "prepare_requires_root")
+
+    def test_prepare_hands_secrets_to_root_only_when_privileged(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            PREPARE, "SECRETS", Path(directory)
+        ):
+            token = Path(directory) / "seo_employee_api_token"
+            token.write_text("b" * 32 + "\n", encoding="utf-8")
+            with (
+                mock.patch.object(PREPARE.os, "geteuid", return_value=0, create=True),
+                mock.patch.object(PREPARE.os, "chown", create=True) as chown,
+            ):
+                PREPARE.ensure_generated_secret("seo_employee_api_token")
+            chown.assert_called_once_with(token, 0, 0)
+            with (
+                mock.patch.object(PREPARE.os, "geteuid", return_value=1000, create=True),
+                mock.patch.object(PREPARE.os, "chown", create=True) as chown,
+            ):
+                PREPARE.ensure_generated_secret("seo_employee_api_token")
+            chown.assert_not_called()
+
+    def test_prepare_rotate_replaces_token_and_keeps_owner_only_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            PREPARE, "SECRETS", Path(directory)
+        ):
+            token = Path(directory) / "seo_employee_api_token"
+            token.write_text("b" * 32 + "\n", encoding="utf-8")
+            PREPARE.rotate_generated_secret("seo_employee_api_token")
+            rotated = token.read_text(encoding="utf-8").strip()
+            self.assertNotEqual(rotated, "b" * 32)
+            self.assertGreaterEqual(len(rotated), 32)
+            self.assertEqual(oct(token.stat().st_mode & 0o777), "0o600")
+
+    def test_prepare_rotate_refuses_missing_or_invalid_secret(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            PREPARE, "SECRETS", Path(directory)
+        ):
+            with self.assertRaises(RuntimeError):
+                PREPARE.rotate_generated_secret("seo_employee_api_token")
+            token = Path(directory) / "seo_employee_api_token"
+            token.write_text("short\n", encoding="utf-8")
+            with self.assertRaises(RuntimeError):
+                PREPARE.rotate_generated_secret("seo_employee_api_token")
+            with self.assertRaises(RuntimeError):
+                PREPARE.rotate_generated_secret("crawlseo_db_password")
+
+    def test_prepare_rotate_cli_requires_root_and_reports_name_only(self) -> None:
+        argv = ["prepare.py", "--rotate-secret", "seo_employee_api_token"]
+        output = io.StringIO()
+        with (
+            mock.patch.object(PREPARE.os, "geteuid", return_value=1000, create=True),
+            mock.patch.object(PREPARE.sys, "argv", argv),
+            mock.patch("sys.stdout", output),
+        ):
+            self.assertEqual(PREPARE.main(), 1)
+        self.assertEqual(json.loads(output.getvalue())["code"], "prepare_requires_root")
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            PREPARE, "SECRETS", Path(directory)
+        ):
+            token = Path(directory) / "seo_employee_api_token"
+            token.write_text("c" * 32 + "\n", encoding="utf-8")
+            output = io.StringIO()
+            with (
+                mock.patch.object(PREPARE.os, "geteuid", return_value=0, create=True),
+                mock.patch.object(PREPARE.os, "chown", create=True),
+                mock.patch.object(PREPARE.sys, "argv", argv),
+                mock.patch("sys.stdout", output),
+            ):
+                self.assertEqual(PREPARE.main(), 0)
+            payload = json.loads(output.getvalue())
+            self.assertEqual(payload["status"], "success")
+            self.assertEqual(payload["rotated"], "seo_employee_api_token")
+            self.assertNotIn("c" * 32, output.getvalue())
+            self.assertNotEqual(token.read_text(encoding="utf-8").strip(), "c" * 32)
+
+    def test_prepare_rotate_cli_rejects_unknown_secret_name(self) -> None:
+        with mock.patch.object(PREPARE.sys, "argv", ["prepare.py", "--rotate-secret", "nope"]):
+            with self.assertRaises(SystemExit) as exited:
+                PREPARE.main()
+        self.assertEqual(exited.exception.code, 2)
+
+    def test_prepare_syncs_token_with_pinned_interpreter(self) -> None:
+        token = "A" * 32
+        completed = SimpleNamespace(returncode=0, stdout=token + "\n")
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            PREPARE, "SECRETS", Path(directory)
+        ), mock.patch.object(
+            PREPARE, "run", return_value="agent-zero-test-container"
+        ), mock.patch.object(
+            PREPARE.subprocess, "run", return_value=completed
+        ) as run_call:
+            self.assertEqual(PREPARE.sync_managed_token(), "agent-zero-test-container")
+            command = run_call.call_args.args[0]
+            joined = " ".join(command)
+            self.assertIn("/opt/venv-a0/bin/python", joined)
+            self.assertIn("cd /a0", joined)
+            self.assertIn("create_auth_token", joined)
+            self.assertEqual(
+                (Path(directory) / "agent_zero_api_key").read_text(encoding="utf-8").strip(),
+                token,
+            )
+
     def test_prepare_starts_restarts_and_checks_loopback_health(self) -> None:
         compose = ("docker", "compose", "-f", str(PREPARE.COMPOSE))
         with mock.patch.object(PREPARE, "run") as run, mock.patch.object(PREPARE, "wait_for_product_health") as health:

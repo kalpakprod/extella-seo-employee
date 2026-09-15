@@ -1,14 +1,14 @@
-{"label":"fixture_ready","wall_ns":"1789454590418000000","monotonic_ns":"60935984422830","pid":1930711,"port":46695}
-{"label":"slow_provider_child_active","wall_ns":"1789454591073000000","monotonic_ns":"60936639660140","parent":{"pid":1930748,"state":"S","ppid":1929381,"pgrp":1929340,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[{"pid":1930927,"state":"R","ppid":1930748,"pgrp":1930927,"command":"/usr/bin/python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py --probe-child nu"}]}
-{"label":"slow_provider_response","wall_ns":"1789454591381000000","monotonic_ns":"60936947469393","status":200,"headers":{"server":"ExtellaProbe/2.1 Python/3.14.7","date":"Tue, 15 Sep 2026 06:43:11 GMT","content-type":"application/json; charset=utf-8","content-length":"43","cache-control":"no-store"},"body":{"status":"unavailable","reason":"timeout"},"elapsed_ms":356.50205}
-{"label":"slow_provider_children_reaped","wall_ns":"1789454591554000000","monotonic_ns":"60937120083178","parent":{"pid":1930748,"state":"S","ppid":1929381,"pgrp":1929340,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[]}
-{"label":"slow_provider_children_reaped_process_groups","wall_ns":"1789454591598000000","monotonic_ns":"60937164251206","groups":[1930927],"members":[]}
-{"event":"fixture_ready","wall_ns":1789454590418282970,"monotonic_ns":60935984106684,"pid":1930711,"port":46695}
-{"event":"site_started","wall_ns":1789454591084832237,"monotonic_ns":60936650655480,"pid":1930711,"path":"/fast-site","mode":"fast","client_port":39308}
-{"event":"site_completed","wall_ns":1789454591084986043,"monotonic_ns":60936650808975,"pid":1930711,"path":"/fast-site"}
-{"event":"site_closed","wall_ns":1789454591085012161,"monotonic_ns":60936650834813,"pid":1930711,"path":"/fast-site"}
-{"event":"provider_started","wall_ns":1789454591090578304,"monotonic_ns":60936656401446,"pid":1930711,"source":"nu","path":"https://validator.w3.org/nu/?out=json","mode":"drip"}
-{"event":"provider_body_byte","wall_ns":1789454591090758709,"monotonic_ns":60936656581891,"pid":1930711,"label":"nu","index":1}
-{"event":"provider_body_byte","wall_ns":1789454591110918931,"monotonic_ns":60936676742624,"pid":1930711,"label":"nu","index":2}
-{"event":"provider_client_closed","wall_ns":1789454591413043001,"monotonic_ns":60936978867165,"pid":1930711,"source":"nu","error":"BrokenPipeError"}
-{"event":"provider_closed","wall_ns":1789454591413119353,"monotonic_ns":60936978942024,"pid":1930711,"source":"nu"}
+{"label":"fixture_ready","wall_ns":"1789455189336000000","monotonic_ns":"61534901909007","pid":2482592,"port":34703}
+{"label":"slow_provider_child_active","wall_ns":"1789455189983000000","monotonic_ns":"61535548832064","parent":{"pid":2482666,"state":"S","ppid":2481097,"pgrp":2481057,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[{"pid":2483233,"state":"R","ppid":2482666,"pgrp":2483233,"command":"/usr/bin/python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py --probe-child nu"}]}
+{"label":"slow_provider_response","wall_ns":"1789455190298000000","monotonic_ns":"61535864019378","status":200,"headers":{"server":"ExtellaProbe/2.1 Python/3.14.7","date":"Tue, 15 Sep 2026 06:53:10 GMT","content-type":"application/json; charset=utf-8","content-length":"43","cache-control":"no-store"},"body":{"status":"unavailable","reason":"timeout"},"elapsed_ms":355.969624}
+{"label":"slow_provider_children_reaped","wall_ns":"1789455190461000000","monotonic_ns":"61536026958115","parent":{"pid":2482666,"state":"S","ppid":2481097,"pgrp":2481057,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[]}
+{"label":"slow_provider_children_reaped_process_groups","wall_ns":"1789455190501000000","monotonic_ns":"61536067529194","groups":[2483233],"members":[]}
+{"event":"fixture_ready","wall_ns":1789455189335896063,"monotonic_ns":61534901719576,"pid":2482592,"port":34703}
+{"event":"site_started","wall_ns":1789455189993030542,"monotonic_ns":61535558854175,"pid":2482592,"path":"/fast-site","mode":"fast","client_port":53604}
+{"event":"site_completed","wall_ns":1789455189993175120,"monotonic_ns":61535558997911,"pid":2482592,"path":"/fast-site"}
+{"event":"site_closed","wall_ns":1789455189993206007,"monotonic_ns":61535559028678,"pid":2482592,"path":"/fast-site"}
+{"event":"provider_started","wall_ns":1789455189998748132,"monotonic_ns":61535564571214,"pid":2482592,"source":"nu","path":"https://validator.w3.org/nu/?out=json","mode":"drip"}
+{"event":"provider_body_byte","wall_ns":1789455189998886378,"monotonic_ns":61535564709150,"pid":2482592,"label":"nu","index":1}
+{"event":"provider_body_byte","wall_ns":1789455190019038761,"monotonic_ns":61535584862544,"pid":2482592,"label":"nu","index":2}
+{"event":"provider_client_closed","wall_ns":1789455190320951444,"monotonic_ns":61535886775267,"pid":2482592,"source":"nu","error":"BrokenPipeError"}
+{"event":"provider_closed","wall_ns":1789455190321019631,"monotonic_ns":61535886842302,"pid":2482592,"source":"nu"}

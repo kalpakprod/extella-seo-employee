@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Optional P2 probe worker: W3C Nu HTML validation, TLS/security headers, Common Crawl excerpts.
 
-PROBE_KIND selects the lane (nu|tls|cc). Each lane is single-shot, capped, and
-stdlib-only; it returns a strict extella.*_source.v1 payload. Thresholds and
-verdicts live in the in-product adapters, never here.
+PROBE_KIND selects the lane (nu|tls|cc). The long-lived HTTP process is a bounded
+supervisor; each request's network work runs in a fresh child process and returns
+through a capped UTF-8 JSON pipe. Each lane is single-shot, capped, and stdlib-only;
+it returns a strict extella.*_source.v1 payload. Thresholds and verdicts live in the
+in-product adapters, never here.
 """
 
 from __future__ import annotations
@@ -914,7 +916,7 @@ def run_isolated(body: bytes, kind: str) -> tuple[int, dict[str, object]]:
         except TimeoutError:
             SUPERVISOR.kill_and_reap(entry)
             return _unavailable("timeout")
-        except (OSError, ValueError, selectors.Error):
+        except (OSError, ValueError):
             SUPERVISOR.kill_and_reap(entry)
             return _unavailable("http_503")
         if time.monotonic() >= deadline:
@@ -1065,7 +1067,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             status, payload = self._run_request(body, PROBE_KIND)
-        except (OSError, ValueError, selectors.Error):
+        except (OSError, ValueError):
             status, payload = _unavailable("http_503")
         try:
             self._send(status, payload)

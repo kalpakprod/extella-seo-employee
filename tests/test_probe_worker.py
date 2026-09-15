@@ -48,7 +48,7 @@ class ProbeHandleRunTest(unittest.TestCase):
     def test_cc_kind_never_fetches_the_site_host(self) -> None:
         body = json.dumps({"site_url": "http://127.0.0.1/", "plan": {"timeout_ms": 5000}}).encode()
         with mock.patch.object(WORKER, "_get_json", side_effect=OSError("down")):
-            status, payload = WORKER.handle_run(body, "cc")
+            status, payload = WORKER._run_direct(body, "cc")
         self.assertEqual(status, 200)
         self.assertEqual(payload["status"], "unavailable")
 
@@ -145,7 +145,7 @@ class TlsProbeTest(unittest.TestCase):
                 mock.patch.object(WORKER, "_is_global_host", return_value=True),
                 mock.patch.object(WORKER, patched, side_effect=http.client.BadStatusLine("BROKEN")),
             ):
-                status, result = WORKER.handle_run(body, kind)
+                status, result = WORKER._run_direct(body, kind)
             self.assertEqual(status, 200)
             self.assertEqual(result, {"status": "unavailable", "reason": "http_503"})
 

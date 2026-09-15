@@ -479,6 +479,46 @@ class ServiceV2Tests(unittest.TestCase):
 
 
 class ProbeServiceTests(unittest.TestCase):
+    def test_probe_wire_budget_reserves_one_second_and_skips_nonpositive_budget(self):
+        self.assertEqual(service._probe_wire_timeout_ms(0.999), -2)
+        self.assertEqual(service._probe_wire_timeout_ms(1.0), 0)
+        self.assertEqual(service._probe_wire_timeout_ms(1.0011), 1)
+        self.assertEqual(service._probe_wire_timeout_ms(20.0), 19000)
+
+    def test_probe_wrapper_skips_when_reserved_wire_budget_is_exhausted(self):
+        plan = service.build_audit_plan("service_b2b", requested_max_pages=1)
+        calls: list[list[str]] = []
+
+        def run(argv, **_kwargs):
+            calls.append(argv)
+            return SimpleNamespace(returncode=0)
+
+        with tempfile.TemporaryDirectory() as directory:
+            status, result = service._run_v2_source_wrapper(
+                "NuHTML", Path("run_nu"), "https://example.com/", Path(directory) / "nu.json", plan,
+                runner=run, obtained_at="2026-09-15T00:00:00Z", timeout_seconds=1.0, best_effort=True,
+            )
+        self.assertEqual((status["status"], result.status, result.reason), ("unavailable", "unavailable", "timeout"))
+        self.assertEqual(calls, [])
+
+    def test_probe_wrapper_sends_floor_wire_budget_after_margin(self):
+        plan = service.build_audit_plan("service_b2b", requested_max_pages=1)
+        captured: dict[str, object] = {}
+
+        def run(argv, **kwargs):
+            captured["plan"] = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
+            captured["timeout"] = kwargs["timeout"]
+            Path(argv[3]).write_text(json.dumps({"status": "unavailable", "reason": "timeout"}), encoding="utf-8")
+            return SimpleNamespace(returncode=0)
+
+        with tempfile.TemporaryDirectory() as directory:
+            status, result = service._run_v2_source_wrapper(
+                "NuHTML", Path("run_nu"), "https://example.com/", Path(directory) / "nu.json", plan,
+                runner=run, obtained_at="2026-09-15T00:00:00Z", timeout_seconds=1.0011, best_effort=True,
+            )
+        self.assertEqual(captured, {"plan": {"timeout_ms": 1}, "timeout": 1.0011})
+        self.assertEqual((status["status"], result.status, result.reason), ("unavailable", "unavailable", "timeout"))
+
     def test_optional_workers_have_bounded_plans_and_fail_without_downgrading_report(self):
         import subprocess
         plan = service.build_audit_plan("service_b2b", requested_max_pages=25)
@@ -489,7 +529,7 @@ class ProbeServiceTests(unittest.TestCase):
             plans[name] = payload
             if name in {"run_nu", "run_tls", "run_cc"}:
                 self.assertEqual(set(payload), {"timeout_ms"})
-                self.assertLessEqual(payload["timeout_ms"], 20000)
+                self.assertLessEqual(payload["timeout_ms"], 19000)
                 self.assertLessEqual(kwargs["timeout"], 20)
             if name == "run_nu":
                 raise subprocess.TimeoutExpired(argv, kwargs["timeout"])

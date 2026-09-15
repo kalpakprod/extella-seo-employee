@@ -11,8 +11,13 @@ from __future__ import annotations
 import ipaddress
 import http.client
 import json
+import math
 import os
 import re
+import selectors
+import signal
+import subprocess
+import threading
 import zlib
 from html.parser import HTMLParser
 import socket
@@ -30,6 +35,8 @@ SSL_API = "https://api.ssllabs.com/api/v3/analyze"
 SSL_HOST = "api.ssllabs.com"
 CC_INDEX_HOST = "index.commoncrawl.org"
 CC_DATA_HOST = "data.commoncrawl.org"
+CC_INDEX_BASE = f"https://{CC_INDEX_HOST}"
+CC_DATA_BASE = f"https://{CC_DATA_HOST}"
 HTML_BYTES = 262_144
 HEADER_BODY_BYTES = 4_096
 EXCERPT_BYTES = 65_536
@@ -40,6 +47,13 @@ EXEMPLAR_CHARS = 200
 CALL_TIMEOUT_SECONDS = 60.0
 MAX_BODY_BYTES = 65_536
 MAX_PINNED_ADDRESSES = 4
+MAX_CHILDREN = 2
+MAX_HANDLERS = 4
+CHILD_IPC_BYTES = 65_536
+CHILD_CLEANUP_SECONDS = 0.25
+HANDLER_IDLE_SECONDS = 2.0
+PROBE_CHILD_MODE = "--probe-child"
+MAX_TIMEOUT_MS = 720_000
 PORT = int(os.environ.get("PORT", "8085"))
 PROBE_KIND = os.environ.get("PROBE_KIND", "")
 
@@ -278,7 +292,7 @@ def _get_json(url: str, timeout: float, max_bytes: int = 2_000_000) -> object:
     if len(raw) > max_bytes:
         raise ValueError("JSON response exceeds byte cap")
     # Common Crawl's index returns JSON lines, including multiple captures.
-    if urllib.parse.urlsplit(url).hostname == CC_INDEX_HOST and "-index?" in url:
+    if "-index?" in url:
         return [_read_json(line) for line in raw.splitlines() if line.strip()]
     return _read_json(raw)
 
@@ -334,8 +348,8 @@ def _nu_messages(payload: object) -> tuple[int, int, list[dict[str, object]]]:
     return errors, warnings, exemplars
 
 
-def run_nu_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
-    deadline = time.monotonic() + timeout_ms / 1000
+def run_nu_probe(site_url: str, timeout_ms: int, *, deadline: float | None = None) -> dict[str, object]:
+    deadline = deadline if deadline is not None else time.monotonic() + timeout_ms / 1000
     _origin, allowed = _check_site_host(site_url, deadline)
     try:
         status, body, truncated, _seen = fetch_bytes(
@@ -361,6 +375,7 @@ def run_nu_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
             if len(raw) > 2_000_000:
                 raise ValueError("validator response exceeds cap")
             payload = _read_json(raw)
+        _remaining(deadline)
     except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
         _log("nu", f"validator {type(error).__name__}")
         return {"status": "unavailable", "reason": _reason_for(error)}
@@ -418,8 +433,8 @@ def _ssl_grade(payload: object) -> tuple[str, str | None]:
     return "ready", worst
 
 
-def run_tls_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
-    deadline = time.monotonic() + timeout_ms / 1000
+def run_tls_probe(site_url: str, timeout_ms: int, *, deadline: float | None = None) -> dict[str, object]:
+    deadline = deadline if deadline is not None else time.monotonic() + timeout_ms / 1000
     _origin, allowed = _check_site_host(site_url, deadline)
     host = urllib.parse.urlsplit(site_url).hostname or ""
     try:
@@ -450,6 +465,7 @@ def run_tls_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
         labs_query = urllib.parse.urlencode({"host": host, "fromCache": "on", "maxAge": 24})
         try:
             labs = _get_json(f"{SSL_API}?{labs_query}", _remaining(deadline))
+            _remaining(deadline)
         except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
             _log("tls", f"labs {type(error).__name__}")
             labs_block = {"status": "unavailable", "detail": _reason_for(error), "grade": None}
@@ -555,20 +571,20 @@ def _archive_excerpt(raw: bytes) -> str:
     return " ".join(" ".join(parser.parts).split())[:EXCERPT_CHARS]
 
 
-def run_cc_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
-    deadline = time.monotonic() + timeout_ms / 1000
+def run_cc_probe(site_url: str, timeout_ms: int, *, deadline: float | None = None) -> dict[str, object]:
+    deadline = deadline if deadline is not None else time.monotonic() + timeout_ms / 1000
     parsed = urllib.parse.urlsplit(site_url)
     if (parsed.scheme not in {"http", "https"} or not parsed.hostname
             or parsed.username is not None or parsed.password is not None):
         raise ValueError("site url is invalid")
     try:
-        collinfo = _get_json(f"https://{CC_INDEX_HOST}/collinfo.json", _remaining(deadline))
+        collinfo = _get_json(f"{CC_INDEX_BASE}/collinfo.json", _remaining(deadline))
         index_id = _cc_index_id(collinfo)
         if index_id is None:
             return {"status": "unavailable", "reason": "http_503"}
         lookup = urllib.parse.urlencode({"url": site_url, "output": "json", "filter": "status:200", "limit": 1, "matchType": "exact"})
         try:
-            index_payload = _get_json(f"https://{CC_INDEX_HOST}/{index_id}-index?{lookup}", _remaining(deadline))
+            index_payload = _get_json(f"{CC_INDEX_BASE}/{index_id}-index?{lookup}", _remaining(deadline))
         except urllib.error.HTTPError as error:
             if error.code != 404:
                 raise
@@ -590,7 +606,7 @@ def run_cc_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
         assert isinstance(record["offset"], int)
         end = record["offset"] + min(EXCERPT_BYTES, int(record["length"])) - 1
         request = urllib.request.Request(
-            f"https://{CC_DATA_HOST}/{record['filename']}",
+            f"{CC_DATA_BASE}/{record['filename']}",
             headers={"User-Agent": "ExtellaProbe/2.1", "Range": f"bytes={record['offset']}-{end}"},
             method="GET",
         )
@@ -599,6 +615,7 @@ def run_cc_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
             if response.status != 206 or not response.headers.get("Content-Range", "").startswith(expected_range):
                 raise ValueError("archive server ignored the byte range")
             raw = response.read(min(EXCERPT_BYTES, int(record["length"])))
+        _remaining(deadline)
         excerpt = _archive_excerpt(raw)
     except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
         _log("cc", type(error).__name__)
@@ -617,35 +634,377 @@ def run_cc_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
 _RUNNERS = {"nu": run_nu_probe, "tls": run_tls_probe, "cc": run_cc_probe}
 
 
-def handle_run(body: bytes, kind: str) -> tuple[int, dict[str, object]]:
-    runner = _RUNNERS.get(kind)
-    if runner is None:
-        return 400, {"status": "error", "code": "unknown_probe_kind"}
+class _ChildEntry:
+    def __init__(self, process: subprocess.Popen[bytes], kind: str) -> None:
+        self.process = process
+        self.kind = kind
+        self.pending_reap = False
+
+
+class _ProbeSupervisor:
+    """Own bounded probe children and their slots for the long-lived HTTP parent."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._children: dict[int, _ChildEntry] = {}
+        self._shutdown_requested = threading.Event()
+        self._shutdown = False
+
+    def _reap_exited_locked(self) -> None:
+        for pid, entry in list(self._children.items()):
+            if entry.process.poll() is None:
+                continue
+            try:
+                entry.process.wait(timeout=0)
+            except subprocess.TimeoutExpired:
+                continue
+            if self._children.get(pid) is entry:
+                del self._children[pid]
+
+    def spawn(self, kind: str) -> _ChildEntry | None:
+        with self._lock:
+            self._reap_exited_locked()
+            if self._shutdown or self._shutdown_requested.is_set() or len(self._children) >= MAX_CHILDREN:
+                return None
+            try:
+                process = subprocess.Popen(
+                    [sys.executable, os.path.abspath(__file__), PROBE_CHILD_MODE, kind],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    shell=False,
+                    start_new_session=True,
+                    close_fds=True,
+                )
+            except (OSError, ValueError):
+                return None
+            entry = _ChildEntry(process, kind)
+            self._children[process.pid] = entry
+            return entry
+
+    def _remove(self, entry: _ChildEntry) -> None:
+        with self._lock:
+            if self._children.get(entry.process.pid) is entry:
+                del self._children[entry.process.pid]
+
+    def _mark_pending(self, entry: _ChildEntry) -> None:
+        with self._lock:
+            if self._children.get(entry.process.pid) is entry:
+                entry.pending_reap = True
+
+    def finish(self, entry: _ChildEntry) -> bool:
+        if entry.process.poll() is None:
+            return False
+        try:
+            entry.process.wait(timeout=0)
+        except subprocess.TimeoutExpired:
+            return False
+        self._remove(entry)
+        return True
+
+    def kill_and_reap(self, entry: _ChildEntry) -> bool:
+        process = entry.process
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            except OSError:
+                self._mark_pending(entry)
+        try:
+            process.wait(timeout=CHILD_CLEANUP_SECONDS)
+        except subprocess.TimeoutExpired:
+            self._mark_pending(entry)
+            return False
+        self._remove(entry)
+        return True
+
+    def health(self) -> _ChildEntry | None:
+        with self._lock:
+            self._reap_exited_locked()
+            for entry in self._children.values():
+                if entry.pending_reap:
+                    return entry
+        return None
+
+    def begin_shutdown(self) -> None:
+        self._shutdown_requested.set()
+
+    def shutdown(self) -> None:
+        with self._lock:
+            self._shutdown = True
+            self._shutdown_requested.set()
+            entries = list(self._children.values())
+        for entry in entries:
+            self.kill_and_reap(entry)
+
+
+SUPERVISOR = _ProbeSupervisor()
+
+
+def _request_parts(body: bytes, kind: str) -> tuple[dict[str, object], int] | None:
+    if kind not in _RUNNERS:
+        return None
     try:
         payload = json.loads(body)
     except (TypeError, ValueError, json.JSONDecodeError):
-        return 400, {"status": "error", "code": "invalid_request"}
+        return None
     plan = payload.get("plan") if isinstance(payload, dict) else None
+    site_url = payload.get("site_url") if isinstance(payload, dict) else None
     if (
         not isinstance(payload, dict)
-        or not isinstance(payload.get("site_url"), str)
+        or not isinstance(site_url, str)
         or not isinstance(plan, dict)
         or set(plan) != {"timeout_ms"}
         or not isinstance(plan["timeout_ms"], int)
         or isinstance(plan["timeout_ms"], bool)
-        or not 1 <= plan["timeout_ms"] <= 720_000
+        or not 1 <= plan["timeout_ms"] <= MAX_TIMEOUT_MS
     ):
+        return None
+    try:
+        parsed = urllib.parse.urlsplit(site_url)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.fragment
+        ):
+            return None
+        parsed.port
+    except ValueError:
+        return None
+    return payload, plan["timeout_ms"]
+
+
+def _child_envelope(body: bytes, kind: str, deadline: float) -> bytes | None:
+    parts = _request_parts(body, kind)
+    if parts is None:
+        return None
+    payload, _timeout_ms = parts
+    envelope = {
+        "kind": kind,
+        "site_url": payload["site_url"],
+        "plan": payload["plan"],
+        "deadline": deadline,
+    }
+    try:
+        encoded = json.dumps(envelope, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    except (TypeError, ValueError):
+        return None
+    return encoded if len(encoded) <= CHILD_IPC_BYTES else None
+
+
+def _unavailable(reason: str) -> tuple[int, dict[str, object]]:
+    return 200, {"status": "unavailable", "reason": reason}
+
+
+def _exchange_child(entry: _ChildEntry, request: bytes, deadline: float) -> bytes:
+    process = entry.process
+    if process.stdin is None or process.stdout is None:
+        raise OSError("probe child pipes unavailable")
+    selector = selectors.DefaultSelector()
+    stdin_fd = process.stdin.fileno()
+    stdout_fd = process.stdout.fileno()
+    os.set_blocking(stdin_fd, False)
+    os.set_blocking(stdout_fd, False)
+    selector.register(stdin_fd, selectors.EVENT_WRITE, "stdin")
+    selector.register(stdout_fd, selectors.EVENT_READ, "stdout")
+    offset = 0
+    output = bytearray()
+    stdin_closed = False
+    stdout_closed = False
+    try:
+        while not stdout_closed or process.poll() is None:
+            remaining = _remaining(deadline)
+            events = selector.select(remaining)
+            if not events:
+                raise TimeoutError("probe child deadline exceeded")
+            for key, mask in events:
+                if key.data == "stdin" and mask & selectors.EVENT_WRITE:
+                    if offset < len(request):
+                        try:
+                            written = os.write(stdin_fd, request[offset:])
+                        except BlockingIOError:
+                            continue
+                        if written <= 0:
+                            raise OSError("probe child stdin closed")
+                        offset += written
+                    if offset == len(request) and not stdin_closed:
+                        selector.unregister(stdin_fd)
+                        process.stdin.close()
+                        stdin_closed = True
+                if key.data == "stdout" and mask & selectors.EVENT_READ:
+                    try:
+                        chunk = os.read(stdout_fd, min(8192, CHILD_IPC_BYTES + 1 - len(output)))
+                    except BlockingIOError:
+                        continue
+                    if not chunk:
+                        selector.unregister(stdout_fd)
+                        stdout_closed = True
+                    else:
+                        output.extend(chunk)
+                        if len(output) > CHILD_IPC_BYTES:
+                            raise ValueError("probe child stdout exceeds cap")
+            _remaining(deadline)
+        return bytes(output)
+    finally:
+        selector.close()
+        if not stdin_closed:
+            process.stdin.close()
+        process.stdout.close()
+
+
+def _decode_child_envelope(raw: bytes) -> tuple[int, dict[str, object]] | None:
+    try:
+        text = raw.decode("utf-8")
+        envelope = json.loads(text)
+    except (UnicodeDecodeError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(envelope, dict) or set(envelope) != {"http_status", "payload"}:
+        return None
+    status = envelope["http_status"]
+    payload = envelope["payload"]
+    if isinstance(status, bool) or not isinstance(status, int) or status not in {200, 400}:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return status, payload
+
+
+def run_isolated(body: bytes, kind: str) -> tuple[int, dict[str, object]]:
+    if kind not in _RUNNERS:
+        return 400, {"status": "error", "code": "unknown_probe_kind"}
+    parts = _request_parts(body, kind)
+    if parts is None:
+        return 400, {"status": "error", "code": "invalid_request"}
+    _payload, timeout_ms = parts
+    deadline = time.monotonic() + timeout_ms / 1000
+    encoded = _child_envelope(body, kind, deadline)
+    if encoded is None:
         return 400, {"status": "error", "code": "invalid_request"}
     try:
-        return 200, runner(payload["site_url"], plan["timeout_ms"])
+        _remaining(deadline)
+    except TimeoutError:
+        return _unavailable("timeout")
+    entry = SUPERVISOR.spawn(kind)
+    if entry is None:
+        return _unavailable("http_503")
+    try:
+        try:
+            raw = _exchange_child(entry, encoded, deadline)
+        except TimeoutError:
+            SUPERVISOR.kill_and_reap(entry)
+            return _unavailable("timeout")
+        except (OSError, ValueError, selectors.Error):
+            SUPERVISOR.kill_and_reap(entry)
+            return _unavailable("http_503")
+        if time.monotonic() >= deadline:
+            SUPERVISOR.kill_and_reap(entry)
+            return _unavailable("timeout")
+        decoded = _decode_child_envelope(raw)
+        if decoded is None:
+            SUPERVISOR.kill_and_reap(entry)
+            return _unavailable("http_503")
+        status, payload = decoded
+        if entry.process.poll() is None:
+            SUPERVISOR.kill_and_reap(entry)
+            return _unavailable("timeout")
+        returncode = entry.process.returncode
+        if not SUPERVISOR.finish(entry) or returncode != 0:
+            return _unavailable("http_503")
+        if time.monotonic() >= deadline:
+            return _unavailable("timeout")
+        return status, payload
+    except BaseException:
+        SUPERVISOR.kill_and_reap(entry)
+        raise
+
+
+def _probe_child_main(kind: str) -> int:
+    raw = sys.stdin.buffer.read(CHILD_IPC_BYTES + 1)
+    try:
+        envelope = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, TypeError, ValueError, json.JSONDecodeError):
+        return 2
+    if (
+        len(raw) > CHILD_IPC_BYTES
+        or not isinstance(envelope, dict)
+        or set(envelope) != {"kind", "site_url", "plan", "deadline"}
+        or envelope.get("kind") != kind
+        or not isinstance(envelope.get("site_url"), str)
+        or not isinstance(envelope.get("plan"), dict)
+        or not isinstance(envelope.get("deadline"), (int, float))
+        or isinstance(envelope.get("deadline"), bool)
+        or not math.isfinite(float(envelope["deadline"]))
+    ):
+        return 2
+    deadline = float(envelope["deadline"])
+    if time.monotonic() >= deadline:
+        result = _unavailable("timeout")
+        status, payload = result
+    else:
+        request_body = json.dumps(
+            {"site_url": envelope["site_url"], "plan": envelope["plan"]},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        parts = _request_parts(request_body, kind)
+        if parts is None:
+            status, payload = 400, {"status": "error", "code": "invalid_request"}
+        else:
+            _request, timeout_ms = parts
+            remaining_ms = math.floor((deadline - time.monotonic()) * 1000)
+            if remaining_ms < 1:
+                status, payload = _unavailable("timeout")
+            else:
+                adjusted = json.dumps(
+                    {"site_url": envelope["site_url"], "plan": {"timeout_ms": min(timeout_ms, remaining_ms)}},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                status, payload = _run_direct(adjusted, kind, deadline=deadline)
+    encoded = json.dumps(
+        {"http_status": status, "payload": payload}, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    if len(encoded) > CHILD_IPC_BYTES:
+        return 3
+    sys.stdout.buffer.write(encoded)
+    sys.stdout.buffer.flush()
+    return 0
+
+
+def _run_direct(body: bytes, kind: str, *, deadline: float | None = None) -> tuple[int, dict[str, object]]:
+    runner = _RUNNERS.get(kind)
+    if runner is None:
+        return 400, {"status": "error", "code": "unknown_probe_kind"}
+    parts = _request_parts(body, kind)
+    if parts is None:
+        return 400, {"status": "error", "code": "invalid_request"}
+    payload, timeout_ms = parts
+    try:
+        if deadline is None:
+            return 200, runner(payload["site_url"], timeout_ms)
+        return 200, runner(payload["site_url"], timeout_ms, deadline=deadline)
     except ValueError:
         return 400, {"status": "error", "code": "invalid_request"}
     except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
         return 200, {"status": "unavailable", "reason": _reason_for(error)}
 
 
+def handle_run(body: bytes, kind: str) -> tuple[int, dict[str, object]]:
+    return run_isolated(body, kind)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "ExtellaProbe/2.1"
+
+    def setup(self) -> None:
+        super().setup()
+        self.connection.settimeout(HANDLER_IDLE_SECONDS)
+
+    def _run_request(self, body: bytes, kind: str) -> tuple[int, dict[str, object]]:
+        return run_isolated(body, kind)
 
     def _send(self, status: int, payload: dict[str, object]) -> None:
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -658,7 +1017,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._send(200, {"status": "ok", "kind": PROBE_KIND or None})
+            pending = SUPERVISOR.health()
+            if pending is not None:
+                self._send(503, {"status": "degraded", "reason": "child_cleanup_pending", "kind": pending.kind})
+            else:
+                self._send(200, {"status": "ok", "kind": PROBE_KIND or None})
             return
         self._send(404, {"status": "error", "code": "route_not_found"})
 
@@ -674,21 +1037,89 @@ class Handler(BaseHTTPRequestHandler):
         if length < 0 or length > MAX_BODY_BYTES:
             self._send(400, {"status": "error", "code": "invalid_request"})
             return
-        status, payload = handle_run(self.rfile.read(length) if length else b"", PROBE_KIND)
-        self._send(status, payload)
+        try:
+            body = self.rfile.read(length) if length else b""
+        except OSError:
+            self._send(400, {"status": "error", "code": "invalid_request"})
+            return
+        if len(body) != length:
+            self._send(400, {"status": "error", "code": "invalid_request"})
+            return
+        try:
+            status, payload = self._run_request(body, PROBE_KIND)
+        except (OSError, ValueError, selectors.Error):
+            status, payload = _unavailable("http_503")
+        try:
+            self._send(status, payload)
+        except OSError:
+            return
 
     def log_message(self, _format: str, *_args: object) -> None:
         return
 
 
+def _send_prethread_unavailable(request: socket.socket) -> None:
+    body = b'{"status":"error","code":"http_503"}'
+    response = (
+        b"HTTP/1.1 503 Service Unavailable\r\n"
+        b"Content-Type: application/json\r\n"
+        b"Content-Length: " + str(len(body)).encode("ascii") + b"\r\n"
+        b"Connection: close\r\n\r\n" + body
+    )
+    try:
+        request.settimeout(HANDLER_IDLE_SECONDS)
+        request.sendall(response)
+    except OSError:
+        return
+    finally:
+        request.close()
+
+
+class _BoundedProbeHTTPServer(ThreadingHTTPServer):
+    daemon_threads = True
+    block_on_close = False
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self._handler_slots = threading.BoundedSemaphore(MAX_HANDLERS)
+
+    def process_request(self, request: socket.socket, client_address: object) -> None:
+        if not self._handler_slots.acquire(blocking=False):
+            _send_prethread_unavailable(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._handler_slots.release()
+            raise
+
+    def process_request_thread(self, request: socket.socket, client_address: object) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._handler_slots.release()
+
+
 def main() -> int:
     if PROBE_KIND not in _RUNNERS:
         raise SystemExit("PROBE_KIND must be one of nu, tls, cc")
-    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    server.daemon_threads = True
-    server.serve_forever()
+    server = _BoundedProbeHTTPServer(("0.0.0.0", PORT), Handler)
+
+    def request_shutdown(_signum: int, _frame: object) -> None:
+        SUPERVISOR.begin_shutdown()
+        server._BaseServer__shutdown_request = True
+
+    signal.signal(signal.SIGTERM, request_shutdown)
+    signal.signal(signal.SIGINT, request_shutdown)
+    try:
+        server.serve_forever(poll_interval=0.1)
+    finally:
+        SUPERVISOR.shutdown()
+        server.server_close()
     return 0
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 3 and sys.argv[1] == PROBE_CHILD_MODE:
+        raise SystemExit(_probe_child_main(sys.argv[2]))
     raise SystemExit(main())

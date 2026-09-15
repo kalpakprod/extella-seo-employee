@@ -1,0 +1,80 @@
+[
+  {
+    "kind": "nu",
+    "transport": "loopback HTTP /run",
+    "http_status": 200,
+    "elapsed_seconds": 2.315,
+    "payload": {
+      "schema": "extella.nu_source.v1",
+      "source": "NuHTML",
+      "site_url": "https://books.toscrape.com/",
+      "probed_urls": [
+        "https://books.toscrape.com/"
+      ],
+      "fetch": {
+        "http_status": 200,
+        "truncated": false,
+        "bytes": 51294
+      },
+      "errors": 1,
+      "warnings": 9,
+      "exemplars": [
+        {
+          "kind": "warning",
+          "line": 647,
+          "message": "Section lacks heading. Consider using “h2”-“h6” elements to add identifying headings to all sections, or else use a “div” element instead for any cases where no heading is needed."
+        },
+        {
+          "kind": "warning",
+          "line": 2208,
+          "message": "The “type” attribute is unnecessary for JavaScript resources."
+        },
+        {
+          "kind": "warning",
+          "line": 2210,
+          "message": "The “charset” attribute on the “script” element is obsolete."
+        }
+      ]
+    }
+  },
+  {
+    "kind": "tls",
+    "transport": "loopback HTTP /run",
+    "http_status": 200,
+    "elapsed_seconds": 1.994,
+    "payload": {
+      "schema": "extella.tls_source.v1",
+      "source": "SecurityProbe",
+      "site_url": "https://books.toscrape.com/",
+      "probed_urls": [
+        "https://books.toscrape.com/"
+      ],
+      "fetch": {
+        "http_status": 200
+      },
+      "headers": {
+        "hsts": true,
+        "hsts_max_age": 0,
+        "csp": false,
+        "x_content_type_options": false,
+        "referrer_policy": false,
+        "frame_guard": false
+      },
+      "ssl_labs": {
+        "status": "ready",
+        "detail": null,
+        "grade": "A-"
+      }
+    }
+  },
+  {
+    "kind": "cc",
+    "transport": "loopback HTTP /run",
+    "http_status": 200,
+    "elapsed_seconds": 11.287,
+    "payload": {
+      "status": "unavailable",
+      "reason": "http_503"
+    }
+  }
+]

@@ -11,6 +11,11 @@ Documentation/evidence commit: the final HEAD reported with this task.
 
 Integrated external acceptance harness commit: `e734abd` (`#3: add external probe supervisor acceptance harness`).
 
+Latest external rerun used runtime source from `f0debd74caef47121e77eee234f4d63ddf9dd5ab`
+(`runtime/probe/entrypoint.py` blob `ac1dafb3353b8c300958fa6093ceacc77151e682`); docs/evidence
+commits after that rerun do not alter runtime code.
+
+
 ## Result
 
 The endpoint, malformed-response, IPv6, NAT64, validated-address, and hard-cancellation findings
@@ -44,10 +49,22 @@ the pinned connection path, with a fresh public-address validation on every redi
 The process boundary addresses the confirmed threat: source_proxy caller death or a slow remote
 origin must not leave a probe child doing outbound work. The supervisor keeps at most two active
 children and four handler threads, returns unavailable JSON on timeout/busy/failure, and keeps
-the existing 128 MiB/32-PID lane limits. Rollback is the previous runtime commit series
+the existing 128 MiB/32-PID lane limits. Product service wiring reserves one second from each
+probe source budget (`floor((B - 1) * 1000)` wire timeout; B≤1 skips locally). Rollback is the
+previous runtime commit series
 (`4fa02ad` through `5a725ad`) if the owner chooses to revert the architecture; no Compose,
 release, version, or dist change is required. The remaining platform limit is ordinary OS
 scheduling/kernel behavior: the measured cleanup grace is bounded, not real-time.
+
+## Review routing evidence
+
+The dedicated Sol xhigh session is the required reviewer. A separate optional review attempt was
+rejected by the executor role; the exact tool result is committed in
+`luna-review-tool-error.raw.txt`:
+
+```text
+{"content":[{"type":"text","text":"review_requester_forbidden: only a worker or full-cycle executor may start or resume a model review; orchestrators inspect the executor's evidence and return questions to it"}],"structuredContent":{"result":null,"error":{"code":"review_requester_forbidden","message":"only a worker or full-cycle executor may start or resume a model review; orchestrators inspect the executor's evidence and return questions to it","status":null,"retryable":false,"request_id":null,"retry_after_seconds":null,"outcome_unknown":false,"details":{"role":"extella-p2-build"}},"isError":true}
+```
 
 ## Verification commands
 
@@ -63,7 +80,7 @@ All output below is committed under `.orchestra/tasks/1/`.
 | Compose syntax: `docker compose -f deploy/compose.yaml config -q` | OK | `compose-config.txt` |
 | Diff whitespace: `git diff --check` | OK | `diff-check.txt` |
 | Corrected Sol runtime reproductions | all assertions passed | `sol-followup-runtime.raw.txt` |
-| External process-boundary acceptance | 6 passed, exit 0, 11.2s | `.orchestra/tasks/3/raw/acceptance-suite-latest.raw.txt` and NDJSON raw files |
+| External process-boundary acceptance | 6 passed, exit 0, 11.2s | `.orchestra/tasks/3/raw/acceptance-suite-final.raw.txt` and NDJSON raw files |
 | Failed optional model-review route | dedicated executor refused requester; Sol is the only reviewer | `luna-review-tool-error.raw.txt` |
 
 The focused suite includes actual loopback HTTP and TLS sockets plus a scaled real-child IPC
@@ -94,7 +111,7 @@ The current worker was also copied into a fresh image with:
 docker build --no-cache -f runtime/probe/Dockerfile -t extella-p2-luna-probe:20260915 .
 ```
 
-Image identity: `sha256:7e795439db94a0c564fdbcbbcd3fcf23e5812622d5dc9a922886851902cae6c`.
+Image identity: `sha256:c0da79cd5e92f08b423aeeb28435856186cb0d0e8b6d95368a4f6ba899c75622`.
 Three temporary containers returned HTTP 200 bounded Nu, SecurityProbe, and Common Crawl
 payloads for the same public URL; their raw replies are in `isolated-docker-workers.raw.txt`.
 The temporary containers and image were removed (`probe-image-remove.txt`). No Compose service
@@ -102,10 +119,10 @@ was started, stopped, restarted, or changed.
 
 ## Restrictions honored
 
-No main service was modified or restarted. No release/store/publish action, `dist/` or version
-change, GSC OAuth change, or external publication was performed. The only implementation files
-changed are the probe worker, its focused tests, and the P2 verification documentation; the
-remaining committed files are bounded verification artifacts for this task.
+No Compose production service was modified or restarted. No release/store/publish action,
+`dist/` or version change, GSC OAuth change, or external publication was performed. The
+implementation changes are the probe supervisor, product budget wiring, focused tests, and P2
+verification documentation; the remaining committed files are bounded verification artifacts.
 
 ## Pre-mortem and remaining uncertainty
 
@@ -131,6 +148,7 @@ remaining committed files are bounded verification artifacts for this task.
   verbatim; the fresh Docker run independently exercised the same current worker and returned
   all three payloads. GSC and DataForSEO remain deliberately not configured.
 
-The architecture is implemented; final acceptance remains gated on the dedicated external
-process-boundary harness and Sol's exact-HEAD review. The owner-approved residual limitation is
-ordinary OS scheduling/kernel behavior, not an intentionally surviving remote probe worker.
+The architecture is implemented; the external process-boundary harness passes on the tested
+runtime source, and final acceptance remains gated on Sol's review of the combined exact HEAD.
+The owner-approved residual limitation is ordinary OS scheduling/kernel behavior, not an
+intentionally surviving remote probe worker.

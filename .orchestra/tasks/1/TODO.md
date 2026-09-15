@@ -32,5 +32,5 @@ kernel reap retains the registry slot and returns degraded health; the superviso
 unbounded cleanup threads or silently claim successful cancellation.
 
 The exact Sol raw reproduction is preserved in `sol-f219de2-deadline.raw.txt`; the dedicated
-external acceptance harness and its `/proc`/dripper transcript live under `.orchestra/tasks/3/`
-and must be copied into the final report after its exact-HEAD run.
+external acceptance harness and its `/proc`/dripper transcript live under `.orchestra/tasks/3/`.
+The latest exact-runtime rerun is `raw/acceptance-suite-final.raw.txt`; its six scenarios passed.

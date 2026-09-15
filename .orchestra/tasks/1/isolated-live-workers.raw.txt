@@ -3,7 +3,7 @@
     "kind": "nu",
     "transport": "loopback HTTP /run",
     "http_status": 200,
-    "elapsed_seconds": 2.315,
+    "elapsed_seconds": 1.872,
     "payload": {
       "schema": "extella.nu_source.v1",
       "source": "NuHTML",
@@ -41,7 +41,7 @@
     "kind": "tls",
     "transport": "loopback HTTP /run",
     "http_status": 200,
-    "elapsed_seconds": 1.994,
+    "elapsed_seconds": 1.545,
     "payload": {
       "schema": "extella.tls_source.v1",
       "source": "SecurityProbe",
@@ -71,7 +71,7 @@
     "kind": "cc",
     "transport": "loopback HTTP /run",
     "http_status": 200,
-    "elapsed_seconds": 11.287,
+    "elapsed_seconds": 0.628,
     "payload": {
       "status": "unavailable",
       "reason": "http_503"

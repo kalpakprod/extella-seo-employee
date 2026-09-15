@@ -57,6 +57,13 @@ class RuleCatalogTests(unittest.TestCase):
         self.assertEqual(catalog["core-title-present"].severity, "critical")
         self.assertEqual(catalog["core-title-present"].severity_policy, "seomator-documentation-status-v1")
 
+    def test_every_catalog_severity_fits_the_documented_methodology(self) -> None:
+        catalog = load_rule_catalog()
+        self.assertTrue(
+            {definition.severity for definition in catalog.values()} <= {"critical", "warning", "info"}
+        )
+        self.assertTrue(all(definition.severity_policy for definition in catalog.values()))
+
     def test_legacy_meta_description_mapping_remains_canonical_and_rule_specific(self) -> None:
         definition = canonical_rule("CrawlSEO", "MISSING_DESCRIPTION")
         self.assertIsNotNone(definition)

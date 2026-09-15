@@ -437,6 +437,87 @@ class SeoEmployeeContractTest(unittest.TestCase):
         self.assertTrue(all(item["evidence_level"] != "unverified" for item in first))
         self.assertEqual(first[0]["severity"], "critical")
 
+    def test_effective_severity_reserves_the_catalog_level_for_confirmed_failures(self) -> None:
+        self.assertEqual(
+            SERVICE.effective_severity("critical", confirmed_failure=True), ("critical", "confirmed_failure")
+        )
+        self.assertEqual(
+            SERVICE.effective_severity("critical", confirmed_failure=False), ("warning", "unconfirmed_occurrence")
+        )
+        self.assertEqual(
+            SERVICE.effective_severity("warning", confirmed_failure=False), ("info", "unconfirmed_occurrence")
+        )
+        self.assertEqual(
+            SERVICE.effective_severity("info", confirmed_failure=False), ("info", "unconfirmed_occurrence")
+        )
+        self.assertEqual(SERVICE.SEVERITY_LEVELS, ("critical", "warning", "info"))
+
+    def test_group_findings_by_rule_keeps_affected_pages_and_strongest_evidence(self) -> None:
+        findings = [
+            {
+                "target_id": "target-example-com-0f115db0",
+                "url": f"https://example.com/{index}",
+                "rule_key": "meta-description-missing",
+                "severity": "critical" if index == 3 else "warning",
+                "severity_basis": "confirmed_failure" if index == 3 else "unconfirmed_occurrence",
+                "affected_pages_count": 1,
+                "evidence_level": "verified" if index == 3 else "supported",
+                "evidence": [{"source": "CrawlSEO", "source_rule": "MISSING_DESCRIPTION", "fact": f"page {index}"}],
+                "confirmed_fact": "На странице отсутствует meta description.",
+            }
+            for index in range(4)
+        ]
+        groups = SERVICE.group_findings_by_rule(findings)
+        self.assertEqual(len(groups), 1)
+        group = groups[0]
+        self.assertEqual(group["affected_pages_count"], 4)
+        self.assertEqual(
+            [page["url"] for page in group["affected_pages"]],
+            [f"https://example.com/{index}" for index in range(4)],
+        )
+        self.assertFalse(group["affected_pages_truncated"])
+        self.assertEqual(group["severity"], "critical")
+        self.assertEqual(group["severity_basis"], "confirmed_failure")
+        self.assertEqual(group["evidence_level"], "verified")
+        self.assertEqual(len(group["evidence"]), 4)
+
+    def test_group_findings_by_rule_bounds_stored_affected_pages(self) -> None:
+        findings = [
+            {
+                "target_id": "target-example-com-0f115db0",
+                "url": f"https://example.com/{index}",
+                "rule_key": "meta-description-missing",
+                "severity": "warning",
+                "affected_pages_count": 1,
+                "evidence_level": "supported",
+                "evidence": [],
+                "confirmed_fact": "На странице отсутствует meta description.",
+            }
+            for index in range(SERVICE.GROUP_PAGE_LIMIT + 2)
+        ]
+        group = SERVICE.group_findings_by_rule(findings)[0]
+        self.assertEqual(group["affected_pages_count"], SERVICE.GROUP_PAGE_LIMIT + 2)
+        self.assertEqual(len(group["affected_pages"]), SERVICE.GROUP_PAGE_LIMIT)
+        self.assertTrue(group["affected_pages_truncated"])
+
+    def test_recommendation_cap_counts_distinct_rules_not_pages(self) -> None:
+        findings = [
+            {
+                "target_id": "target-example-com-0f115db0",
+                "url": f"https://example.com/{index}",
+                "rule_key": f"rule-{index}",
+                "severity": "warning",
+                "affected_pages_count": 5,
+                "evidence_level": "supported",
+                "evidence": [],
+                "confirmed_fact": "A finding exists.",
+            }
+            for index in range(12)
+        ]
+        groups = SERVICE.group_findings_by_rule(findings)
+        self.assertEqual(len(groups), 12)
+        self.assertEqual(len(groups[: SERVICE.RECOMMENDATION_LIMIT]), 10)
+
     def test_ct_sc_008_compares_baseline_and_preserves_it_on_incomplete_runs(self) -> None:
         current = [
             {"task_id": "b", "url": "https://example.com/b", "rule_key": "meta-description-missing"},
@@ -930,6 +1011,7 @@ class SeoEmployeeContractTest(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0]["rule_key"], "schema-present")
         self.assertEqual(findings[0]["severity"], "info")
+        self.assertEqual(findings[0]["severity_basis"], "unconfirmed_occurrence")
         self.assertEqual(findings[0]["evidence_level"], "supported")
 
     def test_mixed_fail_and_warn_keeps_catalog_severity(self) -> None:
@@ -944,9 +1026,12 @@ class SeoEmployeeContractTest(unittest.TestCase):
         }
         # CrawlSEO WARNING + SEOmator fail -> fail wins, catalog severity kept.
         self.assertEqual(findings["meta-description-missing"]["severity"], "critical")
+        self.assertEqual(findings["meta-description-missing"]["severity_basis"], "confirmed_failure")
         self.assertEqual(findings["core-canonical-present"]["severity"], "critical")
+        self.assertEqual(findings["core-canonical-present"]["severity_basis"], "confirmed_failure")
         # CrawlSEO-only INFO advisory -> downgraded warning -> info.
         self.assertEqual(findings["schema-present"]["severity"], "info")
+        self.assertEqual(findings["schema-present"]["severity_basis"], "unconfirmed_occurrence")
 
     def test_model_input_accepts_only_the_documented_downgrade(self) -> None:
         plan = SERVICE.build_audit_plan("service_b2b", requested_max_pages=1)

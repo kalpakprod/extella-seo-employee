@@ -406,7 +406,7 @@ class ServiceV2Tests(unittest.TestCase):
             self.assertEqual(report["model_enrichment"]["total"], 2)
             self.assertEqual(report["model_enrichment"]["attempts"], 4)
 
-    def test_all_profiles_run_with_exact_worker_plan_keys_and_ten_task_cap(self) -> None:
+    def test_all_profiles_run_with_exact_worker_plan_keys_and_grouped_mass_problem(self) -> None:
         profiles = ("service_b2b", "ecommerce", "local_business", "content_media", "saas_marketplace")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -446,12 +446,18 @@ class ServiceV2Tests(unittest.TestCase):
                     resolver=public_resolver, now_provider=now,
                 )
                 self.assertEqual(result["state"], "ready")
-                self.assertEqual(len(result["report"]["tasks"]), 10)
+                report = result["report"]
+                self.assertEqual(len(report["tasks"]), 1)
+                mass = report["tasks"][0]
+                self.assertEqual(mass["rule_key"], "meta-description-missing")
+                self.assertEqual(mass["affected_pages_count"], 13)
                 self.assertEqual(
-                    [item["url"] for item in result["report"]["tasks"]],
-                    ["https://example.com/", "https://example.com/0", "https://example.com/1", "https://example.com/10", "https://example.com/11"]
-                    + [f"https://example.com/{index}" for index in range(2, 7)],
+                    {page["url"] for page in mass["affected_pages"]},
+                    {f"https://example.com/{index}" for index in range(12)} | {"https://example.com/"},
                 )
+                self.assertFalse(mass["affected_pages_truncated"])
+                self.assertEqual(report["model_enrichment"]["findings"], 13)
+                self.assertEqual(report["model_enrichment"]["recommendations"], 1)
             self.assertEqual(len(worker_plans), 10)
             self.assertTrue(all(set(plan) == {"max_pages", "categories", "performance_sample_pages", "timeout_ms"} for plan in worker_plans))
 

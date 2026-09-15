@@ -18,6 +18,7 @@ from seo_employee_rules import canonical_rule
 
 
 SourceStatus = Literal["ok", "not_configured", "unavailable", "failed", "unsupported"]
+SubcheckStatus = Literal["ok", "partial", "not_configured", "unavailable", "unsupported"]
 _BLOCKING_REASONS = ("waf", "captcha", "http_403", "http_429", "http_503", "robots_denied", "timeout")
 _SECRET_MATERIAL = re.compile(
     r"(?i)(bearer\s+\S+|sk-[a-z0-9_-]{8,}|api[_-]?key\s*[:=]|"
@@ -34,6 +35,17 @@ class SourceAdapterError(ValueError):
 
 
 @dataclass(frozen=True)
+class Subcheck:
+    name: str
+    status: SubcheckStatus
+    reason: str = ""
+    scope: str = ""
+
+    def as_dict(self) -> dict[str, str]:
+        return {"name": self.name, "status": self.status, "reason": self.reason, "scope": self.scope}
+
+
+@dataclass(frozen=True)
 class Coverage:
     planned_pages: int
     crawled_pages: int
@@ -43,6 +55,7 @@ class Coverage:
     unavailable_sources: tuple[str, ...]
     unmapped_rules: tuple[str, ...]
     notes: tuple[str, ...] = ()
+    subchecks: tuple[Subcheck, ...] = ()
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -54,6 +67,7 @@ class Coverage:
             "unavailable_sources": list(self.unavailable_sources),
             "unmapped_rules": list(self.unmapped_rules),
             "notes": list(self.notes),
+            "subchecks": [item.as_dict() for item in self.subchecks],
         }
 
 
@@ -115,6 +129,7 @@ def _coverage(
     status: SourceStatus = "ok",
     unmapped_rules: Sequence[str] = (),
     notes: Sequence[str] = (),
+    subchecks: Sequence[Subcheck] = (),
 ) -> Coverage:
     categories = _plan_categories(plan)
     return Coverage(
@@ -126,6 +141,7 @@ def _coverage(
         unavailable_sources=(source,) if status == "unavailable" else (),
         unmapped_rules=tuple(sorted(set(unmapped_rules))),
         notes=tuple(notes),
+        subchecks=tuple(sorted(subchecks, key=lambda item: item.name)),
     )
 
 
@@ -781,19 +797,46 @@ class PSIAdapter:
         probed = payload["probed_urls"]
         assert isinstance(probed, list)
         notes: list[str] = []
+        subchecks: list[Subcheck] = []
         psi_api = payload["psi_api"]
         crux = payload["crux"]
         assert isinstance(psi_api, Mapping) and isinstance(crux, Mapping)
         if psi_api.get("status") == "degraded":
             notes.append(f"psi api {psi_api['reason']}: lab metrics unavailable")
+            subchecks.append(Subcheck("psi_lab", "unavailable", str(psi_api["reason"]), site_url))
+        elif any(_psi_number(entry.get("lab")) is not None for entry in payload["metrics"]):
+            subchecks.append(Subcheck("psi_lab", "ok", "", site_url))
+        else:
+            subchecks.append(Subcheck("psi_lab", "partial", "no_lab_metrics", site_url))
         if crux.get("status") == "not_configured":
             notes.append("crux not_configured: field data unavailable without a key")
+            subchecks.append(Subcheck("field_crux", "not_configured", "not_configured", site_url))
         elif crux.get("status") == "unavailable":
             notes.append(f"crux {crux['reason']}: field data unavailable")
+            subchecks.append(Subcheck("field_crux", "unavailable", str(crux["reason"]), site_url))
+        elif any(_psi_number(entry.get("field_p75")) is not None for entry in payload["metrics"]):
+            subchecks.append(Subcheck("field_crux", "ok", "", site_url))
+        else:
+            subchecks.append(Subcheck("field_crux", "partial", "no_field_metrics", site_url))
+        for section, (name, scope) in {
+            "robots_txt": ("robots_txt", f"{origin}/robots.txt"),
+            "sitemap_xml": ("sitemap_xml", f"{origin}/sitemap.xml"),
+            "homepage_html": ("schema", site_url),
+        }.items():
+            body = sitefiles[section]
+            assert isinstance(body, Mapping)
+            if body.get("http_status") != 200:
+                subchecks.append(Subcheck(name, "unavailable", f"http_{body['http_status']}", scope))
+            elif body.get("truncated"):
+                subchecks.append(Subcheck(name, "partial", "truncated", scope))
+            else:
+                subchecks.append(Subcheck(name, "ok", "", scope))
         return SourceResult(
             source=self.name,
             status="ok",
-            coverage=_coverage(self.name, plan, crawled_pages=len(probed), sampled_pages=0, notes=notes),
+            coverage=_coverage(
+                self.name, plan, crawled_pages=len(probed), sampled_pages=0, notes=notes, subchecks=subchecks
+            ),
             occurrences=tuple(occurrences),
         )
 
@@ -898,10 +941,15 @@ class NuHTMLAdapter:
         assert isinstance(fetch, Mapping)
         if fetch.get("truncated"):
             notes.append(f"nu fetch truncated: validated the first {_NU_FETCH_BYTES} bytes")
+            htmlval = Subcheck("htmlval", "partial", "truncated", site_url)
+        else:
+            htmlval = Subcheck("htmlval", "ok", "", site_url)
         return SourceResult(
             source=self.name,
             status="ok",
-            coverage=_coverage(self.name, plan, crawled_pages=1, notes=notes, unmapped_rules=unmapped),
+            coverage=_coverage(
+                self.name, plan, crawled_pages=1, notes=notes, unmapped_rules=unmapped, subchecks=(htmlval,)
+            ),
             occurrences=tuple(occurrences),
         )
 
@@ -971,6 +1019,10 @@ class SecurityProbeAdapter(_SinglePageProbeAdapter):
             checks.append((_TLS_GRADE_RULE, "fail" if grade in _TLS_FAIL_GRADES else "warn", f"SSL Labs cached TLS grade is {grade}"))
         if labs["status"] != "ready" or grade is None:
             notes.append("ssl_labs unavailable: no completed cached TLS grade; no polling performed")
+            ssl_labs = Subcheck("ssl_labs", "unavailable", str(labs.get("detail") or labs["status"]), url)
+        else:
+            ssl_labs = Subcheck("ssl_labs", "ok", "", url)
+        subchecks = (Subcheck("security_headers", "ok", "", url), ssl_labs)
         occurrences, unmapped = [], []
         for rule, status, fact in checks:
             known = _known_rule(self.name, rule)
@@ -978,7 +1030,12 @@ class SecurityProbeAdapter(_SinglePageProbeAdapter):
                 unmapped.append(rule)
             else:
                 occurrences.append(SourceOccurrence(self.name, rule, known[0], known[1], url, fact, status))
-        return SourceResult(self.name, "ok", _coverage(self.name, plan, sampled_pages=1, notes=notes, unmapped_rules=unmapped), tuple(occurrences))
+        return SourceResult(
+            self.name,
+            "ok",
+            _coverage(self.name, plan, sampled_pages=1, notes=notes, unmapped_rules=unmapped, subchecks=subchecks),
+            tuple(occurrences),
+        )
 
 
 class CommonCrawlAdapter(_SinglePageProbeAdapter):
@@ -1015,9 +1072,13 @@ class CommonCrawlAdapter(_SinglePageProbeAdapter):
         notes = ["common_crawl historical excerpt only; no live pages crawled"]
         if payload["record"] is None:
             notes.append("common_crawl no archived record found in the selected index")
+            excerpt = Subcheck("excerpt", "unavailable", "no_record", str(payload["site_url"]))
         elif not payload["excerpt"]:
             notes.append("common_crawl excerpt unavailable within the archive byte cap")
-        return SourceResult(self.name, "ok", _coverage(self.name, plan, notes=notes))
+            excerpt = Subcheck("excerpt", "unavailable", "byte_cap", str(payload["site_url"]))
+        else:
+            excerpt = Subcheck("excerpt", "ok", "", str(payload["site_url"]))
+        return SourceResult(self.name, "ok", _coverage(self.name, plan, notes=notes, subchecks=(excerpt,)))
 
 
 def required_sources_satisfied(plan: AuditPlan, results: Sequence[SourceResult]) -> bool:

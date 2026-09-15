@@ -536,9 +536,9 @@ class SeoEmployeeContractTest(unittest.TestCase):
             {"schema": "extella.seo_employee_baseline.v1", "items": [fixed, legacy]},
         )
         self.assertEqual(comparison["fixed_items"], [fixed, legacy])
-        self.assertEqual(len(next_baseline["items"]), 10)
+        self.assertEqual(len(next_baseline["items"]), 11)
         self.assertEqual(next_baseline["items"][0], current[0])
-        self.assertEqual(next_baseline["items"][-1], current[9])
+        self.assertEqual(next_baseline["items"][-1], current[10])
 
     def test_runtime_baseline_is_scoped_to_the_configured_site(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -1086,6 +1086,98 @@ class SeoEmployeeContractTest(unittest.TestCase):
         self.assertEqual(result["method"], "configure")
         self.assertEqual(result["target_id"], target["target_id"])
         self.assertEqual(result["config"], target)
+
+
+class BaselineComparisonRegressionTest(unittest.TestCase):
+    TARGET_ID = "target-example-com-0f115db0"
+
+    @classmethod
+    def _card(cls, index: int) -> dict[str, object]:
+        url = f"https://example.com/page-{index:02d}"
+        return {
+            "task_id": SERVICE._task_identity(
+                {"target_id": cls.TARGET_ID, "url": url, "rule_key": "meta-description-missing"}
+            ),
+            "url": url,
+            "rule_key": "meta-description-missing",
+            "severity": "warning",
+            "evidence_level": "verified",
+            "sources": ["CrawlSEO", "SEOmator"],
+            "confirmed_fact": "На странице отсутствует meta description.",
+        }
+
+    @staticmethod
+    def _results(plan: object, *, crawled_pages: int) -> dict[str, object]:
+        categories = tuple(plan.categories)
+        return {
+            "CrawlSEO": SERVICE.SourceResult(
+                "CrawlSEO", "ok", SERVICE.Coverage(plan.max_pages, crawled_pages, 0, categories, ("CrawlSEO",), (), ())
+            ),
+            "SEOmator": SERVICE.SourceResult(
+                "SEOmator", "ok", SERVICE.Coverage(plan.max_pages, crawled_pages, 0, categories, ("SEOmator",), (), ())
+            ),
+        }
+
+    def test_full_identity_set_survives_the_display_cap(self) -> None:
+        current = [self._card(index) for index in range(11)]
+        baseline = {
+            "schema": "extella.seo_employee_baseline.v2",
+            "comparison_version": SERVICE.COMPARISON_VERSION,
+            "target_id": self.TARGET_ID,
+            "items": list(current),
+        }
+        comparison, next_baseline = SERVICE.compare_with_baseline(current, baseline)
+        self.assertEqual(
+            {key: comparison[key] for key in ("new", "fixed", "unchanged")},
+            {"new": 0, "fixed": 0, "unchanged": 11},
+        )
+        self.assertEqual(len(next_baseline["items"]), 11)
+
+    def test_shrunk_coverage_reports_not_evaluated_instead_of_fixed(self) -> None:
+        plan = SERVICE.build_audit_plan("service_b2b", requested_max_pages=12)
+        previous = self._card(0)
+        baseline = {
+            "schema": "extella.seo_employee_baseline.v2",
+            "comparison_version": SERVICE.COMPARISON_VERSION,
+            "target_id": self.TARGET_ID,
+            "plan_signature": SERVICE._plan_signature(plan),
+            "catalog_major": SERVICE._catalog_major(),
+            "coverage": {"crawled_pages": 12, "planned_pages": 12},
+            "items": [previous],
+        }
+        comparison, _next_baseline = SERVICE._comparison_for_v2(
+            [],
+            baseline,
+            target_id=self.TARGET_ID,
+            plan=plan,
+            terminal_state="ready",
+            results=self._results(plan, crawled_pages=1),
+        )
+        self.assertEqual(comparison["fixed"], 0)
+        self.assertEqual(comparison["fixed_items"], [])
+        self.assertEqual(comparison["not_evaluated"], 1)
+        self.assertEqual(comparison["not_evaluated_items"][0]["task_id"], previous["task_id"])
+
+    def test_baseline_without_comparison_version_is_not_compared(self) -> None:
+        plan = SERVICE.build_audit_plan("service_b2b", requested_max_pages=1)
+        card = self._card(0)
+        baseline = {
+            "schema": "extella.seo_employee_baseline.v2",
+            "target_id": self.TARGET_ID,
+            "plan_signature": SERVICE._plan_signature(plan),
+            "catalog_major": SERVICE._catalog_major(),
+            "items": [card],
+        }
+        comparison, _next_baseline = SERVICE._comparison_for_v2(
+            [],
+            baseline,
+            target_id=self.TARGET_ID,
+            plan=plan,
+            terminal_state="ready",
+            results=self._results(plan, crawled_pages=1),
+        )
+        self.assertEqual(comparison["baseline"], "not_compared")
+        self.assertEqual(comparison["fixed"], 0)
 
 
 if __name__ == "__main__":

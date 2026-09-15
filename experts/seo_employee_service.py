@@ -86,6 +86,8 @@ REPORT_SCHEMA = "extella.seo_employee_report.v2"
 STATE_SCHEMA = "extella.seo_employee_state.v2"
 CONFIG_SCHEMA = TARGET_CONFIG_SCHEMA
 NORMALIZER_VERSION = "2.1.0"
+COMPARISON_VERSION = 2
+BASELINE_ITEM_LIMIT = 10000
 ACTIVE_VERSION = "2.0.0"
 MODEL_FIELDS = frozenset(
     {
@@ -648,16 +650,16 @@ def _safe_failure(code: str) -> dict[str, str]:
 
 
 def compare_with_baseline(
-    tasks: Sequence[Mapping[str, object]], baseline: Mapping[str, object] | None
+    tasks: Sequence[Mapping[str, object]],
+    baseline: Mapping[str, object] | None,
+    *,
+    can_declare_fixed: Callable[[Mapping[str, object]], bool] | None = None,
 ) -> tuple[dict[str, object], dict[str, object]]:
     current: dict[str, dict[str, object]] = {}
     for task in tasks:
         card = dict(task)
         _assert_no_secret_material(card)
         current[str(card["task_id"])] = card
-    # Reports are capped to ten tasks. Preserve the same bounded, deterministic
-    # set in the baseline even when this helper is called directly.
-    current = {task_id: current[task_id] for task_id in sorted(current)[:10]}
     previous_items = baseline.get("items", []) if isinstance(baseline, Mapping) else []
     previous: dict[str, dict[str, object]] = {}
     if isinstance(previous_items, list):
@@ -671,19 +673,26 @@ def compare_with_baseline(
                 continue
             previous[str(card["task_id"])] = card
     new_ids = sorted(set(current) - set(previous))
-    fixed_ids = sorted(set(previous) - set(current))
+    absent_ids = sorted(set(previous) - set(current))
     unchanged_ids = sorted(set(current) & set(previous))
+    evaluated = can_declare_fixed or (lambda _previous: True)
+    fixed_ids = [item for item in absent_ids if evaluated(previous[item])]
+    fixed_set = set(fixed_ids)
+    not_evaluated_ids = [item for item in absent_ids if item not in fixed_set]
     comparison: dict[str, object] = {
         "baseline": "compared" if baseline is not None else "created",
         "new": len(new_ids),
         "fixed": len(fixed_ids),
         "unchanged": len(unchanged_ids),
+        "not_evaluated": len(not_evaluated_ids),
         "new_items": [current[item] for item in new_ids],
         "fixed_items": [previous[item] for item in fixed_ids],
         "unchanged_items": [current[item] for item in unchanged_ids],
+        "not_evaluated_items": [previous[item] for item in not_evaluated_ids],
     }
     next_baseline: dict[str, object] = {
         "schema": "extella.seo_employee_baseline.v1",
+        "comparison_version": COMPARISON_VERSION,
         "items": [current[item] for item in sorted(current)],
     }
     return comparison, next_baseline
@@ -1244,24 +1253,98 @@ def validate_model_input(value: Mapping[str, object]) -> None:
 
 
 def _not_compared() -> dict[str, object]:
-    return {"baseline": "not_compared", "new": 0, "fixed": 0, "unchanged": 0, "new_items": [], "fixed_items": [], "unchanged_items": []}
+    return {
+        "baseline": "not_compared",
+        "new": 0,
+        "fixed": 0,
+        "unchanged": 0,
+        "not_evaluated": 0,
+        "new_items": [],
+        "fixed_items": [],
+        "unchanged_items": [],
+        "not_evaluated_items": [],
+    }
+
+
+def _current_crawled_pages(results: Mapping[str, SourceResult]) -> int:
+    return max((result.coverage.crawled_pages for result in results.values()), default=0)
+
+
+def _baseline_coverage_comparable(baseline: Mapping[str, object], results: Mapping[str, SourceResult]) -> bool:
+    stored = baseline.get("coverage")
+    if not isinstance(stored, Mapping):
+        return True
+    previous_crawled = stored.get("crawled_pages")
+    if not isinstance(previous_crawled, int) or isinstance(previous_crawled, bool):
+        return True
+    return _current_crawled_pages(results) >= previous_crawled
+
+
+def _can_declare_fixed(
+    results: Mapping[str, SourceResult], *, coverage_comparable: bool
+) -> Callable[[Mapping[str, object]], bool]:
+    statuses = {result.source: result.status for result in results.values()}
+    catalog = load_rule_catalog()
+
+    def _evaluated(previous: Mapping[str, object]) -> bool:
+        if not coverage_comparable:
+            return False
+        definition = catalog.get(str(previous.get("rule_key")))
+        if definition is None:
+            return False
+        required = tuple(definition.source_rules)
+        return bool(required) and all(statuses.get(source) == "ok" for source in required)
+
+    return _evaluated
+
+
+def _reclassify_fixed(comparison: dict[str, object]) -> None:
+    fixed_items = list(comparison.get("fixed_items", []))
+    if not fixed_items:
+        return
+    comparison["fixed"] = 0
+    comparison["fixed_items"] = []
+    comparison["not_evaluated"] = int(comparison.get("not_evaluated", 0)) + len(fixed_items)
+    comparison["not_evaluated_items"] = list(comparison.get("not_evaluated_items", [])) + fixed_items
 
 
 def _comparison_for_v2(
-    tasks: Sequence[Mapping[str, object]], baseline: Mapping[str, object] | None, *, target_id: str, plan: AuditPlan, terminal_state: str,
+    tasks: Sequence[Mapping[str, object]],
+    baseline: Mapping[str, object] | None,
+    *,
+    target_id: str,
+    plan: AuditPlan,
+    terminal_state: str,
+    results: Mapping[str, SourceResult],
 ) -> tuple[dict[str, object], dict[str, object] | None]:
     if terminal_state == "failed":
         return _not_compared(), None
     if baseline is not None and (
-        baseline.get("target_id") != target_id or baseline.get("plan_signature") != _plan_signature(plan) or baseline.get("catalog_major") != _catalog_major()
+        baseline.get("target_id") != target_id
+        or baseline.get("plan_signature") != _plan_signature(plan)
+        or baseline.get("catalog_major") != _catalog_major()
+        or baseline.get("comparison_version") != COMPARISON_VERSION
     ):
         return _not_compared(), None
-    comparison, next_baseline = compare_with_baseline(tasks, baseline)
+    coverage_comparable = _baseline_coverage_comparable(baseline, results) if baseline is not None else True
+    comparison, next_baseline = compare_with_baseline(
+        tasks,
+        baseline,
+        can_declare_fixed=_can_declare_fixed(results, coverage_comparable=coverage_comparable),
+    )
     if terminal_state == "partial":
-        comparison["fixed"] = 0
-        comparison["fixed_items"] = []
+        _reclassify_fixed(comparison)
         return comparison, None
-    next_baseline.update({"schema": "extella.seo_employee_baseline.v2", "target_id": target_id, "plan_signature": _plan_signature(plan), "catalog_major": _catalog_major()})
+    next_baseline.update(
+        {
+            "schema": "extella.seo_employee_baseline.v2",
+            "comparison_version": COMPARISON_VERSION,
+            "target_id": target_id,
+            "plan_signature": _plan_signature(plan),
+            "catalog_major": _catalog_major(),
+            "coverage": {"planned_pages": plan.max_pages, "crawled_pages": _current_crawled_pages(results)},
+        }
+    )
     return comparison, next_baseline
 
 
@@ -1396,10 +1479,13 @@ def _build_v2_report(
 ) -> tuple[dict[str, object], dict[str, object] | None]:
     target_id = str(target["target_id"])
     findings = prioritize_findings(
-        _normalize_v2_results(target_id, plan, results), category_priority=plan.categories
+        _normalize_v2_results(target_id, plan, results),
+        limit=BASELINE_ITEM_LIMIT,
+        category_priority=plan.categories,
     )
+    display_findings = findings[:10]
     tasks, model_status = _build_tasks(
-        findings,
+        display_findings,
         target_id=target_id,
         site_url=command["site_url"],
         expires_at=_iso(datetime.fromisoformat(completed_at.replace("Z", "+00:00")) + timedelta(days=7)),
@@ -1409,8 +1495,9 @@ def _build_v2_report(
     required_ok = required_sources_satisfied(plan, list(results.values()))
     any_factual = any(item.status == "ok" for item in results.values())
     state = "ready" if required_ok else "partial" if any_factual else "failed"
+    comparison_cards = [{"task_id": _task_identity(finding), **finding} for finding in findings]
     comparison, next_baseline = _comparison_for_v2(
-        tasks, baseline, target_id=target_id, plan=plan, terminal_state=state
+        comparison_cards, baseline, target_id=target_id, plan=plan, terminal_state=state, results=results
     )
     report: dict[str, object] = {
         "schema": REPORT_SCHEMA,

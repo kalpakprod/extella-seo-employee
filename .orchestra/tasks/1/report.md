@@ -9,6 +9,8 @@ Implementation commits: `3a40c5fe22f0b72d9632196aff6581e0434fb8aa` (supervisor),
 
 Documentation/evidence commit: the final HEAD reported with this task.
 
+Integrated external acceptance harness commit: `e734abd` (`#3: add external probe supervisor acceptance harness`).
+
 ## Result
 
 The endpoint, malformed-response, IPv6, NAT64, validated-address, and hard-cancellation findings
@@ -53,14 +55,16 @@ All output below is committed under `.orchestra/tasks/1/`.
 
 | Check | Result | Raw output |
 |---|---:|---|
-| Python discovery: `python3 -m unittest discover -s tests -p 'test_*.py' -v` | pending final architecture run | `python-suite.txt` |
+| Python discovery: `python3 -m unittest discover -s tests -p 'test_*.py' -v` | 284 passed | `python-suite.txt` |
 | Node contracts: `node --test tests/safe_fetch.test.mjs tests/worker_plan.test.mjs tests/ui/ui_contract.test.mjs` | 64 passed | `node-suite.txt` |
 | Focused probe regressions: `python3 -m unittest discover -s tests -p 'test_probe_worker.py' -v` | 38 passed | `test_probe_worker.txt` |
+| Service budget regressions: `python3 -m unittest discover -s tests -p 'test_seo_employee_service_v2.py' -v` | 27 passed | `python-suite.txt` |
 | `collect_sources` → source proxies → real supervisor children → adapters → `_build_v2_report` | 1 passed; report state `ready`; `missing_data` includes unavailable PSI and not-configured GSC/DataForSEO | `collect-sources-report.raw.txt` |
 | Compose syntax: `docker compose -f deploy/compose.yaml config -q` | OK | `compose-config.txt` |
 | Diff whitespace: `git diff --check` | OK | `diff-check.txt` |
 | Corrected Sol runtime reproductions | all assertions passed | `sol-followup-runtime.raw.txt` |
-| Sol hard-cancellation acceptance | pending final exact HEAD | `.orchestra/tasks/3/` artifacts from extella-p2-luna-tests |
+| External process-boundary acceptance | 6 passed, exit 0, 11.2s | `.orchestra/tasks/3/raw/acceptance-suite-latest.raw.txt` and NDJSON raw files |
+| Failed optional model-review route | dedicated executor refused requester; Sol is the only reviewer | `luna-review-tool-error.raw.txt` |
 
 The focused suite includes actual loopback HTTP and TLS sockets plus a scaled real-child IPC
 deadline regression. The TLS regression generates a
@@ -69,8 +73,9 @@ bracket-correct Host authority. The corrected runtime reproduction records the e
 deadline result-acceptance check (`elapsed=1.35` → `TimeoutError`), malformed HTTP JSON responses
 for all three lanes, both IPv6 Host forms, NAT64 rejection, and first-address fallback order.
 The prior Sol slow-drip reproduction remains preserved in `sol-f219de2-deadline.raw.txt`; the
-new process-boundary acceptance transcript will be copied from the dedicated tests worker after
-its exact-head run.
+new process-boundary acceptance transcript records parent/child PIDs, D/response/cleanup timing,
+dripper close events, DNS-child cancellation, caller death, overload, health, process-group
+membership, and no live children after cleanup.
 
 ## Isolated live worker evidence
 

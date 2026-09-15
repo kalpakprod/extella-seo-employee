@@ -47,10 +47,10 @@ test_prepare_syncs_token_with_pinned_interpreter (test_container_runtime.Contain
 test_product_dispatch_is_fixed_and_token_is_required (test_container_runtime.ContainerRuntimeTest.test_product_dispatch_is_fixed_and_token_is_required) ... ok
 test_source_proxy_calls_internal_worker_and_writes_atomically (test_container_runtime.ContainerRuntimeTest.test_source_proxy_calls_internal_worker_and_writes_atomically) ... ok
 test_source_proxy_posts_psi_plan_to_psi_worker (test_container_runtime.ContainerRuntimeTest.test_source_proxy_posts_psi_plan_to_psi_worker) ... ok
-test_source_proxy_preserves_only_allowlisted_worker_machine_reasons (test_container_runtime.ContainerRuntimeTest.test_source_proxy_preserves_only_allowlisted_worker_machine_reasons) ... ok
-test_source_proxy_rejects_an_invalid_plan_before_network_io (test_container_runtime.ContainerRuntimeTest.test_source_proxy_rejects_an_invalid_plan_before_network_io) ... /usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 400: 'bad request'>
+test_source_proxy_preserves_only_allowlisted_worker_machine_reasons (test_container_runtime.ContainerRuntimeTest.test_source_proxy_preserves_only_allowlisted_worker_machine_reasons) ... /usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 400: 'bad request'>
   _warnings.warn(self.warn_message, ResourceWarning)
 ok
+test_source_proxy_rejects_an_invalid_plan_before_network_io (test_container_runtime.ContainerRuntimeTest.test_source_proxy_rejects_an_invalid_plan_before_network_io) ... ok
 test_source_proxy_rejects_an_invalid_psi_plan_before_network_io (test_container_runtime.ContainerRuntimeTest.test_source_proxy_rejects_an_invalid_psi_plan_before_network_io) ... ok
 test_worker_dns_result_still_passes_public_address_validation (test_container_runtime.ContainerRuntimeTest.test_worker_dns_result_still_passes_public_address_validation) ... ok
 test_worker_images_preload_the_safe_fetch_guard (test_container_runtime.ContainerRuntimeTest.test_worker_images_preload_the_safe_fetch_guard) ... ok
@@ -86,9 +86,12 @@ ok
 test_cc_kind_never_fetches_the_site_host (test_probe_worker.ProbeHandleRunTest.test_cc_kind_never_fetches_the_site_host) ... probe cc detail=OSError
 ok
 test_each_kind_rejects_a_bad_plan (test_probe_worker.ProbeHandleRunTest.test_each_kind_rejects_a_bad_plan) ... ok
+test_public_handle_run_routes_through_isolated_supervisor (test_probe_worker.ProbeHandleRunTest.test_public_handle_run_routes_through_isolated_supervisor) ... ok
 test_site_fetching_kinds_reject_a_private_site_host (test_probe_worker.ProbeHandleRunTest.test_site_fetching_kinds_reject_a_private_site_host) ... ok
 test_unknown_kind_is_rejected (test_probe_worker.ProbeHandleRunTest.test_unknown_kind_is_rejected) ... ok
-test_absolute_deadline_rejects_slow_request_response_and_body (test_probe_worker.ProbeHonestyTests.test_absolute_deadline_rejects_slow_request_response_and_body) ... ok
+test_absolute_deadline_rejects_slow_request_response_and_body (test_probe_worker.ProbeHonestyTests.test_absolute_deadline_rejects_slow_request_response_and_body) ... /usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 400: 'bad request'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+ok
 test_archive_crawler_encoding_metadata_does_not_hide_plain_html (test_probe_worker.ProbeHonestyTests.test_archive_crawler_encoding_metadata_does_not_hide_plain_html) ... ok
 test_archive_decompression_is_bounded (test_probe_worker.ProbeHonestyTests.test_archive_decompression_is_bounded) ... ok
 test_archive_excerpt_decompresses_and_omits_scripts (test_probe_worker.ProbeHonestyTests.test_archive_excerpt_decompresses_and_omits_scripts) ... ok
@@ -103,6 +106,7 @@ test_real_socket_path_uses_pinned_numeric_address_and_host (test_probe_worker.Pr
 test_real_tls_path_uses_pinned_address_and_preserves_sni (test_probe_worker.ProbeHonestyTests.test_real_tls_path_uses_pinned_address_and_preserves_sni) ... ok
 test_response_failure_does_not_fall_back_to_another_address (test_probe_worker.ProbeHonestyTests.test_response_failure_does_not_fall_back_to_another_address) ... ok
 test_site_fetch_pins_the_validated_public_address (test_probe_worker.ProbeHonestyTests.test_site_fetch_pins_the_validated_public_address) ... ok
+test_supervisor_ipc_wait_does_not_inherit_network_wait_cap (test_probe_worker.ProbeHonestyTests.test_supervisor_ipc_wait_does_not_inherit_network_wait_cap) ... ok
 test_truncated_html_is_not_reported_as_invalid_html (test_probe_worker.ProbeHonestyTests.test_truncated_html_is_not_reported_as_invalid_html) ... ok
 test_validator_internal_errors_are_not_a_clean_validation (test_probe_worker.ProbeHonestyTests.test_validator_internal_errors_are_not_a_clean_validation) ... ok
 test_fetch_failure_is_unavailable_not_an_exception (test_probe_worker.TlsProbeTest.test_fetch_failure_is_unavailable_not_an_exception) ... probe tls detail=fetch OSError
@@ -118,23 +122,23 @@ test_ssl_labs_grade_is_unavailable_for_unsupported_origins (test_probe_worker.Tl
 test_access_log_records_request_without_secret_values (test_product_api_v2.ProductApiV2Test.test_access_log_records_request_without_secret_values) ... ok
 test_exact_request_allowlists_and_queue_status (test_product_api_v2.ProductApiV2Test.test_exact_request_allowlists_and_queue_status) ... ok
 test_execution_failure_is_the_only_503_case (test_product_api_v2.ProductApiV2Test.test_execution_failure_is_the_only_503_case) ... ok
-test_handler_distinguishes_client_input_from_state_targets_and_configure_backend_failures (test_product_api_v2.ProductApiV2Test.test_handler_distinguishes_client_input_from_state_targets_and_configure_backend_failures) ... {"ts": "2026-09-15T04:41:49Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
-{"ts": "2026-09-15T04:41:49Z", "client": "127.0.0.1", "method": "POST", "route": "/api/configure", "status": 503}
-{"ts": "2026-09-15T04:41:50Z", "client": "127.0.0.1", "method": "GET", "route": "/api/state", "status": 503}
-{"ts": "2026-09-15T04:41:50Z", "client": "127.0.0.1", "method": "GET", "route": "/api/targets", "status": 503}
-{"ts": "2026-09-15T04:41:51Z", "client": "127.0.0.1", "method": "GET", "route": "/api/targets", "status": 503}
-{"ts": "2026-09-15T04:41:51Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+test_handler_distinguishes_client_input_from_state_targets_and_configure_backend_failures (test_product_api_v2.ProductApiV2Test.test_handler_distinguishes_client_input_from_state_targets_and_configure_backend_failures) ... {"ts": "2026-09-15T07:03:51Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+{"ts": "2026-09-15T07:03:52Z", "client": "127.0.0.1", "method": "POST", "route": "/api/configure", "status": 503}
+{"ts": "2026-09-15T07:03:52Z", "client": "127.0.0.1", "method": "GET", "route": "/api/state", "status": 503}
+{"ts": "2026-09-15T07:03:53Z", "client": "127.0.0.1", "method": "GET", "route": "/api/targets", "status": 503}
+{"ts": "2026-09-15T07:03:53Z", "client": "127.0.0.1", "method": "GET", "route": "/api/targets", "status": 503}
+{"ts": "2026-09-15T07:03:54Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
 ok
-test_handler_enforces_auth_body_cap_transfer_encoding_and_routes (test_product_api_v2.ProductApiV2Test.test_handler_enforces_auth_body_cap_transfer_encoding_and_routes) ... {"ts": "2026-09-15T04:41:52Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 401}
-{"ts": "2026-09-15T04:41:52Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
-{"ts": "2026-09-15T04:41:53Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
-{"ts": "2026-09-15T04:41:53Z", "client": "127.0.0.1", "method": "GET", "route": "/api/unknown", "status": 404}
-{"ts": "2026-09-15T04:41:54Z", "client": "127.0.0.1", "method": "GET", "route": "/api/state", "status": 400}
+test_handler_enforces_auth_body_cap_transfer_encoding_and_routes (test_product_api_v2.ProductApiV2Test.test_handler_enforces_auth_body_cap_transfer_encoding_and_routes) ... {"ts": "2026-09-15T07:03:54Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 401}
+{"ts": "2026-09-15T07:03:55Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+{"ts": "2026-09-15T07:03:55Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+{"ts": "2026-09-15T07:03:56Z", "client": "127.0.0.1", "method": "GET", "route": "/api/unknown", "status": 404}
+{"ts": "2026-09-15T07:03:56Z", "client": "127.0.0.1", "method": "GET", "route": "/api/state", "status": 400}
 ok
-test_handler_maps_backend_failures_to_503_without_exposing_details (test_product_api_v2.ProductApiV2Test.test_handler_maps_backend_failures_to_503_without_exposing_details) ... {"ts": "2026-09-15T04:41:54Z", "client": "127.0.0.1", "method": "POST", "route": "/api/configure", "status": 503}
-{"ts": "2026-09-15T04:41:55Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 503}
+test_handler_maps_backend_failures_to_503_without_exposing_details (test_product_api_v2.ProductApiV2Test.test_handler_maps_backend_failures_to_503_without_exposing_details) ... {"ts": "2026-09-15T07:03:57Z", "client": "127.0.0.1", "method": "POST", "route": "/api/configure", "status": 503}
+{"ts": "2026-09-15T07:03:57Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 503}
 ok
-test_health_reports_version_queue_and_consumer (test_product_api_v2.ProductApiV2Test.test_health_reports_version_queue_and_consumer) ... {"ts": "2026-09-15T04:41:55Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
+test_health_reports_version_queue_and_consumer (test_product_api_v2.ProductApiV2Test.test_health_reports_version_queue_and_consumer) ... {"ts": "2026-09-15T07:03:58Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
 ok
 test_state_error_mapping_is_input_400_or_storage_503 (test_product_api_v2.ProductApiV2Test.test_state_error_mapping_is_input_400_or_storage_503) ... ok
 test_state_requires_target_unless_exactly_one_is_configured (test_product_api_v2.ProductApiV2Test.test_state_requires_target_unless_exactly_one_is_configured) ... ok
@@ -144,12 +148,12 @@ test_targets_route_returns_target_summaries (test_product_api_v2.ProductApiV2Tes
 test_unknown_get_route_and_malformed_state_query_have_v2_codes (test_product_api_v2.ProductApiV2Test.test_unknown_get_route_and_malformed_state_query_have_v2_codes) ... ok
 test_access_log_omits_authorization_value (test_product_gateway.ProductGatewayTest.test_access_log_omits_authorization_value) ... ok
 test_parse_rate_limit_defaults_and_rejects_garbage (test_product_gateway.ProductGatewayTest.test_parse_rate_limit_defaults_and_rejects_garbage) ... ok
-test_rate_limit_counts_rejected_routes_too (test_product_gateway.ProductGatewayTest.test_rate_limit_counts_rejected_routes_too) ... {"ts": "2026-09-15T04:41:56Z", "client": "127.0.0.1", "method": "GET", "route": "/no-such-route", "status": 404}
-{"ts": "2026-09-15T04:41:56Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 429}
+test_rate_limit_counts_rejected_routes_too (test_product_gateway.ProductGatewayTest.test_rate_limit_counts_rejected_routes_too) ... {"ts": "2026-09-15T07:03:59Z", "client": "127.0.0.1", "method": "GET", "route": "/no-such-route", "status": 404}
+{"ts": "2026-09-15T07:03:59Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 429}
 ok
-test_rate_limit_returns_429_with_retry_after (test_product_gateway.ProductGatewayTest.test_rate_limit_returns_429_with_retry_after) ... {"ts": "2026-09-15T04:41:57Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
-{"ts": "2026-09-15T04:41:57Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
-{"ts": "2026-09-15T04:41:57Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 429}
+test_rate_limit_returns_429_with_retry_after (test_product_gateway.ProductGatewayTest.test_rate_limit_returns_429_with_retry_after) ... {"ts": "2026-09-15T07:04:00Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
+{"ts": "2026-09-15T07:04:00Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
+{"ts": "2026-09-15T07:04:00Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 429}
 ok
 test_extractors_read_google_shapes (test_psi_worker.PsiWorkerTest.test_extractors_read_google_shapes) ... ok
 test_fetch_follows_same_origin_redirects_and_caps_bytes (test_psi_worker.PsiWorkerTest.test_fetch_follows_same_origin_redirects_and_caps_bytes) ... /usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 302: 'Found'>
@@ -261,6 +265,9 @@ test_url_identity_strips_default_ports_only (test_seo_employee_service.SeoEmploy
 test_warn_only_finding_is_downgraded_one_step (test_seo_employee_service.SeoEmployeeContractTest.test_warn_only_finding_is_downgraded_one_step) ... ok
 test_exhausted_budget_skips_optional_workers_without_losing_required_results (test_seo_employee_service_v2.ProbeServiceTests.test_exhausted_budget_skips_optional_workers_without_losing_required_results) ... ok
 test_optional_workers_have_bounded_plans_and_fail_without_downgrading_report (test_seo_employee_service_v2.ProbeServiceTests.test_optional_workers_have_bounded_plans_and_fail_without_downgrading_report) ... ok
+test_probe_wire_budget_reserves_one_second_and_skips_nonpositive_budget (test_seo_employee_service_v2.ProbeServiceTests.test_probe_wire_budget_reserves_one_second_and_skips_nonpositive_budget) ... ok
+test_probe_wrapper_sends_floor_wire_budget_after_margin (test_seo_employee_service_v2.ProbeServiceTests.test_probe_wrapper_sends_floor_wire_budget_after_margin) ... ok
+test_probe_wrapper_skips_when_reserved_wire_budget_is_exhausted (test_seo_employee_service_v2.ProbeServiceTests.test_probe_wrapper_skips_when_reserved_wire_budget_is_exhausted) ... ok
 test_action_proposal_requires_successful_nonempty_model_minimal_fix (test_seo_employee_service_v2.ServiceV2Tests.test_action_proposal_requires_successful_nonempty_model_minimal_fix) ... ok
 test_all_profiles_run_with_exact_worker_plan_keys_and_ten_task_cap (test_seo_employee_service_v2.ServiceV2Tests.test_all_profiles_run_with_exact_worker_plan_keys_and_ten_task_cap) ... ok
 test_complete_from_evidence_selects_target_then_rejects_cross_site_without_mutation (test_seo_employee_service_v2.ServiceV2Tests.test_complete_from_evidence_selects_target_then_rejects_cross_site_without_mutation) ... ok
@@ -333,6 +340,6 @@ test_v2_migration_is_idempotent (test_seo_employee_targets.TargetConfigTests.tes
 test_v2_validation_rejects_invalid_profile_language_region_and_missing_consent (test_seo_employee_targets.TargetConfigTests.test_v2_validation_rejects_invalid_profile_language_region_and_missing_consent) ... ok
 
 ----------------------------------------------------------------------
-Ran 279 tests in 13.845s
+Ran 284 tests in 15.263s
 
 OK

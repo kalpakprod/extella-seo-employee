@@ -63,7 +63,7 @@ The final run stores raw command output and the full handoff report under
 | `isolated-live-workers.json` and `isolated-live-workers.raw.txt` | Fresh-process public-site probe payloads and terminal output. |
 | `probe-image-build.txt`, `probe-image-id.txt`, `probe-image-remove.txt`, and `isolated-docker-workers.raw.txt` | Fresh worker image build/identity/removal and temporary-container payloads. |
 | `sol-f219de2-deadline.raw.txt` and `TODO.md` | Prior Sol threat reproduction plus selected process-boundary architecture/rollback limits. |
-| `.orchestra/tasks/3/` | External acceptance raw transcript and report, copied from the dedicated tests worker after exact-head review. |
+| `.orchestra/tasks/3/raw/` | External acceptance raw transcript/NDJSON; latest rerun is `acceptance-suite-latest.raw.txt`. |
 | `report.md` | Full verification report, exact HEAD, commands, results, limits, and restrictions. |
 
 ## Deliberately deferred

@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-09-15T04:21:48.321909+00:00",
+  "checked_at": "2026-09-15T07:00:04.218665+00:00",
   "site_url": "https://books.toscrape.com/",
   "timeout_ms": 20000,
   "worker": "runtime/probe/entrypoint.py",
@@ -9,7 +9,7 @@
       "kind": "nu",
       "transport": "loopback HTTP /run",
       "http_status": 200,
-      "elapsed_seconds": 2.315,
+      "elapsed_seconds": 3.935,
       "payload": {
         "schema": "extella.nu_source.v1",
         "source": "NuHTML",
@@ -47,7 +47,7 @@
       "kind": "tls",
       "transport": "loopback HTTP /run",
       "http_status": 200,
-      "elapsed_seconds": 1.994,
+      "elapsed_seconds": 3.846,
       "payload": {
         "schema": "extella.tls_source.v1",
         "source": "SecurityProbe",
@@ -77,7 +77,7 @@
       "kind": "cc",
       "transport": "loopback HTTP /run",
       "http_status": 200,
-      "elapsed_seconds": 11.287,
+      "elapsed_seconds": 0.772,
       "payload": {
         "status": "unavailable",
         "reason": "http_503"
@@ -87,24 +87,24 @@
   "processes": [
     {
       "kind": "nu",
-      "port": 40735,
-      "returncode": -15,
+      "port": 35251,
+      "returncode": 0,
       "stdout": "",
       "stderr": ""
     },
     {
       "kind": "tls",
-      "port": 58035,
-      "returncode": -15,
+      "port": 40833,
+      "returncode": 0,
       "stdout": "",
       "stderr": ""
     },
     {
       "kind": "cc",
-      "port": 44197,
-      "returncode": -15,
+      "port": 51765,
+      "returncode": 0,
       "stdout": "",
-      "stderr": "probe cc detail=HTTPError\n"
+      "stderr": ""
     }
   ]
 }

@@ -892,6 +892,19 @@ def _decode_child_envelope(raw: bytes) -> tuple[int, dict[str, object]] | None:
     return status, payload
 
 
+def _write_child_output(raw: bytes) -> None:
+    fd = sys.stdout.buffer.fileno()
+    offset = 0
+    while offset < len(raw):
+        try:
+            written = os.write(fd, raw[offset:])
+        except InterruptedError:
+            continue
+        if written <= 0:
+            raise OSError("probe child stdout closed")
+        offset += written
+
+
 def run_isolated(body: bytes, kind: str) -> tuple[int, dict[str, object]]:
     if kind not in _RUNNERS:
         return 400, {"status": "error", "code": "unknown_probe_kind"}
@@ -989,8 +1002,7 @@ def _probe_child_main(kind: str) -> int:
     ).encode("utf-8")
     if len(encoded) > CHILD_IPC_BYTES:
         return 3
-    sys.stdout.buffer.write(encoded)
-    sys.stdout.buffer.flush()
+    _write_child_output(encoded)
     return 0
 
 

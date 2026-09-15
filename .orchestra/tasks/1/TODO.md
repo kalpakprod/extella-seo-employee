@@ -1,24 +1,36 @@
-# P2 follow-ups
+# P2 architecture handoff and residual limits
 
-## Owner decision required: hard wall-clock cancellation
+## Implemented owner-approved design
 
-The current probe path has a result-acceptance deadline and per-stage socket idle
-timeouts. They prevent a late successful result from entering the report, but they do
-not interrupt a slow-drip response while bytes continue arriving. `_get_json` provider
-reads likewise retain an idle timeout without an aggregate read deadline in this scope.
+The supervisor architecture from `architecture.md` (owner commits `dae6adf`, `076211d`,
+`fc9c00c`) is implemented in `runtime/probe/entrypoint.py`:
 
-Sol's exact reproduction is preserved in `sol-f219de2-deadline.raw.txt`; it came from the
-repeat-review WIP `71d2b1f8d6d9853f10bef862e8d35e537d46e3fd`. The source reproduction is
-`f219de2_deadline_repro.py` in the Sol review worktree. It demonstrates:
+- parent validates request syntax without DNS, computes D after the bounded body, and starts
+  `sys.executable entrypoint.py --probe-child <kind>` in a fresh process group;
+- parent/child exchange one bounded UTF-8 JSON document over nonblocking selectors and closed
+  stdin/stdout; stdout, envelope, and stderr are bounded;
+- SIGKILL targets only the child process group at D, followed by bounded 0.25s reap; pending
+  reaps retain their slot and degrade `/health`; confirmed reap releases the slot exactly once;
+- at most two active children and four handler threads are admitted; child-slot busy is HTTP 200
+  unavailable/http_503, while pre-thread overload is HTTP 503 with exact `{"status":"error","code":"http_503"}`;
+- source budget B reserves one second for worker IPC/cleanup/response (`floor((B-1)*1000)` wire
+  timeout; B≤1 skips the worker locally). Required audit/report schemas remain unchanged.
 
-- `_get_json(timeout=0.15)` returning success after `0.307s` for a one-byte/50ms drip;
-- pinned `fetch_bytes(timeout=0.15)` rejecting after `0.302s`, while the blocking body read
-  itself remains active until the socket operation returns;
-- `source_proxy` being killed at its caller timeout while the separate remote probe worker
-  remains alive with an active origin request.
+## Threat and rollback
 
-The existing outer source timeout bounds product wait and kills `source_proxy` only. It
-does not kill a remote Docker worker or its handler thread. No per-request child isolation,
-nonblocking/select transport, or cancellable resolver is added here; those are an
-architecture choice for the owner. Until that choice, do not describe the deadline as a
-hard cancellation or claim that the remote worker lifetime is bounded by `source_proxy`.
+This boundary stops slow-drip site/provider reads and blocking child DNS after D, including when
+the caller/source_proxy dies. The previous source_proxy-only reproduction remains in
+`sol-f219de2-deadline.raw.txt`; it is threat evidence, not the acceptance result for the new
+design. Rollback is the pre-isolation runtime series ending at `5a725ad`; no Compose production
+service, release artifact, version, or Orchestra restart is involved.
+
+## Residual limits
+
+OS scheduling and kernel SIGKILL/reap behavior are not real-time guarantees. Slow TCP ingress is
+bounded by four handler slots and the two-second handler idle timeout, not by child D. A delayed
+kernel reap retains the registry slot and returns degraded health; the supervisor does not spawn
+unbounded cleanup threads or silently claim successful cancellation.
+
+The exact Sol raw reproduction is preserved in `sol-f219de2-deadline.raw.txt`; the dedicated
+external acceptance harness and its `/proc`/dripper transcript live under `.orchestra/tasks/3/`
+and must be copied into the final report after its exact-HEAD run.

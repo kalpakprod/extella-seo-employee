@@ -1000,7 +1000,7 @@ class CommonCrawlAdapter(_SinglePageProbeAdapter):
         if (not isinstance(record, Mapping)
                 or set(record) != {"url", "filename", "offset", "length", "status"}
                 or not _safe_audit_url(record.get("url"))
-                or urllib.parse.urlsplit(record["url"]).hostname != urllib.parse.urlsplit(str(payload["site_url"])).hostname
+                or record["url"] != payload["site_url"]
                 or not isinstance(record.get("filename"), str)
                 or not re.fullmatch(r"crawl-data/[a-zA-Z0-9_./-]+\.warc\.gz", record["filename"])
                 or ".." in record["filename"].split("/")

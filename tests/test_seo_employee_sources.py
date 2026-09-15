@@ -562,6 +562,7 @@ class ProbeAdapterTests(unittest.TestCase):
         for mutate in (
             lambda p: p.update(excerpt="x" * 501),
             lambda p: p["record"].update(url="https://other.example/"),
+            lambda p: p["record"].update(url="https://example.com/other"),
             lambda p: p["record"].update(filename="crawl-data/../secret.warc.gz"),
             lambda p: p["record"].update(length=True),
             lambda p: p.update(excerpt="token=secret"),

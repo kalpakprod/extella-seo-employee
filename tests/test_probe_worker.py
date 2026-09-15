@@ -131,6 +131,15 @@ class CcProbeTest(unittest.TestCase):
         self.assertIsNone(WORKER._cc_record(bad))
         self.assertIsNone(WORKER._cc_record({"nope": True}))
 
+    def test_archive_record_must_match_the_exact_requested_url(self) -> None:
+        record = {
+            "url": "https://example.com/other", "filename": "crawl-data/f.warc.gz",
+            "offset": "10", "length": "5", "status": "200",
+        }
+        with mock.patch.object(WORKER, "_get_json", side_effect=[[{"id": "CC-MAIN-2025-30"}], record]):
+            result = WORKER.run_cc_probe("https://example.com/", 5000)
+        self.assertEqual(result, {"status": "unavailable", "reason": "http_503"})
+
     def test_missing_record_is_ok_with_empty_excerpt(self) -> None:
         with (
             mock.patch.object(WORKER, "_get_json", side_effect=[[{"id": "CC-MAIN-2025-30"}], {}]),
@@ -145,7 +154,7 @@ class CcProbeTest(unittest.TestCase):
 
     def test_excerpt_is_capped(self) -> None:
         record = {
-            "url": "http://example.com/", "filename": "crawl-data/f.warc.gz",
+            "url": "https://example.com/", "filename": "crawl-data/f.warc.gz",
             "offset": "0", "length": "999999", "status": "200",
         }
         body = gzip.compress(b"WARC/1.0\r\n\r\nHTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<p>" + b"y" * 5000 + b"</p>")
@@ -177,6 +186,35 @@ class CcProbeTest(unittest.TestCase):
 
 
 class ProbeHonestyTests(unittest.TestCase):
+    def test_site_fetch_pins_the_validated_public_address(self):
+        response = mock.MagicMock()
+        response.status = 200
+        response.getheaders.return_value = []
+        response.read.return_value = b"ok"
+        connection = mock.MagicMock()
+        connection.getresponse.return_value = response
+        with (
+            mock.patch.object(WORKER, "_global_addresses", return_value=["93.184.216.34"]),
+            mock.patch.object(WORKER, "_PinnedHTTPConnection", return_value=connection) as factory,
+        ):
+            result = WORKER.fetch_bytes(
+                "http://example.com/path?q=1", 5, 10, allowed_hosts={"example.com"}
+            )
+        factory.assert_called_once_with("example.com", 80, "93.184.216.34", mock.ANY)
+        connection.request.assert_called_once_with(
+            "GET", "/path?q=1", headers={"Host": "example.com", "User-Agent": "ExtellaProbe/2.1"}
+        )
+        self.assertEqual(result[:3], (200, b"ok", False))
+
+    def test_mixed_public_private_dns_answer_is_rejected(self):
+        answers = [
+            (WORKER.socket.AF_INET, WORKER.socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443)),
+            (WORKER.socket.AF_INET, WORKER.socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443)),
+        ]
+        with mock.patch.object(WORKER.socket, "getaddrinfo", return_value=answers):
+            with self.assertRaisesRegex(ValueError, "not a global address"):
+                WORKER._global_addresses("example.com", 443)
+
     def test_deadline_cannot_be_extended_by_another_request(self):
         with mock.patch.object(WORKER.time, "monotonic", return_value=10):
             with self.assertRaises(TimeoutError):

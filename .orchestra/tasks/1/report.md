@@ -4,11 +4,13 @@ Date: 2026-09-15
 
 Implementation commit: `4fa02ad8541cc4980731164998bca0daba8345ee`
 
-Final artifact commit: pending this report's final metadata commit.
+Documentation/evidence commit: the final HEAD reported with this task.
 
 ## Result
 
-The six returned runtime findings are corrected in `runtime/probe/entrypoint.py`:
+The endpoint, malformed-response, IPv6, NAT64, and validated-address findings are corrected
+in `runtime/probe/entrypoint.py`. The wall-clock cancellation finding remains an explicit
+owner decision, recorded in `TODO.md`:
 
 1. SSL Labs is queried only for the default HTTPS origin. HTTP and HTTPS origins on a
    non-default port return `ssl_labs.status=unavailable` and `grade=null`, without asking
@@ -16,16 +18,19 @@ The six returned runtime findings are corrected in `runtime/probe/entrypoint.py`
 2. `http.client.HTTPException`, including `BadStatusLine`, is contained by every optional
    lane and by `handle_run`; the HTTP worker contract returns bounded JSON unavailable data.
 3. IPv6 literal authorities use `[address]` and `[address]:port` in the HTTP Host header.
-4. DNS checks, every validated address attempt, connection/TLS setup, request/response
-   headers, redirects, and capped body reads share one monotonic deadline. Socket timeouts
-   are refreshed before each blocking stage and body chunk; an over-budget response is not
-   reported as success.
+4. The pinned site path uses one monotonic deadline for result acceptance and refreshes an
+   idle socket timeout before each blocking stage/body chunk; an over-budget response is not
+   reported as success. This is not hard wall-clock cancellation: a slow-drip body can keep a
+   blocking read alive while bytes continue arriving, and provider `_get_json` has the same
+   idle-timeout-only behavior. Per-request process isolation, nonblocking transport, and a
+   cancellable resolver remain an owner decision and are not added in this scope.
 5. The NAT64 well-known prefix `64:ff9b::/96` is rejected when its embedded IPv4 address is
    non-global. This closes the conditional embedded-private route without claiming that the
    deployment uses NAT64.
 6. Up to four deduplicated, already-validated public numeric addresses are tried in DNS order
-   under the same deadline. A connection/setup failure may advance to the next address; an
-   HTTP response never does. The original hostname remains HTTPS SNI and certificate identity.
+   under the same result-acceptance budget and per-stage idle timeout. A connection/setup
+   failure may advance to the next address; an HTTP response never does. The original hostname
+   remains HTTPS SNI and certificate identity.
 
 The obsolete `NoRedirect` helper was removed. Manual same-origin redirect handling remains in
 the pinned connection path, with a fresh public-address validation on every redirect.
@@ -39,16 +44,21 @@ All output below is committed under `.orchestra/tasks/1/`.
 | Python discovery: `python3 -m unittest discover -s tests -p 'test_*.py' -v` | 279 passed | `python-suite.txt` |
 | Node contracts: `node --test tests/safe_fetch.test.mjs tests/worker_plan.test.mjs tests/ui/ui_contract.test.mjs` | 64 passed | `node-suite.txt` |
 | Focused probe regressions: `python3 -m unittest discover -s tests -p 'test_probe_worker.py' -v` | 36 passed | `test_probe_worker.txt` |
-| `collect_sources` → subprocess source proxies → real loopback probe handlers → adapters → `_build_v2_report` | 1 passed; report state `ready` with only unavailable PSI in `missing_data` | `collect-sources-report.raw.txt` |
+| `collect_sources` → subprocess source proxies → real loopback probe handlers → adapters → `_build_v2_report` | 1 passed; report state `ready`; `missing_data` includes unavailable PSI and not-configured GSC/DataForSEO | `collect-sources-report.raw.txt` |
 | Compose syntax: `docker compose -f deploy/compose.yaml config -q` | OK | `compose-config.txt` |
 | Diff whitespace: `git diff --check` | OK | `diff-check.txt` |
 | Corrected Sol runtime reproductions | all assertions passed | `sol-followup-runtime.raw.txt` |
+| Sol slow-drip/process-boundary follow-up | WIP finding retained; hard cancellation unresolved | `sol-f219de2-deadline.raw.txt`, `TODO.md` |
 
 The focused suite includes actual loopback HTTP and TLS sockets. The TLS regression generates a
 short-lived certificate, verifies the numeric pinned connection, preserves SNI, and checks the
 bracket-correct Host authority. The corrected runtime reproduction records the exact 1.0-second
-deadline harness result (`elapsed=1.35` → `TimeoutError`), malformed HTTP JSON responses for all
-three lanes, both IPv6 Host forms, NAT64 rejection, and first-address fallback order.
+deadline result-acceptance check (`elapsed=1.35` → `TimeoutError`), malformed HTTP JSON responses
+for all three lanes, both IPv6 Host forms, NAT64 rejection, and first-address fallback order.
+Sol's subsequent slow-drip reproduction is preserved in `sol-f219de2-deadline.raw.txt` and
+documents the unresolved hard-cancellation boundary. It came from Sol repeat-review WIP
+`71d2b1f8d6d9853f10bef862e8d35e537d46e3fd` (`.orchestra/tasks/2/review.md` in the Sol
+worktree).
 
 ## Isolated live worker evidence
 
@@ -89,18 +99,26 @@ remaining committed files are bounded verification artifacts for this task.
   false negative unless all four bounded attempts fail or the deadline expires. No hostname is
   resolved between attempts.
 - A malformed provider/site response becomes an optional unavailable payload, so a handler
-  thread does not escape without JSON. The outer source subprocess timeout still bounds worker
-  lifetime and terminates the subprocess on expiry.
+  thread does not escape without JSON. The outer source timeout bounds product-side waiting and
+  kills `source_proxy` on expiry; it does not kill the remote Docker worker or its handler thread.
+  A slow-drip remote request may therefore remain active until its body finishes or its idle
+  socket timeout fires.
 - Historical Common Crawl records remain exact-URL evidence only; an old record cannot become a
   current-site defect or an instruction. Unsupported SSL Labs origins remain explicit missing
   enrichment rather than a foreign grade.
 - Native libc `getaddrinfo` has no cancellable timeout in Python's standard library. The worker
-  checks the absolute deadline before and after the resolver stage, and the existing outer
-  subprocess timeout terminates the worker if that native call itself hangs. The committed
-  deterministic DNS-stage regression proves an over-budget resolution cannot proceed to a
-  connection or success result; a resolver-level hang remains an environment-dependent limit.
+  checks the result-acceptance deadline before and after the resolver stage, but a resolver-level
+  hang remains an environment-dependent limit. The existing outer source timeout stops product
+  waiting and kills `source_proxy` only; it does not terminate a remote worker/handler.
+- The hard wall-clock deadline is intentionally unresolved. Sol's slow-drip reproduction shows
+  `_get_json(timeout=0.15)` completing at `0.307s`, pinned body reads returning only after
+  `0.302s`, and `source_proxy` expiry leaving the remote worker alive with an active origin
+  request. See `TODO.md` and `sol-f219de2-deadline.raw.txt`; per-request isolation,
+  nonblocking I/O, or a cancellable resolver requires an owner architecture decision.
 - Public provider contents and availability vary. The live Common Crawl miss above is retained
   verbatim; the fresh Docker run independently exercised the same current worker and returned
   all three payloads. GSC and DataForSEO remain deliberately not configured.
 
-The corrected implementation is ready for the independent Sol repeat review on the final HEAD.
+The implementation/report boundary is ready for owner review. This report makes no final PASS
+claim for hard wall-clock cancellation; that item remains in `TODO.md` pending the architecture
+decision.

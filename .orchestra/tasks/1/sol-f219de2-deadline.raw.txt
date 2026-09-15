@@ -1,0 +1,12 @@
+HEAD= 6e454b091bf5529e02522b8a89b6b4d5d2fe1a3d (merge HEAD; runtime blob identical to 4fa02ad/f219de2)
+
+[provider-read-slow-drip]
+_get_json timeout=0.15 elapsed=0.307 result={'a': 1} remote_done=True
+
+[pinned-read-slow-drip]
+connection_close=False timeout=0.15 elapsed=0.302 outcome=('TimeoutError', 'probe deadline exceeded') socket_stages=['none', 'socket', 'socket', 'socket']
+connection_close=True timeout=0.15 elapsed=0.302 outcome=('TimeoutError', 'probe deadline exceeded') socket_stages=['none', 'socket', 'none', 'none']
+
+[source-proxy-vs-remote-worker]
+source_proxy=TimeoutExpired (source_proxy killed) remote_worker_alive=True remote_worker_pid=3016318 task_count=2 origin_request_active=True output_exists=False
+cleanup worker_returncode=-15 origin_done=True

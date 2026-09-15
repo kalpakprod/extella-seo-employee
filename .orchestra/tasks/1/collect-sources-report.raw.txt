@@ -1,6 +1,6 @@
 test_collect_sources_through_http_probes_builds_an_honest_report (test_p2_probe_integration.P2ProbeCollectionIntegrationTest.test_collect_sources_through_http_probes_builds_an_honest_report) ... ok
 
 ----------------------------------------------------------------------
-Ran 1 test in 0.738s
+Ran 1 test in 0.677s
 
 OK

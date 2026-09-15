@@ -1,0 +1,17 @@
+Command:
+env EXTELLA_ACCEPTANCE_RUNTIME=/home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py EXTELLA_P2_RAW_DIR=/home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna-tests/.orchestra/tasks/3/raw node --test tests/probe_supervisor_acceptance.test.mjs
+Runtime HEAD: 227d4fcd4deb155fdc88253d94e497c0368e622c
+Exit: 0
+
+✔ production entrypoint cancels a slow-drip site child at remote D and reaps its PID (1513.98779ms)
+✔ production child reaches a redirected slow-drip provider and cancellation closes it (1542.809251ms)
+✔ caller source_proxy can die while the remote supervisor still stops its child at D (2340.036092ms)
+✔ two child slots overload with HTTP 200 unavailable while health stays ready, then the next request works (1982.687552ms)
+✔ DNS hang is provided only by the test-local child fixture and is cancelled/reaped (1575.396235ms)
+✔ repeated and concurrent cancellation leaves no orphan and the next request works (1726.045801ms)
+ℹ tests 6
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ duration_ms 11402.103366

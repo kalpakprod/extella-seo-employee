@@ -9,12 +9,14 @@ verdicts live in the in-product adapters, never here.
 from __future__ import annotations
 
 import ipaddress
+import http.client
 import json
 import os
 import re
 import zlib
 from html.parser import HTMLParser
 import socket
+import ssl
 import sys
 import time
 import urllib.error
@@ -62,6 +64,47 @@ def _is_global_host(hostname: str) -> bool:
     return bool(addresses) and all(address.is_global for address in addresses)
 
 
+def _global_addresses(hostname: str, port: int) -> list[str]:
+    """Resolve once and return only an all-public address set for a pinned connection."""
+    if os.environ.get("PROBE_ALLOW_PRIVATE") == "1":
+        return list(dict.fromkeys(info[4][0] for info in socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)))
+    try:
+        infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+    except OSError as error:
+        raise ValueError("site host cannot be resolved") from error
+    addresses = list(dict.fromkeys(info[4][0] for info in infos))
+    try:
+        public = bool(addresses) and all(ipaddress.ip_address(address).is_global for address in addresses)
+    except ValueError as error:
+        raise ValueError("site host resolved to an invalid address") from error
+    if not public:
+        raise ValueError("site host is not a global address")
+    return addresses
+
+
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, host: str, port: int, address: str, timeout: float) -> None:
+        super().__init__(host, port, timeout=timeout)
+        self._address = address
+
+    def connect(self) -> None:
+        self.sock = socket.create_connection((self._address, self.port), self.timeout)
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, host: str, port: int, address: str, timeout: float) -> None:
+        super().__init__(host, port, timeout=timeout, context=ssl.create_default_context())
+        self._address = address
+
+    def connect(self) -> None:
+        raw = socket.create_connection((self._address, self.port), self.timeout)
+        try:
+            self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
+        except BaseException:
+            raw.close()
+            raise
+
+
 def _same_origin(left: str, right: str) -> bool:
     first, second = urllib.parse.urlsplit(left), urllib.parse.urlsplit(right)
     return (first.scheme, first.hostname, first.port) == (second.scheme, second.hostname, second.port)
@@ -74,7 +117,6 @@ def fetch_bytes(
     if max_bytes < 1 or timeout <= 0:
         raise ValueError("fetch budget is invalid")
     current = url
-    opener = urllib.request.build_opener(NoRedirect)
     deadline = time.monotonic() + timeout
     for _ in range(4):
         parsed = urllib.parse.urlsplit(current)
@@ -84,23 +126,25 @@ def fetch_bytes(
             or parsed.username is not None
             or parsed.password is not None
             or parsed.hostname not in allowed_hosts
+            or parsed.fragment
         ):
             raise ValueError("fetch target is not allowed")
-        request = urllib.request.Request(current, headers={"User-Agent": "ExtellaProbe/2.1"}, method="GET")
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        addresses = _global_addresses(parsed.hostname, port)
+        path = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
+        host_header = parsed.hostname if parsed.port is None else f"{parsed.hostname}:{parsed.port}"
+        connection_class = _PinnedHTTPSConnection if parsed.scheme == "https" else _PinnedHTTPConnection
+        connection = connection_class(parsed.hostname, port, addresses[0], _remaining(deadline))
         try:
-            response = opener.open(request, timeout=_remaining(deadline))
-        except urllib.error.HTTPError as error:
-            if error.code in {301, 302, 303, 307, 308}:
-                location = error.headers.get("Location", "")
+            connection.request("GET", path, headers={"Host": host_header, "User-Agent": "ExtellaProbe/2.1"})
+            response = connection.getresponse()
+            if response.status in {301, 302, 303, 307, 308}:
+                location = response.getheader("Location", "")
                 target = urllib.parse.urljoin(current, location)
                 if not location or not _same_origin(target, current):
                     raise ValueError("redirect leaves the probed origin") from None
                 current = target
                 continue
-            if 400 <= error.code <= 599:
-                return error.code, b"", False, {}
-            raise
-        with response:
             status = response.status
             seen = {key.lower(): value for key, value in response.getheaders()} if headers else {}
             if status != 200:
@@ -109,6 +153,8 @@ def fetch_bytes(
             if len(raw) > max_bytes:
                 return status, raw[:max_bytes], True, seen
             return status, raw, False, seen
+        finally:
+            connection.close()
     raise ValueError("too many redirects")
 
 
@@ -433,8 +479,8 @@ def run_cc_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
                 raise
             index_payload = []
         record = _cc_record(index_payload)
-        if record is not None and urllib.parse.urlsplit(str(record["url"])).hostname != parsed.hostname:
-            raise ValueError("archive record is for another host")
+        if record is not None and record["url"] != site_url:
+            raise ValueError("archive record is for another URL")
         if record is None:
             _log("cc", "no record")
             return {

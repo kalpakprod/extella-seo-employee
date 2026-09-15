@@ -12,7 +12,8 @@ unavailable without turning a required-source-complete report into failure.
 | Unit and integration suite | `python3 -m unittest discover -s tests -p 'test_*.py'` | `test_p2_probe_integration` runs the complete `collect_sources` path through subprocess source proxies and real loopback `/run` HTTP handlers. Its Nu, SSL Labs, and Common Crawl provider responses are deterministic mocks at the outbound boundary. |
 | Node suite | `node --test tests/safe_fetch.test.mjs tests/worker_plan.test.mjs tests/ui/ui_contract.test.mjs` | Existing worker, safe-fetch, and UI contracts remain green. |
 | Compose syntax | `docker compose -f deploy/compose.yaml config -q` | `nu`, `tls`, and `cc` are isolated internal services with no host ports or secrets. |
-| Pinned socket/TLS regressions | `python3 -m unittest discover -s tests -p 'test_probe_worker.py'` | Real loopback HTTP and TLS sockets exercise numeric-address pinning, Host/SNI identity, result-acceptance and idle timeouts, bounded address fallback, malformed-response containment, IPv6 authority formatting, and NAT64 embedded-address rejection. They do not establish hard wall-clock cancellation. |
+| Pinned socket/TLS and IPC regressions | `python3 -m unittest discover -s tests -p 'test_probe_worker.py'` | Real loopback HTTP/TLS plus a real child IPC deadline test exercise numeric pinning, Host/SNI identity, bounded selectors, result-acceptance/idle timeouts, fallback, malformed responses, IPv6, and NAT64. |
+| External process-boundary acceptance | dedicated `extella-p2-luna-tests` harness; command/raw transcript copied from `.orchestra/tasks/3/` | Fresh supervisor parent/child PIDs, slow-drip site/provider, blocking DNS child, caller death, overload, `/proc` cleanup, dripper EOF/reset, health, and timeout `collect_sources` report. |
 | Isolated live workers | `python3 .orchestra/tasks/1/isolated_live_workers.py .orchestra/tasks/1/isolated-live-workers.json` | Three fresh processes execute the current `runtime/probe/entrypoint.py` against `https://books.toscrape.com/`; no existing Compose worker is reused. |
 | Isolated Docker workers | `docker build --no-cache -f runtime/probe/Dockerfile -t extella-p2-luna-probe:20260915 .` followed by the bounded `/run` calls recorded in `.orchestra/tasks/1/isolated-docker-workers.raw.txt` | A fresh image copied the current worker and three temporary containers returned bounded Nu, SecurityProbe, and CommonCrawl payloads. The image was removed with the temporary containers; no Compose project was changed. |
 | Gate definition | `.github/workflows/release-gate.yml` | CI runs the Python and Node commands above, deterministic build, self-check, manifest, Compose config, and pinned upstream gates. |
@@ -40,12 +41,12 @@ payload. The NAT64 well-known prefix is accepted only when its embedded IPv4 add
 this closes the conditional embedded-private route without claiming that the deployment uses
 NAT64.
 
-The deadline boundary is deliberate: the caller's `source_proxy` timeout bounds product-side
-waiting and kills `source_proxy` when it expires, but it does not kill a remote Docker worker or
-its handler thread. Slow-drip responses can therefore remain active while bytes continue to
-arrive. Hard wall-clock cancellation (per-request process isolation, nonblocking/select I/O, or
-a cancellable resolver) is an owner architecture decision and remains in
-`.orchestra/tasks/1/TODO.md`.
+The deadline boundary is a supervisor process boundary: the parent computes D after the bounded
+request body, launches a fresh same-entrypoint child, and kills/reaps only that child process
+group at D. Source_proxy retains one second of the B budget for IPC/cleanup/response; its outer
+timeout is a safety margin and does not serve as the worker cancellation mechanism. The owner
+architecture and rollback/limits are recorded in `.orchestra/tasks/1/architecture.md` and
+`TODO.md`.
 
 ## Verification artifacts
 
@@ -61,7 +62,8 @@ The final run stores raw command output and the full handoff report under
 | `collect-sources-report.raw.txt` | End-to-end `collect_sources` → source proxies → probe handlers → adapters → report test. |
 | `isolated-live-workers.json` and `isolated-live-workers.raw.txt` | Fresh-process public-site probe payloads and terminal output. |
 | `probe-image-build.txt`, `probe-image-id.txt`, `probe-image-remove.txt`, and `isolated-docker-workers.raw.txt` | Fresh worker image build/identity/removal and temporary-container payloads. |
-| `sol-f219de2-deadline.raw.txt` and `TODO.md` | Exact Sol slow-drip/process-boundary raw output and the unresolved hard-cancellation limitation. |
+| `sol-f219de2-deadline.raw.txt` and `TODO.md` | Prior Sol threat reproduction plus selected process-boundary architecture/rollback limits. |
+| `.orchestra/tasks/3/` | External acceptance raw transcript and report, copied from the dedicated tests worker after exact-head review. |
 | `report.md` | Full verification report, exact HEAD, commands, results, limits, and restrictions. |
 
 ## Deliberately deferred
@@ -71,7 +73,7 @@ The final run stores raw command output and the full handoff report under
 | Google Search Console OAuth | No GSC credentials or approved OAuth integration are configured. Search-performance mode stays explicitly `not_configured`. |
 | DataForSEO paid API | No paid API account or authorization is configured. It remains an optional not-configured source. |
 | SecurityHeaders.com API | This lane does not use it. SecurityProbe evaluates direct response headers and requests SSL Labs cached assessment once, without polling. |
-| Hard wall-clock cancellation | The current worker enforces result acceptance and socket idle timeouts, but slow-drip reads/provider calls can continue after the caller budget. `source_proxy` timeout bounds product-side waiting and kills only `source_proxy`; remote Docker workers/handler threads are not hard-cancelled. Per-request isolation, nonblocking I/O, or a cancellable resolver requires an owner architecture decision. |
+| Hard wall-clock cancellation | Implemented by fresh child process groups, uncapped supervisor IPC D, SIGKILL and bounded reap. OS scheduling/kernel behavior is not real-time; slow ingress is bounded by four handler slots and two-second idle timeout. |
 | Full release gate for `2.1.0` | P2 verification does not claim a release: current product `VERSION` is `2.0.3`, and committed `dist/` / release manifest were intentionally not regenerated. Run the workflow commands only after an approved release-version and artifact update. |
 | Live provider determinism | External Nu, SSL Labs, and Common Crawl availability and contents vary. CI mocks only their outbound replies; the live probe command records current results and may report a lane unavailable. |
 

@@ -9,15 +9,16 @@ the in-product PSIAdapter, never here.
 
 from __future__ import annotations
 
+import http.client
 import ipaddress
 import json
 import os
 import socket
+import ssl
 import sys
 import time
 import urllib.error
 import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ElementTree
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -29,7 +30,12 @@ MAX_URLS = 3
 FETCH_BYTES = {"robots_txt": 65_536, "sitemap_xml": 65_536, "homepage_html": 262_144}
 CALL_TIMEOUT_SECONDS = 60.0
 MAX_BODY_BYTES = 65_536
+MAX_PINNED_ADDRESSES = 4
 PORT = int(os.environ.get("PORT", "8084"))
+
+_NAT64_PREFIX = ipaddress.IPv6Network("64:ff9b::/96")
+_REDIRECT_CODES = {301, 302, 303, 307, 308}
+_USER_AGENT = "ExtellaPSI/2.1"
 
 _LCP_KEYS = ("largest-contentful-paint",)
 _INP_KEYS = ("interaction-to-next-paint",)
@@ -41,25 +47,108 @@ _FIELD_KEYS = {
 }
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *_args: object, **_kwargs: object) -> None:
-        return None
+def _remaining(deadline: float) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("fetch deadline exceeded")
+    return remaining
 
 
-def _is_global_host(hostname: str) -> bool:
+def _is_allowed_address(value: str) -> bool:
     if os.environ.get("PSI_ALLOW_PRIVATE") == "1":
         return True
     try:
-        infos = socket.getaddrinfo(hostname, None)
-    except OSError:
+        address = ipaddress.ip_address(value)
+    except ValueError:
         return False
-    addresses = set()
-    for info in infos:
-        try:
-            addresses.add(ipaddress.ip_address(info[4][0]))
-        except ValueError:
+    if isinstance(address, ipaddress.IPv6Address) and address in _NAT64_PREFIX:
+        embedded = ipaddress.IPv4Address(int(address) & 0xFFFF_FFFF)
+        if not embedded.is_global:
             return False
-    return bool(addresses) and all(address.is_global for address in addresses)
+    return bool(address.is_global)
+
+
+def _global_addresses(hostname: str, port: int) -> list[str]:
+    """Resolve once and require every answer to be a global address."""
+    try:
+        infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+    except OSError as error:
+        raise ValueError("fetch target is not a global address") from error
+    addresses = list(dict.fromkeys(info[4][0] for info in infos))
+    if not addresses or not all(_is_allowed_address(address) for address in addresses):
+        raise ValueError("fetch target is not a global address")
+    return addresses
+
+
+def _host_header(hostname: str, port: int | None) -> str:
+    authority = f"[{hostname}]" if ":" in hostname else hostname
+    return authority if port is None else f"{authority}:{port}"
+
+
+def _prepare_socket_stage(connection: object, deadline: float) -> None:
+    """Refresh the socket timeout immediately before one blocking HTTP stage."""
+    remaining = _remaining(deadline)
+    sock = getattr(connection, "sock", None)
+    settimeout = getattr(sock, "settimeout", None)
+    if callable(settimeout):
+        settimeout(remaining)
+
+
+def _read_response_body(response: object, connection: object, max_bytes: int, deadline: float) -> bytes:
+    limit = max_bytes + 1
+    if not isinstance(response, http.client.HTTPResponse):
+        _prepare_socket_stage(connection, deadline)
+        raw = response.read(limit)
+        _remaining(deadline)
+        if not isinstance(raw, bytes):
+            raise ValueError("HTTP response body is invalid")
+        return raw
+    length = getattr(response, "length", None)
+    chunks: list[bytes] = []
+    total = 0
+    while total < limit:
+        amount = min(4_096, limit - total)
+        _prepare_socket_stage(connection, deadline)
+        chunk = response.read(amount)
+        _remaining(deadline)
+        if not chunk:
+            break
+        if not isinstance(chunk, bytes):
+            raise ValueError("HTTP response body is invalid")
+        chunks.append(chunk)
+        total += len(chunk)
+        if isinstance(length, int) and total >= length:
+            break
+    return b"".join(chunks)
+
+
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, host: str, port: int, address: str, timeout: float) -> None:
+        super().__init__(host, port, timeout=timeout)
+        self._address = address
+        self._deadline: float | None = None
+
+    def connect(self) -> None:
+        timeout = self.timeout if self._deadline is None else _remaining(self._deadline)
+        self.sock = socket.create_connection((self._address, self.port), timeout)
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, host: str, port: int, address: str, timeout: float) -> None:
+        super().__init__(host, port, timeout=timeout, context=ssl.create_default_context())
+        self._address = address
+        self._deadline: float | None = None
+
+    def connect(self) -> None:
+        timeout = self.timeout if self._deadline is None else _remaining(self._deadline)
+        raw = socket.create_connection((self._address, self.port), timeout)
+        try:
+            if self._deadline is not None:
+                raw.settimeout(_remaining(self._deadline))
+            self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
+        except BaseException:
+            raw.close()
+            raise
 
 
 def _same_origin(left: str, right: str) -> bool:
@@ -68,11 +157,15 @@ def _same_origin(left: str, right: str) -> bool:
 
 
 def fetch_bytes(url: str, timeout: float, max_bytes: int, *, allowed_hosts: set[str]) -> tuple[int, bytes, bool]:
-    """Fetch with same-origin-or-allowlist guard, capped bytes, manual redirects."""
+    """Fetch with same-origin-or-allowlist guard, capped bytes, manual redirects.
+
+    The validated numeric address is pinned into the socket connect, so DNS
+    cannot be re-resolved between the policy check and the connection.
+    """
     if max_bytes < 1 or timeout <= 0:
         raise ValueError("fetch budget is invalid")
+    deadline = time.monotonic() + timeout
     current = url
-    opener = urllib.request.build_opener(NoRedirect)
     for _ in range(4):
         parsed = urllib.parse.urlsplit(current)
         if (
@@ -83,30 +176,56 @@ def fetch_bytes(url: str, timeout: float, max_bytes: int, *, allowed_hosts: set[
             or parsed.hostname not in allowed_hosts
         ):
             raise ValueError("fetch target is not allowed")
-        if parsed.hostname not in GOOGLE_HOSTS and not _is_global_host(parsed.hostname):
-            raise ValueError("fetch target is not a global address")
-        request = urllib.request.Request(current, headers={"User-Agent": "ExtellaPSI/2.1"}, method="GET")
-        try:
-            response = opener.open(request, timeout=timeout)
-        except urllib.error.HTTPError as error:
-            if error.code in {301, 302, 303, 307, 308}:
-                location = error.headers.get("Location", "")
-                target = urllib.parse.urljoin(current, location)
-                if not location or not _same_origin(target, current):
-                    raise ValueError("redirect leaves the probed origin") from None
-                current = target
-                continue
-            if 400 <= error.code <= 599:
-                return error.code, b"", False
-            raise
-        with response:
-            status = response.status
-            if status != 200:
-                return status, b"", False
-            raw = response.read(max_bytes + 1)
-            if len(raw) > max_bytes:
-                return status, raw[:max_bytes], True
-            return status, raw, False
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        _remaining(deadline)
+        addresses = _global_addresses(parsed.hostname, port)
+        _remaining(deadline)
+        path = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
+        headers = {"Host": _host_header(parsed.hostname, parsed.port), "User-Agent": _USER_AGENT}
+        connection_class = _PinnedHTTPSConnection if parsed.scheme == "https" else _PinnedHTTPConnection
+        last_error: Exception | None = None
+        for address in addresses[:MAX_PINNED_ADDRESSES]:
+            _remaining(deadline)
+            connection = None
+            response_obtained = False
+            try:
+                connection = connection_class(parsed.hostname, port, address, _remaining(deadline))
+                connection._deadline = deadline
+                _prepare_socket_stage(connection, deadline)
+                connection.request("GET", path, headers=headers)
+                _prepare_socket_stage(connection, deadline)
+                response = connection.getresponse()
+                response_obtained = True
+                _prepare_socket_stage(connection, deadline)
+                status = response.status
+                if status in _REDIRECT_CODES:
+                    location = response.getheader("Location", "") or ""
+                    target = urllib.parse.urljoin(current, location)
+                    if not location or not _same_origin(target, current):
+                        raise ValueError("redirect leaves the probed origin")
+                    current = target
+                    break
+                if status != 200:
+                    return status, b"", False
+                raw = _read_response_body(response, connection, max_bytes, deadline)
+                if len(raw) > max_bytes:
+                    return status, raw[:max_bytes], True
+                return status, raw, False
+            except http.client.HTTPException:
+                raise
+            except (OSError, TimeoutError) as error:
+                if response_obtained:
+                    raise
+                last_error = error
+                _remaining(deadline)
+            finally:
+                if connection is not None:
+                    connection.close()
+        else:
+            if last_error is not None:
+                raise last_error
+            raise OSError("fetch target has no reachable public address")
+        _remaining(deadline)
     raise ValueError("too many redirects")
 
 
@@ -350,21 +469,70 @@ def _read_json(raw: bytes) -> object:
         return None
 
 
+def _api_request(url: str, timeout: float, *, payload: dict[str, object] | None = None) -> object:
+    """Call a fixed Google API host over a connection pinned to a resolved address."""
+    parsed = urllib.parse.urlsplit(url)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.hostname not in GOOGLE_HOSTS
+    ):
+        raise ValueError("api target is not allowed")
+    port = parsed.port or 443
+    deadline = time.monotonic() + timeout
+    addresses = _global_addresses(parsed.hostname, port)[:MAX_PINNED_ADDRESSES]
+    path = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
+    headers = {"Host": _host_header(parsed.hostname, parsed.port), "User-Agent": _USER_AGENT}
+    method = "GET"
+    body = None
+    if payload is not None:
+        method = "POST"
+        body = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+        headers["Content-Length"] = str(len(body))
+    last_error: Exception | None = None
+    for address in addresses:
+        _remaining(deadline)
+        connection = None
+        response_obtained = False
+        try:
+            connection = _PinnedHTTPSConnection(parsed.hostname, port, address, _remaining(deadline))
+            connection._deadline = deadline
+            _prepare_socket_stage(connection, deadline)
+            connection.request(method, path, body=body, headers=headers)
+            _prepare_socket_stage(connection, deadline)
+            response = connection.getresponse()
+            response_obtained = True
+            _prepare_socket_stage(connection, deadline)
+            if response.status != 200:
+                raise urllib.error.HTTPError(url, response.status, "error payload", {}, None)
+            raw = _read_response_body(response, connection, 2_000_000, deadline)
+            return _read_json(raw)
+        except http.client.HTTPException:
+            raise
+        except urllib.error.HTTPError:
+            raise
+        except (OSError, TimeoutError) as error:
+            if response_obtained:
+                raise
+            last_error = error
+            _remaining(deadline)
+        finally:
+            if connection is not None:
+                connection.close()
+    if last_error is not None:
+        raise last_error
+    raise OSError("api host has no reachable public address")
+
+
 def _get_json(url: str, timeout: float) -> object:
-    request = urllib.request.Request(url, headers={"User-Agent": "ExtellaPSI/2.1"}, method="GET")
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return _read_json(response.read(2_000_000 + 1))
+    return _api_request(url, timeout)
 
 
 def _post_json(url: str, payload: dict[str, object], timeout: float) -> object:
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "User-Agent": "ExtellaPSI/2.1"},
-        method="POST",
-    )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return _read_json(response.read(2_000_000 + 1))
+    return _api_request(url, timeout, payload=payload)
 
 
 def handle_run(body: bytes) -> tuple[int, dict[str, object]]:

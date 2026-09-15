@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import socket
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -157,6 +158,195 @@ class PsiWorkerTest(unittest.TestCase):
                 WORKER.fetch_bytes(
                     f"{base}/redir-foreign", 5.0, 100, allowed_hosts={"127.0.0.1"}
                 )
+
+    def test_site_fetch_pins_the_validated_public_address(self) -> None:
+        response = mock.MagicMock()
+        response.status = 200
+        response.getheader.return_value = None
+        response.read.return_value = b"ok"
+        connection = mock.MagicMock()
+        connection.getresponse.return_value = response
+        with (
+            mock.patch.object(WORKER, "_global_addresses", return_value=["93.184.216.34"]),
+            mock.patch.object(WORKER, "_PinnedHTTPConnection", return_value=connection) as factory,
+        ):
+            result = WORKER.fetch_bytes(
+                "http://example.com/path?q=1", 5, 10, allowed_hosts={"example.com"}
+            )
+        factory.assert_called_once_with("example.com", 80, "93.184.216.34", mock.ANY)
+        connection.request.assert_called_once_with(
+            "GET", "/path?q=1", headers={"Host": "example.com", "User-Agent": "ExtellaPSI/2.1"}
+        )
+        self.assertEqual(result, (200, b"ok", False))
+
+    def test_ipv6_host_header_keeps_uri_authority_brackets(self) -> None:
+        address = "2001:4860:4860::8888"
+        response = mock.MagicMock()
+        response.status = 200
+        response.getheader.return_value = None
+        response.read.return_value = b"ok"
+        for url, expected in (
+            (f"http://[{address}]/", f"[{address}]"),
+            (f"http://[{address}]:8080/", f"[{address}]:8080"),
+        ):
+            connection = mock.MagicMock()
+            connection.getresponse.return_value = response
+            with (
+                self.subTest(url=url),
+                mock.patch.object(WORKER, "_global_addresses", return_value=[address]),
+                mock.patch.object(WORKER, "_PinnedHTTPConnection", return_value=connection),
+            ):
+                WORKER.fetch_bytes(url, 5, 10, allowed_hosts={address})
+            self.assertEqual(connection.request.call_args.kwargs["headers"]["Host"], expected)
+
+    def test_first_public_address_failure_falls_back_without_reresolving(self) -> None:
+        response = mock.MagicMock()
+        response.status = 200
+        response.getheader.return_value = None
+        response.read.return_value = b"ok"
+        working = mock.MagicMock()
+        working.getresponse.return_value = response
+        addresses = ["93.184.216.34", "1.1.1.1"]
+        with (
+            mock.patch.object(WORKER, "_global_addresses", return_value=addresses) as resolver,
+            mock.patch.object(WORKER, "_PinnedHTTPConnection", side_effect=[OSError("down"), working]) as factory,
+        ):
+            result = WORKER.fetch_bytes("http://example.com/", 5, 10, allowed_hosts={"example.com"})
+        self.assertEqual(result, (200, b"ok", False))
+        self.assertEqual([call.args[2] for call in factory.call_args_list], addresses)
+        resolver.assert_called_once()
+
+    def test_response_failure_does_not_fall_back_to_another_address(self) -> None:
+        response = mock.MagicMock()
+        response.status = 200
+        response.read.side_effect = OSError("body down")
+        first = mock.MagicMock()
+        first.getresponse.return_value = response
+        second = mock.MagicMock()
+        with (
+            mock.patch.object(WORKER, "_global_addresses", return_value=["93.184.216.34", "1.1.1.1"]),
+            mock.patch.object(WORKER, "_PinnedHTTPConnection", side_effect=[first, second]) as factory,
+        ):
+            with self.assertRaises(OSError):
+                WORKER.fetch_bytes("http://example.com/", 5, 10, allowed_hosts={"example.com"})
+        self.assertEqual(factory.call_count, 1)
+
+    def test_nat64_address_with_non_global_embedded_ipv4_is_rejected(self) -> None:
+        answers = [
+            (WORKER.socket.AF_INET6, WORKER.socket.SOCK_STREAM, 6, "", ("64:ff9b::a9fe:a9fe", 443, 0, 0)),
+        ]
+        with mock.patch.object(WORKER.socket, "getaddrinfo", return_value=answers):
+            with self.assertRaisesRegex(ValueError, "not a global address"):
+                WORKER._global_addresses("nat64.invalid", 443)
+
+    def test_mixed_public_private_dns_answer_is_rejected(self) -> None:
+        answers = [
+            (WORKER.socket.AF_INET, WORKER.socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443)),
+            (WORKER.socket.AF_INET, WORKER.socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443)),
+        ]
+        with mock.patch.object(WORKER.socket, "getaddrinfo", return_value=answers):
+            with self.assertRaisesRegex(ValueError, "not a global address"):
+                WORKER._global_addresses("example.com", 443)
+
+    def test_api_json_call_pins_the_google_host(self) -> None:
+        response = mock.MagicMock()
+        response.status = 200
+        response.read.return_value = b'{"ok": true}'
+        connection = mock.MagicMock()
+        connection.getresponse.return_value = response
+        with (
+            mock.patch.object(WORKER, "_global_addresses", return_value=["142.250.1.1"]) as resolver,
+            mock.patch.object(WORKER, "_PinnedHTTPSConnection", return_value=connection) as factory,
+        ):
+            value = WORKER._get_json("https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=x", 5)
+        self.assertEqual(value, {"ok": True})
+        factory.assert_called_once_with("www.googleapis.com", 443, "142.250.1.1", mock.ANY)
+        self.assertEqual(connection.request.call_args.kwargs["headers"]["Host"], "www.googleapis.com")
+        resolver.assert_called_once()
+
+    def test_api_json_call_rejects_a_non_google_host(self) -> None:
+        with self.assertRaises(ValueError):
+            WORKER._get_json("https://evil.invalid/steal", 5)
+
+    def test_real_socket_path_uses_pinned_numeric_address_and_host(self) -> None:
+        listener = socket.socket()
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        port = listener.getsockname()[1]
+        request = []
+
+        def serve() -> None:
+            raw, _peer = listener.accept()
+            with raw:
+                request.append(raw.recv(4096))
+                raw.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+            listener.close()
+
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            with (
+                mock.patch.dict("os.environ", {"PSI_ALLOW_PRIVATE": "1"}),
+                mock.patch.object(WORKER, "_global_addresses", return_value=["127.0.0.1"]),
+            ):
+                result = WORKER.fetch_bytes(
+                    f"http://audit.example:{port}/path", 3, 10, allowed_hosts={"audit.example"}
+                )
+        finally:
+            thread.join(3)
+            listener.close()
+        self.assertEqual(result, (200, b"ok", False))
+        self.assertIn(b"Host: audit.example:" + str(port).encode(), request[0])
+
+    def test_absolute_deadline_rejects_slow_request_response_and_body(self) -> None:
+        clock = [0.0]
+
+        class SlowResponse:
+            status = 200
+            length = None
+
+            def getheader(self, _name: str, _default: object = None) -> None:
+                return None
+
+            def read(self, _limit: int) -> bytes:
+                clock[0] += 0.45
+                return b"ok"
+
+        class SlowConnection:
+            sock = None
+
+            def request(self, *_args: object, **_kwargs: object) -> None:
+                clock[0] += 0.45
+
+            def getresponse(self) -> SlowResponse:
+                clock[0] += 0.45
+                return SlowResponse()
+
+            def close(self) -> None:
+                return None
+
+        with (
+            mock.patch.object(WORKER.time, "monotonic", side_effect=lambda: clock[0]),
+            mock.patch.object(WORKER, "_global_addresses", return_value=["93.184.216.34"]),
+            mock.patch.object(WORKER, "_PinnedHTTPConnection", return_value=SlowConnection()),
+        ):
+            with self.assertRaises(TimeoutError):
+                WORKER.fetch_bytes("http://example.com/", 1, 10, allowed_hosts={"example.com"})
+        self.assertGreater(clock[0], 1.0)
+
+    def test_dns_stage_cannot_complete_after_the_absolute_deadline(self) -> None:
+        clock = [0.0]
+
+        def slow_resolve(*_args: object, **_kwargs: object):
+            clock[0] += 1.1
+            return [(WORKER.socket.AF_INET, WORKER.socket.SOCK_STREAM, 6, "", ("93.184.216.34", 80))]
+
+        with (
+            mock.patch.object(WORKER.time, "monotonic", side_effect=lambda: clock[0]),
+            mock.patch.object(WORKER.socket, "getaddrinfo", side_effect=slow_resolve),
+        ):
+            with self.assertRaises(TimeoutError):
+                WORKER.fetch_bytes("http://example.com/", 1, 10, allowed_hosts={"example.com"})
 
     def test_run_probe_merges_lab_field_and_sitefiles(self) -> None:
         def fake_fetch(url: str, timeout: float, max_bytes: int, **_kwargs: object):

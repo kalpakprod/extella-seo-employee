@@ -27,6 +27,12 @@ def _plan(timeout_ms: int = 5000) -> bytes:
 
 
 class ProbeHandleRunTest(unittest.TestCase):
+    def test_public_handle_run_routes_through_isolated_supervisor(self) -> None:
+        with mock.patch.object(WORKER, "run_isolated", return_value=(200, {"status": "ok"})) as isolated:
+            result = WORKER.handle_run(_plan(), "nu")
+        self.assertEqual(result, (200, {"status": "ok"}))
+        isolated.assert_called_once_with(_plan(), "nu")
+
     def test_unknown_kind_is_rejected(self) -> None:
         status, payload = WORKER.handle_run(_plan(), "bogus")
         self.assertEqual(status, 400)

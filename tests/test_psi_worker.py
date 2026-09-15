@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import http.client
 import json
 import socket
+import subprocess
+import sys
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -439,6 +443,159 @@ class PsiWorkerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(payload, {"status": "ok"})
         self.assertEqual(probed.call_args[0][:3], ("https://example.com/", 2, 1000))
+
+
+def _run_psi_child(envelope: bytes) -> subprocess.CompletedProcess[bytes]:
+    module = ROOT / "runtime" / "psi" / "entrypoint.py"
+    return subprocess.run(
+        [sys.executable, str(module), WORKER.CHILD_MODE],
+        input=envelope,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+
+
+class PsiSupervisorTest(unittest.TestCase):
+    def _entry(self, code: str) -> object:
+        process = subprocess.Popen(
+            [sys.executable, "-c", code],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            close_fds=True,
+        )
+        self.addCleanup(self._reap, process)
+        return WORKER._ChildEntry(process)
+
+    @staticmethod
+    def _reap(process: object) -> None:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=2)
+        for pipe in (process.stdin, process.stdout):
+            if pipe is not None and not pipe.closed:
+                pipe.close()
+
+    @staticmethod
+    def _body(**overrides: object) -> bytes:
+        plan = {"max_urls": 1, "timeout_ms": 1000}
+        plan.update(overrides.pop("plan", {}) if "plan" in overrides else {})
+        payload = {"site_url": "https://example.com/", "plan": plan}
+        payload.update(overrides)
+        return json.dumps(payload).encode()
+
+    def test_isolated_run_rejects_an_invalid_body_without_spawning(self) -> None:
+        with mock.patch.object(WORKER.SUPERVISOR, "spawn") as spawn:
+            status, payload = WORKER.run_isolated(b"{}")
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["code"], "invalid_request")
+        spawn.assert_not_called()
+
+    def test_isolated_run_rejects_a_bool_max_urls(self) -> None:
+        with mock.patch.object(WORKER.SUPERVISOR, "spawn") as spawn:
+            status, _payload = WORKER.run_isolated(self._body(plan={"max_urls": True}))
+        self.assertEqual(status, 400)
+        spawn.assert_not_called()
+
+    def test_isolated_run_reports_unavailable_without_a_child_slot(self) -> None:
+        with mock.patch.object(WORKER.SUPERVISOR, "spawn", return_value=None):
+            result = WORKER.run_isolated(self._body())
+        self.assertEqual(result, WORKER._unavailable("http_503"))
+
+    def test_isolated_run_kills_and_reaps_the_child_at_the_deadline(self) -> None:
+        entry = self._entry("import time; time.sleep(30)")
+        with (
+            mock.patch.object(WORKER.SUPERVISOR, "spawn", return_value=entry),
+            mock.patch.object(WORKER, "_exchange_child", side_effect=TimeoutError("late")),
+        ):
+            result = WORKER.run_isolated(self._body())
+        self.assertEqual(result, WORKER._unavailable("timeout"))
+        self.assertIsNotNone(entry.process.poll())
+        self.assertFalse(entry.pending_reap)
+
+    def test_isolated_run_reports_unavailable_for_an_empty_child_envelope(self) -> None:
+        entry = self._entry("import sys; sys.stdin.buffer.read()")
+        with mock.patch.object(WORKER.SUPERVISOR, "spawn", return_value=entry):
+            result = WORKER.run_isolated(self._body())
+        self.assertEqual(result, WORKER._unavailable("http_503"))
+        self.assertIsNotNone(entry.process.poll())
+
+    def test_isolated_run_returns_a_valid_child_envelope(self) -> None:
+        code = (
+            "import json,sys; sys.stdin.buffer.read(); "
+            "sys.stdout.buffer.write(json.dumps({'http_status':200,'payload':{'status':'ok'}}).encode())"
+        )
+        entry = self._entry(code)
+        with mock.patch.object(WORKER.SUPERVISOR, "spawn", return_value=entry):
+            result = WORKER.run_isolated(self._body())
+        self.assertEqual(result, (200, {"status": "ok"}))
+
+    def test_child_rejects_a_forged_envelope(self) -> None:
+        completed = _run_psi_child(json.dumps({"site_url": "https://example.com/"}).encode())
+        self.assertEqual(completed.returncode, 2)
+        self.assertEqual(completed.stdout, b"")
+
+    def test_child_reports_timeout_for_an_expired_deadline(self) -> None:
+        envelope = {
+            "site_url": "https://example.com/",
+            "plan": {"max_urls": 1, "timeout_ms": 1000},
+            "deadline": time.monotonic() - 1,
+        }
+        completed = _run_psi_child(json.dumps(envelope).encode())
+        self.assertEqual(completed.returncode, 0)
+        self.assertEqual(
+            json.loads(completed.stdout),
+            {"http_status": 200, "payload": {"status": "unavailable", "reason": "timeout"}},
+        )
+
+
+class PsiHandlerTest(unittest.TestCase):
+    def _request(self, method: str, path: str, body: bytes | None = None) -> tuple[int, object]:
+        server = WORKER._BoundedPSIHTTPServer(("127.0.0.1", 0), WORKER.Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.shutdown)
+        self.addCleanup(server.server_close)
+        connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=10)
+        self.addCleanup(connection.close)
+        connection.request(method, path, body=body)
+        response = connection.getresponse()
+        raw = response.read()
+        connection.close()
+        return response.status, json.loads(raw) if raw else None
+
+    def test_health_reports_ok_without_pending_children(self) -> None:
+        with mock.patch.object(WORKER.SUPERVISOR, "health", return_value=None):
+            status, payload = self._request("GET", "/health")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "ok")
+
+    def test_health_reports_degraded_while_a_child_cleanup_is_pending(self) -> None:
+        entry = mock.MagicMock()
+        with mock.patch.object(WORKER.SUPERVISOR, "health", return_value=entry):
+            status, payload = self._request("GET", "/health")
+        self.assertEqual(status, 503)
+        self.assertEqual(payload, {"status": "degraded", "reason": "child_cleanup_pending"})
+
+    def test_unknown_route_is_rejected(self) -> None:
+        status, _payload = self._request("GET", "/bogus")
+        self.assertEqual(status, 404)
+
+    def test_run_posts_through_the_isolated_supervisor(self) -> None:
+        body = json.dumps({"site_url": "https://example.com/", "plan": {"max_urls": 1, "timeout_ms": 1000}}).encode()
+        with mock.patch.object(WORKER, "run_isolated", return_value=(200, {"status": "ok"})) as isolated:
+            status, payload = self._request("POST", "/run", body)
+        self.assertEqual((status, payload), (200, {"status": "ok"}))
+        isolated.assert_called_once_with(body)
+
+    def test_oversized_body_is_rejected(self) -> None:
+        with mock.patch.object(WORKER, "run_isolated") as isolated:
+            status, payload = self._request("POST", "/run", b"x" * (WORKER.MAX_BODY_BYTES + 1))
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["code"], "invalid_request")
+        isolated.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -39,66 +39,116 @@ EXEMPLARS = 3
 EXEMPLAR_CHARS = 200
 CALL_TIMEOUT_SECONDS = 60.0
 MAX_BODY_BYTES = 65_536
+MAX_PINNED_ADDRESSES = 4
 PORT = int(os.environ.get("PORT", "8085"))
 PROBE_KIND = os.environ.get("PROBE_KIND", "")
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *_args: object, **_kwargs: object) -> None:
-        return None
+_NAT64_PREFIX = ipaddress.IPv6Network("64:ff9b::/96")
+
+
+def _is_allowed_address(value: str) -> bool:
+    try:
+        address = ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    if isinstance(address, ipaddress.IPv6Address) and address in _NAT64_PREFIX:
+        embedded = ipaddress.IPv4Address(int(address) & 0xFFFFFFFF)
+        if not embedded.is_global:
+            return False
+    return bool(os.environ.get("PROBE_ALLOW_PRIVATE") == "1" or address.is_global)
 
 
 def _is_global_host(hostname: str) -> bool:
-    if os.environ.get("PROBE_ALLOW_PRIVATE") == "1":
-        return True
     try:
         infos = socket.getaddrinfo(hostname, None)
     except OSError:
         return False
     addresses = set()
     for info in infos:
-        try:
-            addresses.add(ipaddress.ip_address(info[4][0]))
-        except ValueError:
+        address = info[4][0]
+        if not _is_allowed_address(address):
             return False
-    return bool(addresses) and all(address.is_global for address in addresses)
+        addresses.add(address)
+    return bool(addresses)
 
 
-def _global_addresses(hostname: str, port: int) -> list[str]:
+def _global_addresses(hostname: str, port: int, deadline: float | None = None) -> list[str]:
     """Resolve once and return only an all-public address set for a pinned connection."""
-    if os.environ.get("PROBE_ALLOW_PRIVATE") == "1":
-        return list(dict.fromkeys(info[4][0] for info in socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)))
+    if deadline is not None:
+        _remaining(deadline)
     try:
         infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
     except OSError as error:
         raise ValueError("site host cannot be resolved") from error
+    if deadline is not None:
+        _remaining(deadline)
     addresses = list(dict.fromkeys(info[4][0] for info in infos))
-    try:
-        public = bool(addresses) and all(ipaddress.ip_address(address).is_global for address in addresses)
-    except ValueError as error:
-        raise ValueError("site host resolved to an invalid address") from error
-    if not public:
+    if not addresses or not all(_is_allowed_address(address) for address in addresses):
         raise ValueError("site host is not a global address")
     return addresses
+
+
+def _prepare_socket_stage(connection: object, deadline: float) -> None:
+    """Refresh the socket timeout immediately before one blocking HTTP stage."""
+    remaining = _remaining(deadline)
+    sock = getattr(connection, "sock", None)
+    settimeout = getattr(sock, "settimeout", None)
+    if callable(settimeout):
+        settimeout(remaining)
+
+
+def _read_response_body(response: object, connection: object, max_bytes: int, deadline: float) -> bytes:
+    limit = max_bytes + 1
+    if not isinstance(response, http.client.HTTPResponse):
+        _prepare_socket_stage(connection, deadline)
+        raw = response.read(limit)
+        _remaining(deadline)
+        if not isinstance(raw, bytes):
+            raise ValueError("HTTP response body is invalid")
+        return raw
+    length = getattr(response, "length", None)
+    chunks: list[bytes] = []
+    total = 0
+    while total < limit:
+        amount = min(4_096, limit - total)
+        _prepare_socket_stage(connection, deadline)
+        chunk = response.read(amount)
+        _remaining(deadline)
+        if not chunk:
+            break
+        if not isinstance(chunk, bytes):
+            raise ValueError("HTTP response body is invalid")
+        chunks.append(chunk)
+        total += len(chunk)
+        if isinstance(length, int) and total >= length:
+            break
+    return b"".join(chunks)
 
 
 class _PinnedHTTPConnection(http.client.HTTPConnection):
     def __init__(self, host: str, port: int, address: str, timeout: float) -> None:
         super().__init__(host, port, timeout=timeout)
         self._address = address
+        self._deadline: float | None = None
 
     def connect(self) -> None:
-        self.sock = socket.create_connection((self._address, self.port), self.timeout)
+        timeout = self.timeout if self._deadline is None else _remaining(self._deadline)
+        self.sock = socket.create_connection((self._address, self.port), timeout)
 
 
 class _PinnedHTTPSConnection(http.client.HTTPSConnection):
     def __init__(self, host: str, port: int, address: str, timeout: float) -> None:
         super().__init__(host, port, timeout=timeout, context=ssl.create_default_context())
         self._address = address
+        self._deadline: float | None = None
 
     def connect(self) -> None:
-        raw = socket.create_connection((self._address, self.port), self.timeout)
+        timeout = self.timeout if self._deadline is None else _remaining(self._deadline)
+        raw = socket.create_connection((self._address, self.port), timeout)
         try:
+            if self._deadline is not None:
+                raw.settimeout(_remaining(self._deadline))
             self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
         except BaseException:
             raw.close()
@@ -111,13 +161,20 @@ def _same_origin(left: str, right: str) -> bool:
 
 
 def fetch_bytes(
-    url: str, timeout: float, max_bytes: int, *, allowed_hosts: set[str], headers: bool = False
+    url: str,
+    timeout: float,
+    max_bytes: int,
+    *,
+    allowed_hosts: set[str],
+    headers: bool = False,
+    _deadline: float | None = None,
 ) -> tuple[int, bytes, bool, dict[str, str]]:
     """Fetch with allowlist guard, capped bytes, manual same-origin redirects."""
     if max_bytes < 1 or timeout <= 0:
         raise ValueError("fetch budget is invalid")
     current = url
-    deadline = time.monotonic() + timeout
+    deadline = _deadline if _deadline is not None else time.monotonic() + timeout
+    _remaining(deadline)
     for _ in range(4):
         parsed = urllib.parse.urlsplit(current)
         if (
@@ -130,31 +187,58 @@ def fetch_bytes(
         ):
             raise ValueError("fetch target is not allowed")
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        _remaining(deadline)
         addresses = _global_addresses(parsed.hostname, port)
+        _remaining(deadline)
         path = urllib.parse.urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
-        host_header = parsed.hostname if parsed.port is None else f"{parsed.hostname}:{parsed.port}"
+        host_header = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+        if parsed.port is not None:
+            host_header += f":{parsed.port}"
         connection_class = _PinnedHTTPSConnection if parsed.scheme == "https" else _PinnedHTTPConnection
-        connection = connection_class(parsed.hostname, port, addresses[0], _remaining(deadline))
-        try:
-            connection.request("GET", path, headers={"Host": host_header, "User-Agent": "ExtellaProbe/2.1"})
-            response = connection.getresponse()
-            if response.status in {301, 302, 303, 307, 308}:
-                location = response.getheader("Location", "")
-                target = urllib.parse.urljoin(current, location)
-                if not location or not _same_origin(target, current):
-                    raise ValueError("redirect leaves the probed origin") from None
-                current = target
-                continue
-            status = response.status
-            seen = {key.lower(): value for key, value in response.getheaders()} if headers else {}
-            if status != 200:
-                return status, b"", False, seen
-            raw = response.read(max_bytes + 1)
-            if len(raw) > max_bytes:
-                return status, raw[:max_bytes], True, seen
-            return status, raw, False, seen
-        finally:
-            connection.close()
+        last_error: OSError | TimeoutError | None = None
+        for address in addresses[:MAX_PINNED_ADDRESSES]:
+            _remaining(deadline)
+            connection: object | None = None
+            response_obtained = False
+            try:
+                connection = connection_class(parsed.hostname, port, address, _remaining(deadline))
+                setattr(connection, "_deadline", deadline)
+                _prepare_socket_stage(connection, deadline)
+                connection.request("GET", path, headers={"Host": host_header, "User-Agent": "ExtellaProbe/2.1"})
+                _prepare_socket_stage(connection, deadline)
+                response = connection.getresponse()
+                response_obtained = True
+                _prepare_socket_stage(connection, deadline)
+                if response.status in {301, 302, 303, 307, 308}:
+                    location = response.getheader("Location", "")
+                    target = urllib.parse.urljoin(current, location)
+                    if not location or not _same_origin(target, current):
+                        raise ValueError("redirect leaves the probed origin") from None
+                    current = target
+                    break
+                status = response.status
+                seen = {key.lower(): value for key, value in response.getheaders()} if headers else {}
+                if status != 200:
+                    return status, b"", False, seen
+                raw = _read_response_body(response, connection, max_bytes, deadline)
+                if len(raw) > max_bytes:
+                    return status, raw[:max_bytes], True, seen
+                return status, raw, False, seen
+            except http.client.HTTPException:
+                raise
+            except (OSError, TimeoutError) as error:
+                if response_obtained:
+                    raise
+                last_error = error
+                _remaining(deadline)
+            finally:
+                if connection is not None:
+                    connection.close()
+        else:
+            if last_error is not None:
+                raise last_error
+            raise OSError("site host has no reachable public address")
+        _remaining(deadline)
     raise ValueError("too many redirects")
 
 
@@ -206,13 +290,17 @@ def _remaining(deadline: float) -> float:
     return remaining
 
 
-def _check_site_host(site_url: str) -> tuple[str, set[str]]:
+def _check_site_host(site_url: str, deadline: float | None = None) -> tuple[str, set[str]]:
     parsed = urllib.parse.urlsplit(site_url)
     if (parsed.scheme not in {"http", "https"} or not parsed.hostname
             or parsed.username is not None or parsed.password is not None):
         raise ValueError("site url is invalid")
+    if deadline is not None:
+        _remaining(deadline)
     if not _is_global_host(parsed.hostname):
         raise ValueError("site host is not a global address")
+    if deadline is not None:
+        _remaining(deadline)
     return f"{parsed.scheme}://{parsed.netloc}", {parsed.hostname}
 
 
@@ -248,12 +336,13 @@ def _nu_messages(payload: object) -> tuple[int, int, list[dict[str, object]]]:
 
 def run_nu_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
     deadline = time.monotonic() + timeout_ms / 1000
-    _origin, allowed = _check_site_host(site_url)
+    _origin, allowed = _check_site_host(site_url, deadline)
     try:
         status, body, truncated, _seen = fetch_bytes(
             site_url, _remaining(deadline), HTML_BYTES, allowed_hosts=allowed,
+            _deadline=deadline,
         )
-    except (OSError, ValueError, urllib.error.URLError) as error:
+    except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
         _log("nu", f"fetch {type(error).__name__}")
         return {"status": "unavailable", "reason": _reason_for(error)}
     if status != 200:
@@ -272,7 +361,7 @@ def run_nu_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
             if len(raw) > 2_000_000:
                 raise ValueError("validator response exceeds cap")
             payload = _read_json(raw)
-    except (OSError, ValueError, urllib.error.URLError) as error:
+    except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
         _log("nu", f"validator {type(error).__name__}")
         return {"status": "unavailable", "reason": _reason_for(error)}
     try:
@@ -331,13 +420,14 @@ def _ssl_grade(payload: object) -> tuple[str, str | None]:
 
 def run_tls_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
     deadline = time.monotonic() + timeout_ms / 1000
-    _origin, allowed = _check_site_host(site_url)
+    _origin, allowed = _check_site_host(site_url, deadline)
     host = urllib.parse.urlsplit(site_url).hostname or ""
     try:
         status, _body, _truncated, seen = fetch_bytes(
             site_url, _remaining(deadline), HEADER_BODY_BYTES, allowed_hosts=allowed, headers=True,
+            _deadline=deadline,
         )
-    except (OSError, ValueError, urllib.error.URLError) as error:
+    except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
         _log("tls", f"fetch {type(error).__name__}")
         return {"status": "unavailable", "reason": _reason_for(error)}
     if status != 200:
@@ -352,20 +442,25 @@ def run_tls_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
         "referrer_policy": seen.get("referrer-policy", "") != "",
         "frame_guard": seen.get("x-frame-options", "") != "" or "frame-ancestors" in (csp or "").lower(),
     }
-    labs_query = urllib.parse.urlencode({"host": host, "fromCache": "on", "maxAge": 24})
-    try:
-        labs = _get_json(f"{SSL_API}?{labs_query}", _remaining(deadline))
-    except (OSError, ValueError, urllib.error.URLError) as error:
-        _log("tls", f"labs {type(error).__name__}")
-        labs_block: dict[str, object] = {"status": "unavailable", "detail": _reason_for(error), "grade": None}
+    parsed = urllib.parse.urlsplit(site_url)
+    labs_port = parsed.port
+    if parsed.scheme != "https" or (labs_port is not None and labs_port != 443):
+        labs_block: dict[str, object] = {"status": "unavailable", "detail": None, "grade": None}
     else:
-        labs_status, grade = _ssl_grade(labs)
-        if labs_status == "ready":
-            labs_block = {"status": "ready", "detail": None, "grade": grade}
-        elif labs_status == "unavailable":
-            labs_block = {"status": "unavailable", "detail": None, "grade": None}
+        labs_query = urllib.parse.urlencode({"host": host, "fromCache": "on", "maxAge": 24})
+        try:
+            labs = _get_json(f"{SSL_API}?{labs_query}", _remaining(deadline))
+        except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
+            _log("tls", f"labs {type(error).__name__}")
+            labs_block = {"status": "unavailable", "detail": _reason_for(error), "grade": None}
         else:
-            labs_block = {"status": "pending", "detail": labs_status, "grade": None}
+            labs_status, grade = _ssl_grade(labs)
+            if labs_status == "ready":
+                labs_block = {"status": "ready", "detail": None, "grade": grade}
+            elif labs_status == "unavailable":
+                labs_block = {"status": "unavailable", "detail": None, "grade": None}
+            else:
+                labs_block = {"status": "pending", "detail": labs_status, "grade": None}
     return {
         "schema": "extella.tls_source.v1",
         "source": "SecurityProbe",
@@ -505,7 +600,7 @@ def run_cc_probe(site_url: str, timeout_ms: int) -> dict[str, object]:
                 raise ValueError("archive server ignored the byte range")
             raw = response.read(min(EXCERPT_BYTES, int(record["length"])))
         excerpt = _archive_excerpt(raw)
-    except (OSError, ValueError, urllib.error.URLError) as error:
+    except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
         _log("cc", type(error).__name__)
         return {"status": "unavailable", "reason": _reason_for(error)}
     return {
@@ -545,7 +640,7 @@ def handle_run(body: bytes, kind: str) -> tuple[int, dict[str, object]]:
         return 200, runner(payload["site_url"], plan["timeout_ms"])
     except ValueError:
         return 400, {"status": "error", "code": "invalid_request"}
-    except (OSError, ValueError, urllib.error.URLError) as error:
+    except (OSError, ValueError, urllib.error.URLError, http.client.HTTPException) as error:
         return 200, {"status": "unavailable", "reason": _reason_for(error)}
 
 

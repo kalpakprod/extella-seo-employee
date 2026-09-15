@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import importlib.util
+import http.client
 import json
 import gzip
+import socket
+import ssl
+import subprocess
+import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -119,6 +125,30 @@ class TlsProbeTest(unittest.TestCase):
             result = WORKER.run_tls_probe("https://example.com/", 5000)
         self.assertEqual(result["status"], "unavailable")
 
+    def test_ssl_labs_grade_is_unavailable_for_unsupported_origins(self) -> None:
+        for site_url in ("http://example.com/", "https://example.com:8443/"):
+            with (
+                self.subTest(site_url=site_url),
+                mock.patch.object(WORKER, "_is_global_host", return_value=True),
+                mock.patch.object(WORKER, "fetch_bytes", return_value=(200, b"x", False, {})),
+                mock.patch.object(WORKER, "_get_json") as getter,
+            ):
+                result = WORKER.run_tls_probe(site_url, 5000)
+            getter.assert_not_called()
+            self.assertEqual(result["ssl_labs"], {"status": "unavailable", "detail": None, "grade": None})
+
+    def test_malformed_http_is_an_unavailable_json_result_for_every_lane(self) -> None:
+        body = _plan()
+        for kind, patched in (("nu", "fetch_bytes"), ("tls", "fetch_bytes"), ("cc", "_get_json")):
+            with (
+                self.subTest(kind=kind),
+                mock.patch.object(WORKER, "_is_global_host", return_value=True),
+                mock.patch.object(WORKER, patched, side_effect=http.client.BadStatusLine("BROKEN")),
+            ):
+                status, result = WORKER.handle_run(body, kind)
+            self.assertEqual(status, 200)
+            self.assertEqual(result, {"status": "unavailable", "reason": "http_503"})
+
 
 class CcProbeTest(unittest.TestCase):
     def test_record_rejects_paths_outside_crawl_data(self) -> None:
@@ -205,6 +235,191 @@ class ProbeHonestyTests(unittest.TestCase):
             "GET", "/path?q=1", headers={"Host": "example.com", "User-Agent": "ExtellaProbe/2.1"}
         )
         self.assertEqual(result[:3], (200, b"ok", False))
+
+    def test_ipv6_host_header_keeps_uri_authority_brackets(self):
+        address = "2001:4860:4860::8888"
+        response = mock.MagicMock()
+        response.status = 200
+        response.getheaders.return_value = []
+        response.read.return_value = b"ok"
+        for url, expected in (
+            (f"http://[{address}]/", f"[{address}]"),
+            (f"http://[{address}]:8080/", f"[{address}]:8080"),
+        ):
+            connection = mock.MagicMock()
+            connection.getresponse.return_value = response
+            with (
+                self.subTest(url=url),
+                mock.patch.object(WORKER, "_global_addresses", return_value=[address]),
+                mock.patch.object(WORKER, "_PinnedHTTPConnection", return_value=connection),
+            ):
+                WORKER.fetch_bytes(url, 5, 10, allowed_hosts={address})
+            self.assertEqual(connection.request.call_args.kwargs["headers"]["Host"], expected)
+
+    def test_first_public_address_failure_falls_back_without_reresolving(self):
+        response = mock.MagicMock()
+        response.status = 200
+        response.getheaders.return_value = []
+        response.read.return_value = b"ok"
+        working = mock.MagicMock()
+        working.getresponse.return_value = response
+        addresses = ["93.184.216.34", "1.1.1.1"]
+        with (
+            mock.patch.object(WORKER, "_global_addresses", return_value=addresses) as resolver,
+            mock.patch.object(WORKER, "_PinnedHTTPConnection", side_effect=[OSError("down"), working]) as factory,
+        ):
+            result = WORKER.fetch_bytes("http://example.com/", 5, 10, allowed_hosts={"example.com"})
+        self.assertEqual(result[:3], (200, b"ok", False))
+        self.assertEqual([call.args[2] for call in factory.call_args_list], addresses)
+        resolver.assert_called_once()
+
+    def test_response_failure_does_not_fall_back_to_another_address(self):
+        response = mock.MagicMock()
+        response.status = 200
+        response.read.side_effect = OSError("body down")
+        first = mock.MagicMock()
+        first.getresponse.return_value = response
+        second = mock.MagicMock()
+        with (
+            mock.patch.object(WORKER, "_global_addresses", return_value=["93.184.216.34", "1.1.1.1"]),
+            mock.patch.object(WORKER, "_PinnedHTTPConnection", side_effect=[first, second]) as factory,
+        ):
+            with self.assertRaises(OSError):
+                WORKER.fetch_bytes("http://example.com/", 5, 10, allowed_hosts={"example.com"})
+        self.assertEqual(factory.call_count, 1)
+
+    def test_nat64_address_with_non_global_embedded_ipv4_is_rejected(self):
+        answers = [
+            (WORKER.socket.AF_INET6, WORKER.socket.SOCK_STREAM, 6, "", ("64:ff9b::a9fe:a9fe", 443, 0, 0)),
+        ]
+        with mock.patch.object(WORKER.socket, "getaddrinfo", return_value=answers):
+            with self.assertRaisesRegex(ValueError, "not a global address"):
+                WORKER._global_addresses("nat64.invalid", 443)
+
+    def test_absolute_deadline_rejects_slow_request_response_and_body(self):
+        clock = [0.0]
+
+        class SlowResponse:
+            status = 200
+
+            def getheaders(self):
+                return []
+
+            def read(self, _limit):
+                clock[0] += 0.45
+                return b"ok"
+
+        class SlowConnection:
+            def request(self, *_args, **_kwargs):
+                clock[0] += 0.45
+
+            def getresponse(self):
+                clock[0] += 0.45
+                return SlowResponse()
+
+            def close(self):
+                return None
+
+        with (
+            mock.patch.object(WORKER.time, "monotonic", side_effect=lambda: clock[0]),
+            mock.patch.object(WORKER, "_global_addresses", return_value=["93.184.216.34"]),
+            mock.patch.object(WORKER, "_PinnedHTTPConnection", return_value=SlowConnection()),
+        ):
+            with self.assertRaises(TimeoutError):
+                WORKER.fetch_bytes("http://example.com/", 1, 10, allowed_hosts={"example.com"})
+        self.assertGreater(clock[0], 1.0)
+
+    def test_dns_stage_cannot_complete_after_the_absolute_deadline(self):
+        clock = [0.0]
+
+        def slow_resolve(*_args, **_kwargs):
+            clock[0] += 1.1
+            return [(WORKER.socket.AF_INET, WORKER.socket.SOCK_STREAM, 6, "", ("93.184.216.34", 80))]
+
+        with (
+            mock.patch.object(WORKER.time, "monotonic", side_effect=lambda: clock[0]),
+            mock.patch.object(WORKER.socket, "getaddrinfo", side_effect=slow_resolve),
+        ):
+            with self.assertRaises(TimeoutError):
+                WORKER.fetch_bytes("http://example.com/", 1, 10, allowed_hosts={"example.com"})
+
+    def test_real_socket_path_uses_pinned_numeric_address_and_host(self):
+        listener = socket.socket()
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        port = listener.getsockname()[1]
+        request = []
+
+        def serve():
+            raw, _peer = listener.accept()
+            with raw:
+                request.append(raw.recv(4096))
+                raw.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+            listener.close()
+
+        thread = threading.Thread(target=serve)
+        thread.start()
+        try:
+            with mock.patch.object(WORKER, "_global_addresses", return_value=["127.0.0.1"]):
+                result = WORKER.fetch_bytes(
+                    f"http://audit.example:{port}/path", 3, 10, allowed_hosts={"audit.example"}
+                )
+        finally:
+            thread.join(3)
+            listener.close()
+        self.assertEqual(result[:3], (200, b"ok", False))
+        self.assertIn(b"Host: audit.example:" + str(port).encode(), request[0])
+
+    def test_real_tls_path_uses_pinned_address_and_preserves_sni(self):
+        with tempfile.TemporaryDirectory(prefix="extella-probe-cert-") as directory:
+            cert = Path(directory) / "cert.pem"
+            key = Path(directory) / "key.pem"
+            subprocess.run(
+                [
+                    "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+                    "-subj", "/CN=audit.example", "-addext", "subjectAltName=DNS:audit.example",
+                    "-keyout", str(key), "-out", str(cert),
+                ],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            server_context.load_cert_chain(cert, key)
+            listener = socket.socket()
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
+            port = listener.getsockname()[1]
+            sni: list[str | None] = []
+            request: list[bytes] = []
+            server_context.set_servername_callback(lambda _socket, name, _context: sni.append(name))
+
+            def serve() -> None:
+                raw, _peer = listener.accept()
+                try:
+                    with server_context.wrap_socket(raw, server_side=True) as tls:
+                        request.append(tls.recv(4096))
+                        tls.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+                finally:
+                    listener.close()
+
+            thread = threading.Thread(target=serve)
+            thread.start()
+            client_context = ssl.create_default_context(cafile=str(cert))
+            try:
+                with (
+                    mock.patch.object(WORKER, "_global_addresses", return_value=["127.0.0.1"]),
+                    mock.patch.object(WORKER.ssl, "create_default_context", return_value=client_context),
+                ):
+                    result = WORKER.fetch_bytes(
+                        f"https://audit.example:{port}/", 3, 10, allowed_hosts={"audit.example"}
+                    )
+            finally:
+                thread.join(3)
+                listener.close()
+            self.assertEqual(result[:3], (200, b"ok", False))
+            self.assertEqual(sni, ["audit.example"])
+            self.assertIn(b"Host: audit.example:" + str(port).encode(), request[0])
 
     def test_mixed_public_private_dns_answer_is_rejected(self):
         answers = [

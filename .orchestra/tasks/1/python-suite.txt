@@ -1,0 +1,338 @@
+test_compose_origins_and_settings_token_are_supported (test_agent_zero_transport.AgentZeroTransportTest.test_compose_origins_and_settings_token_are_supported) ... ok
+test_documented_transport_shape (test_agent_zero_transport.AgentZeroTransportTest.test_documented_transport_shape) ... ok
+test_no_tools_profile_assertion_rejects_non_blocking_policy (test_agent_zero_transport.AgentZeroTransportTest.test_no_tools_profile_assertion_rejects_non_blocking_policy) ... ok
+test_no_tools_profile_identifier_is_fixed (test_agent_zero_transport.AgentZeroTransportTest.test_no_tools_profile_identifier_is_fixed) ... ok
+test_no_tools_profile_is_required_before_any_http_request (test_agent_zero_transport.AgentZeroTransportTest.test_no_tools_profile_is_required_before_any_http_request) ... ok
+test_non_loopback_origin_is_rejected (test_agent_zero_transport.AgentZeroTransportTest.test_non_loopback_origin_is_rejected) ... ok
+test_public_entry_rejects_raw_prompt_without_forwarding_it (test_agent_zero_transport.AgentZeroTransportTest.test_public_entry_rejects_raw_prompt_without_forwarding_it) ... ok
+test_create_archives_only_product_scope_and_restores_running_services (test_backup_restore.BackupRestoreTest.test_create_archives_only_product_scope_and_restores_running_services) ... ok
+test_create_with_project_name_never_archives_default_project_volumes (test_backup_restore.BackupRestoreTest.test_create_with_project_name_never_archives_default_project_volumes) ... ok
+test_prune_is_dry_run_without_apply (test_backup_restore.BackupRestoreTest.test_prune_is_dry_run_without_apply) ... ok
+test_verify_and_restore_check_are_offline_and_temporary (test_backup_restore.BackupRestoreTest.test_verify_and_restore_check_are_offline_and_temporary) ... ok
+test_verify_rejects_hash_tampering (test_backup_restore.BackupRestoreTest.test_verify_rejects_hash_tampering) ... ok
+test_verify_rejects_manifest_traversal (test_backup_restore.BackupRestoreTest.test_verify_rejects_manifest_traversal) ... ok
+test_compose_isolates_egress_and_enforces_runtime_limits (test_container_runtime.ContainerRuntimeTest.test_compose_isolates_egress_and_enforces_runtime_limits) ... ok
+test_crawlseo_worker_exports_optional_structured_search_performance (test_container_runtime.ContainerRuntimeTest.test_crawlseo_worker_exports_optional_structured_search_performance) ... ok
+test_deployment_probe_uses_v2_target_payloads (test_container_runtime.ContainerRuntimeTest.test_deployment_probe_uses_v2_target_payloads) ... ok
+test_entrypoints_and_host_wrappers_keep_the_plan_bounded_and_private (test_container_runtime.ContainerRuntimeTest.test_entrypoints_and_host_wrappers_keep_the_plan_bounded_and_private) ... ok
+test_gateway_allows_only_canonical_multi_target_reads (test_container_runtime.ContainerRuntimeTest.test_gateway_allows_only_canonical_multi_target_reads) ... ok
+test_installer_rejects_unbound_device_before_payload_copy (test_container_runtime.ContainerRuntimeTest.test_installer_rejects_unbound_device_before_payload_copy) ... ok
+test_installer_reports_false_when_runtime_rollback_fails (test_container_runtime.ContainerRuntimeTest.test_installer_reports_false_when_runtime_rollback_fails) ... ok
+test_installer_restores_manifest_and_prepare_bindings_after_prepare_failure (test_container_runtime.ContainerRuntimeTest.test_installer_restores_manifest_and_prepare_bindings_after_prepare_failure) ... ok
+test_installer_reuses_device_binding_and_runs_prepare_without_output (test_container_runtime.ContainerRuntimeTest.test_installer_reuses_device_binding_and_runs_prepare_without_output) ... ok
+test_installer_rolls_back_replaced_and_created_payload_files_after_copy_failure (test_container_runtime.ContainerRuntimeTest.test_installer_rolls_back_replaced_and_created_payload_files_after_copy_failure) ... ok
+test_prepare_accepts_the_documented_sixteen_character_agent_token (test_container_runtime.ContainerRuntimeTest.test_prepare_accepts_the_documented_sixteen_character_agent_token) ... ok
+test_prepare_captures_the_existing_api_gateway_loopback_port (test_container_runtime.ContainerRuntimeTest.test_prepare_captures_the_existing_api_gateway_loopback_port) ... ok
+test_prepare_hands_secrets_to_root_only_when_privileged (test_container_runtime.ContainerRuntimeTest.test_prepare_hands_secrets_to_root_only_when_privileged) ... ok
+test_prepare_health_probe_is_loopback_only (test_container_runtime.ContainerRuntimeTest.test_prepare_health_probe_is_loopback_only) ... ok
+test_prepare_refuses_non_root_deploy_user (test_container_runtime.ContainerRuntimeTest.test_prepare_refuses_non_root_deploy_user) ... ok
+test_prepare_rejects_a_non_loopback_runtime_health_url (test_container_runtime.ContainerRuntimeTest.test_prepare_rejects_a_non_loopback_runtime_health_url) ... ok
+test_prepare_rotate_cli_rejects_unknown_secret_name (test_container_runtime.ContainerRuntimeTest.test_prepare_rotate_cli_rejects_unknown_secret_name) ... usage: prepare.py [-h] [--device-id DEVICE_ID]
+                  [--hosting-profile {local,server,client_server}]
+                  [--host HOST] [--agent-id AGENT_ID]
+                  [--external-agent-zero-key EXTERNAL_AGENT_ZERO_KEY]
+                  [--external-agent-zero-container EXTERNAL_AGENT_ZERO_CONTAINER]
+                  [--capture-runtime-state] [--restore-runtime-state]
+                  [--rotate-secret ROTATE_SECRET]
+                  [--compose-file COMPOSE_FILE]
+                  [--runtime-state RUNTIME_STATE]
+prepare.py: error: --rotate-secret accepts only: seo_employee_api_token
+ok
+test_prepare_rotate_cli_requires_root_and_reports_name_only (test_container_runtime.ContainerRuntimeTest.test_prepare_rotate_cli_requires_root_and_reports_name_only) ... ok
+test_prepare_rotate_refuses_missing_or_invalid_secret (test_container_runtime.ContainerRuntimeTest.test_prepare_rotate_refuses_missing_or_invalid_secret) ... ok
+test_prepare_rotate_replaces_token_and_keeps_owner_only_mode (test_container_runtime.ContainerRuntimeTest.test_prepare_rotate_replaces_token_and_keeps_owner_only_mode) ... ok
+test_prepare_runtime_rollback_retains_old_images_and_restarts_prior_project (test_container_runtime.ContainerRuntimeTest.test_prepare_runtime_rollback_retains_old_images_and_restarts_prior_project) ... ok
+test_prepare_starts_restarts_and_checks_loopback_health (test_container_runtime.ContainerRuntimeTest.test_prepare_starts_restarts_and_checks_loopback_health) ... ok
+test_prepare_syncs_token_with_pinned_interpreter (test_container_runtime.ContainerRuntimeTest.test_prepare_syncs_token_with_pinned_interpreter) ... ok
+test_product_dispatch_is_fixed_and_token_is_required (test_container_runtime.ContainerRuntimeTest.test_product_dispatch_is_fixed_and_token_is_required) ... ok
+test_source_proxy_calls_internal_worker_and_writes_atomically (test_container_runtime.ContainerRuntimeTest.test_source_proxy_calls_internal_worker_and_writes_atomically) ... ok
+test_source_proxy_posts_psi_plan_to_psi_worker (test_container_runtime.ContainerRuntimeTest.test_source_proxy_posts_psi_plan_to_psi_worker) ... ok
+test_source_proxy_preserves_only_allowlisted_worker_machine_reasons (test_container_runtime.ContainerRuntimeTest.test_source_proxy_preserves_only_allowlisted_worker_machine_reasons) ... ok
+test_source_proxy_rejects_an_invalid_plan_before_network_io (test_container_runtime.ContainerRuntimeTest.test_source_proxy_rejects_an_invalid_plan_before_network_io) ... /usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 400: 'bad request'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+ok
+test_source_proxy_rejects_an_invalid_psi_plan_before_network_io (test_container_runtime.ContainerRuntimeTest.test_source_proxy_rejects_an_invalid_psi_plan_before_network_io) ... ok
+test_worker_dns_result_still_passes_public_address_validation (test_container_runtime.ContainerRuntimeTest.test_worker_dns_result_still_passes_public_address_validation) ... ok
+test_worker_images_preload_the_safe_fetch_guard (test_container_runtime.ContainerRuntimeTest.test_worker_images_preload_the_safe_fetch_guard) ... ok
+test_worker_server_cancels_audit_process_group_on_disconnect (test_container_runtime.ContainerRuntimeTest.test_worker_server_cancels_audit_process_group_on_disconnect) ... ok
+test_worker_server_keeps_resolver_dns_only (test_container_runtime.ContainerRuntimeTest.test_worker_server_keeps_resolver_dns_only) ... ok
+test_compose_probes_have_no_product_startup_dependency_and_no_host_ports (test_container_runtime.ProbeContainerTests.test_compose_probes_have_no_product_startup_dependency_and_no_host_ports) ... ok
+test_proxy_posts_single_page_probe_plan_and_preserves_unavailable (test_container_runtime.ProbeContainerTests.test_proxy_posts_single_page_probe_plan_and_preserves_unavailable) ... ok
+test_collect_sources_through_http_probes_builds_an_honest_report (test_p2_probe_integration.P2ProbeCollectionIntegrationTest.test_collect_sources_through_http_probes_builds_an_honest_report) ... ok
+test_binding_rejects_noncanonical_agent_id (test_packaging.PackagingTest.test_binding_rejects_noncanonical_agent_id) ... ok
+test_bindings_are_strict_and_do_not_assert_profile_before_provisioning (test_packaging.PackagingTest.test_bindings_are_strict_and_do_not_assert_profile_before_provisioning) ... ok
+test_docker_context_excludes_generated_bindings_and_local_env (test_packaging.PackagingTest.test_docker_context_excludes_generated_bindings_and_local_env) ... ok
+test_generated_json_is_written_with_lf_on_every_platform (test_packaging.PackagingTest.test_generated_json_is_written_with_lf_on_every_platform) ... ok
+test_gitattributes_keeps_text_lf_and_release_binaries_binary (test_packaging.PackagingTest.test_gitattributes_keeps_text_lf_and_release_binaries_binary) ... ok
+test_manifest_checker_is_exact_canonical_copy (test_packaging.PackagingTest.test_manifest_checker_is_exact_canonical_copy) ... ok
+test_no_tools_profile_assets_use_actual_agent_zero_layout (test_packaging.PackagingTest.test_no_tools_profile_assets_use_actual_agent_zero_layout) ... ok
+test_profile_assertion_is_written_only_after_exact_container_readback (test_packaging.PackagingTest.test_profile_assertion_is_written_only_after_exact_container_readback) ... ok
+test_runtime_payload_contains_installer_and_canonical_manifest_check (test_packaging.PackagingTest.test_runtime_payload_contains_installer_and_canonical_manifest_check) ... ok
+test_zip_writer_is_byte_deterministic (test_packaging.PackagingTest.test_zip_writer_is_byte_deterministic) ... ok
+test_archive_record_must_match_the_exact_requested_url (test_probe_worker.CcProbeTest.test_archive_record_must_match_the_exact_requested_url) ... probe cc detail=ValueError
+ok
+test_excerpt_is_capped (test_probe_worker.CcProbeTest.test_excerpt_is_capped) ... ok
+test_index_outage_is_unavailable_not_an_exception (test_probe_worker.CcProbeTest.test_index_outage_is_unavailable_not_an_exception) ... probe cc detail=OSError
+ok
+test_missing_record_is_ok_with_empty_excerpt (test_probe_worker.CcProbeTest.test_missing_record_is_ok_with_empty_excerpt) ... probe cc detail=no record
+ok
+test_record_rejects_paths_outside_crawl_data (test_probe_worker.CcProbeTest.test_record_rejects_paths_outside_crawl_data) ... ok
+test_exemplars_are_capped_and_truncated (test_probe_worker.NuProbeTest.test_exemplars_are_capped_and_truncated) ... ok
+test_fetch_failure_is_unavailable_not_an_exception (test_probe_worker.NuProbeTest.test_fetch_failure_is_unavailable_not_an_exception) ... probe nu detail=fetch OSError
+ok
+test_messages_count_errors_and_warnings_only (test_probe_worker.NuProbeTest.test_messages_count_errors_and_warnings_only) ... ok
+test_validator_failure_is_unavailable_not_an_exception (test_probe_worker.NuProbeTest.test_validator_failure_is_unavailable_not_an_exception) ... probe nu detail=validator OSError
+ok
+test_cc_kind_never_fetches_the_site_host (test_probe_worker.ProbeHandleRunTest.test_cc_kind_never_fetches_the_site_host) ... probe cc detail=OSError
+ok
+test_each_kind_rejects_a_bad_plan (test_probe_worker.ProbeHandleRunTest.test_each_kind_rejects_a_bad_plan) ... ok
+test_site_fetching_kinds_reject_a_private_site_host (test_probe_worker.ProbeHandleRunTest.test_site_fetching_kinds_reject_a_private_site_host) ... ok
+test_unknown_kind_is_rejected (test_probe_worker.ProbeHandleRunTest.test_unknown_kind_is_rejected) ... ok
+test_absolute_deadline_rejects_slow_request_response_and_body (test_probe_worker.ProbeHonestyTests.test_absolute_deadline_rejects_slow_request_response_and_body) ... ok
+test_archive_crawler_encoding_metadata_does_not_hide_plain_html (test_probe_worker.ProbeHonestyTests.test_archive_crawler_encoding_metadata_does_not_hide_plain_html) ... ok
+test_archive_decompression_is_bounded (test_probe_worker.ProbeHonestyTests.test_archive_decompression_is_bounded) ... ok
+test_archive_excerpt_decompresses_and_omits_scripts (test_probe_worker.ProbeHonestyTests.test_archive_excerpt_decompresses_and_omits_scripts) ... ok
+test_deadline_cannot_be_extended_by_another_request (test_probe_worker.ProbeHonestyTests.test_deadline_cannot_be_extended_by_another_request) ... ok
+test_dns_stage_cannot_complete_after_the_absolute_deadline (test_probe_worker.ProbeHonestyTests.test_dns_stage_cannot_complete_after_the_absolute_deadline) ... ok
+test_first_public_address_failure_falls_back_without_reresolving (test_probe_worker.ProbeHonestyTests.test_first_public_address_failure_falls_back_without_reresolving) ... ok
+test_index_json_lines_and_cap (test_probe_worker.ProbeHonestyTests.test_index_json_lines_and_cap) ... ok
+test_ipv6_host_header_keeps_uri_authority_brackets (test_probe_worker.ProbeHonestyTests.test_ipv6_host_header_keeps_uri_authority_brackets) ... ok
+test_mixed_public_private_dns_answer_is_rejected (test_probe_worker.ProbeHonestyTests.test_mixed_public_private_dns_answer_is_rejected) ... ok
+test_nat64_address_with_non_global_embedded_ipv4_is_rejected (test_probe_worker.ProbeHonestyTests.test_nat64_address_with_non_global_embedded_ipv4_is_rejected) ... ok
+test_real_socket_path_uses_pinned_numeric_address_and_host (test_probe_worker.ProbeHonestyTests.test_real_socket_path_uses_pinned_numeric_address_and_host) ... ok
+test_real_tls_path_uses_pinned_address_and_preserves_sni (test_probe_worker.ProbeHonestyTests.test_real_tls_path_uses_pinned_address_and_preserves_sni) ... ok
+test_response_failure_does_not_fall_back_to_another_address (test_probe_worker.ProbeHonestyTests.test_response_failure_does_not_fall_back_to_another_address) ... ok
+test_site_fetch_pins_the_validated_public_address (test_probe_worker.ProbeHonestyTests.test_site_fetch_pins_the_validated_public_address) ... ok
+test_truncated_html_is_not_reported_as_invalid_html (test_probe_worker.ProbeHonestyTests.test_truncated_html_is_not_reported_as_invalid_html) ... ok
+test_validator_internal_errors_are_not_a_clean_validation (test_probe_worker.ProbeHonestyTests.test_validator_internal_errors_are_not_a_clean_validation) ... ok
+test_fetch_failure_is_unavailable_not_an_exception (test_probe_worker.TlsProbeTest.test_fetch_failure_is_unavailable_not_an_exception) ... probe tls detail=fetch OSError
+ok
+test_hsts_max_age_parsing (test_probe_worker.TlsProbeTest.test_hsts_max_age_parsing) ... ok
+test_labs_is_queried_once_and_never_polled (test_probe_worker.TlsProbeTest.test_labs_is_queried_once_and_never_polled) ... ok
+test_malformed_http_is_an_unavailable_json_result_for_every_lane (test_probe_worker.TlsProbeTest.test_malformed_http_is_an_unavailable_json_result_for_every_lane) ... probe nu detail=fetch BadStatusLine
+probe tls detail=fetch BadStatusLine
+probe cc detail=BadStatusLine
+ok
+test_ssl_grade_keeps_the_worst_ready_endpoint (test_probe_worker.TlsProbeTest.test_ssl_grade_keeps_the_worst_ready_endpoint) ... ok
+test_ssl_labs_grade_is_unavailable_for_unsupported_origins (test_probe_worker.TlsProbeTest.test_ssl_labs_grade_is_unavailable_for_unsupported_origins) ... ok
+test_access_log_records_request_without_secret_values (test_product_api_v2.ProductApiV2Test.test_access_log_records_request_without_secret_values) ... ok
+test_exact_request_allowlists_and_queue_status (test_product_api_v2.ProductApiV2Test.test_exact_request_allowlists_and_queue_status) ... ok
+test_execution_failure_is_the_only_503_case (test_product_api_v2.ProductApiV2Test.test_execution_failure_is_the_only_503_case) ... ok
+test_handler_distinguishes_client_input_from_state_targets_and_configure_backend_failures (test_product_api_v2.ProductApiV2Test.test_handler_distinguishes_client_input_from_state_targets_and_configure_backend_failures) ... {"ts": "2026-09-15T04:20:25Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+{"ts": "2026-09-15T04:20:26Z", "client": "127.0.0.1", "method": "POST", "route": "/api/configure", "status": 503}
+{"ts": "2026-09-15T04:20:26Z", "client": "127.0.0.1", "method": "GET", "route": "/api/state", "status": 503}
+{"ts": "2026-09-15T04:20:27Z", "client": "127.0.0.1", "method": "GET", "route": "/api/targets", "status": 503}
+{"ts": "2026-09-15T04:20:27Z", "client": "127.0.0.1", "method": "GET", "route": "/api/targets", "status": 503}
+{"ts": "2026-09-15T04:20:28Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+ok
+test_handler_enforces_auth_body_cap_transfer_encoding_and_routes (test_product_api_v2.ProductApiV2Test.test_handler_enforces_auth_body_cap_transfer_encoding_and_routes) ... {"ts": "2026-09-15T04:20:28Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 401}
+{"ts": "2026-09-15T04:20:29Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+{"ts": "2026-09-15T04:20:29Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+{"ts": "2026-09-15T04:20:30Z", "client": "127.0.0.1", "method": "GET", "route": "/api/unknown", "status": 404}
+{"ts": "2026-09-15T04:20:30Z", "client": "127.0.0.1", "method": "GET", "route": "/api/state", "status": 400}
+ok
+test_handler_maps_backend_failures_to_503_without_exposing_details (test_product_api_v2.ProductApiV2Test.test_handler_maps_backend_failures_to_503_without_exposing_details) ... {"ts": "2026-09-15T04:20:31Z", "client": "127.0.0.1", "method": "POST", "route": "/api/configure", "status": 503}
+{"ts": "2026-09-15T04:20:31Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 503}
+ok
+test_health_reports_version_queue_and_consumer (test_product_api_v2.ProductApiV2Test.test_health_reports_version_queue_and_consumer) ... {"ts": "2026-09-15T04:20:32Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
+ok
+test_state_error_mapping_is_input_400_or_storage_503 (test_product_api_v2.ProductApiV2Test.test_state_error_mapping_is_input_400_or_storage_503) ... ok
+test_state_requires_target_unless_exactly_one_is_configured (test_product_api_v2.ProductApiV2Test.test_state_requires_target_unless_exactly_one_is_configured) ... ok
+test_state_without_target_is_rejected_for_multiple_configured_targets (test_product_api_v2.ProductApiV2Test.test_state_without_target_is_rejected_for_multiple_configured_targets) ... ok
+test_targets_reject_query_and_report_backend_failure_as_503 (test_product_api_v2.ProductApiV2Test.test_targets_reject_query_and_report_backend_failure_as_503) ... ok
+test_targets_route_returns_target_summaries (test_product_api_v2.ProductApiV2Test.test_targets_route_returns_target_summaries) ... ok
+test_unknown_get_route_and_malformed_state_query_have_v2_codes (test_product_api_v2.ProductApiV2Test.test_unknown_get_route_and_malformed_state_query_have_v2_codes) ... ok
+test_access_log_omits_authorization_value (test_product_gateway.ProductGatewayTest.test_access_log_omits_authorization_value) ... ok
+test_parse_rate_limit_defaults_and_rejects_garbage (test_product_gateway.ProductGatewayTest.test_parse_rate_limit_defaults_and_rejects_garbage) ... ok
+test_rate_limit_counts_rejected_routes_too (test_product_gateway.ProductGatewayTest.test_rate_limit_counts_rejected_routes_too) ... {"ts": "2026-09-15T04:20:33Z", "client": "127.0.0.1", "method": "GET", "route": "/no-such-route", "status": 404}
+{"ts": "2026-09-15T04:20:33Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 429}
+ok
+test_rate_limit_returns_429_with_retry_after (test_product_gateway.ProductGatewayTest.test_rate_limit_returns_429_with_retry_after) ... {"ts": "2026-09-15T04:20:34Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
+{"ts": "2026-09-15T04:20:34Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
+{"ts": "2026-09-15T04:20:34Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 429}
+ok
+test_extractors_read_google_shapes (test_psi_worker.PsiWorkerTest.test_extractors_read_google_shapes) ... ok
+test_fetch_follows_same_origin_redirects_and_caps_bytes (test_psi_worker.PsiWorkerTest.test_fetch_follows_same_origin_redirects_and_caps_bytes) ... /usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 302: 'Found'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+/usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 404: 'Not Found'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+ok
+test_fetch_rejects_non_allowlisted_private_and_credential_urls (test_psi_worker.PsiWorkerTest.test_fetch_rejects_non_allowlisted_private_and_credential_urls) ... ok
+test_handle_run_validates_strictly (test_psi_worker.PsiWorkerTest.test_handle_run_validates_strictly) ... ok
+test_run_probe_detects_error_json_payloads (test_psi_worker.PsiWorkerTest.test_run_probe_detects_error_json_payloads) ... psi crux error url_index=-1 strategy=- detail=http_503
+/usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 503: 'error payload'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+psi psi error url_index=0 strategy=mobile detail=http_403
+/usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 403: 'error payload'>
+  _warnings.warn(self.warn_message, ResourceWarning)
+psi psi error url_index=0 strategy=desktop detail=http_403
+ok
+test_run_probe_merges_lab_field_and_sitefiles (test_psi_worker.PsiWorkerTest.test_run_probe_merges_lab_field_and_sitefiles) ... ok
+test_run_probe_reports_degraded_psi_api_without_key_or_url (test_psi_worker.PsiWorkerTest.test_run_probe_reports_degraded_psi_api_without_key_or_url) ... ok
+test_run_probe_total_outage_is_declared_unavailable (test_psi_worker.PsiWorkerTest.test_run_probe_total_outage_is_declared_unavailable) ... psi psi error url_index=0 strategy=mobile detail=OSError
+psi psi error url_index=0 strategy=desktop detail=OSError
+ok
+test_run_probe_without_key_skips_crux (test_psi_worker.PsiWorkerTest.test_run_probe_without_key_skips_crux) ... ok
+test_sample_urls_caps_and_filters_origins (test_psi_worker.PsiWorkerTest.test_sample_urls_caps_and_filters_origins) ... ok
+test_configure_accepts_service_normalized_equivalent_url_for_existing_target (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_configure_accepts_service_normalized_equivalent_url_for_existing_target) ... ok
+test_configure_existing_unreadable_file_is_storage_failure (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_configure_existing_unreadable_file_is_storage_failure) ... ok
+test_configure_rejects_different_existing_target_url_before_mutation (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_configure_rejects_different_existing_target_url_before_mutation) ... ok
+test_consumer_recovers_once_and_waits_without_busy_loop (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_consumer_recovers_once_and_waits_without_busy_loop) ... ok
+test_consumer_stop_raises_when_worker_does_not_terminate (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_consumer_stop_raises_when_worker_does_not_terminate) ... ok
+test_duplicate_flag_uses_returned_queue_item_under_concurrency (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_duplicate_flag_uses_returned_queue_item_under_concurrency) ... ok
+test_preflight_is_fixed_and_does_not_accept_prompt (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_preflight_is_fixed_and_does_not_accept_prompt) ... ok
+test_process_queue_once_completes_exact_claimed_item (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_process_queue_once_completes_exact_claimed_item) ... ok
+test_queue_position_ignores_terminal_history (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_queue_position_ignores_terminal_history) ... ok
+test_run_enqueues_and_deduplicates_same_target_trigger (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_run_enqueues_and_deduplicates_same_target_trigger) ... ok
+test_run_rejects_missing_ownership_before_queue_write (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_run_rejects_missing_ownership_before_queue_write) ... ok
+test_scheduler_does_not_enqueue_a_completed_local_day_again_after_restart (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_scheduler_does_not_enqueue_a_completed_local_day_again_after_restart) ... ok
+test_scheduler_enqueues_each_due_target_and_keeps_going_after_one_error (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_scheduler_enqueues_each_due_target_and_keeps_going_after_one_error) ... ok
+test_scheduler_skips_non_object_and_runtime_failures (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_scheduler_skips_non_object_and_runtime_failures) ... ok
+test_state_distinguishes_empty_unknown_and_corrupt_configuration (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_state_distinguishes_empty_unknown_and_corrupt_configuration) ... ok
+test_state_exposes_fifo_queue_items_and_selected_position (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_state_exposes_fifo_queue_items_and_selected_position) ... ok
+test_target_list_reports_corrupt_configuration_as_safe_error (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_target_list_reports_corrupt_configuration_as_safe_error) ... ok
+test_targetless_multi_target_state_includes_safe_bootstrap_summaries (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_targetless_multi_target_state_includes_safe_bootstrap_summaries) ... ok
+test_unknown_target_and_invalid_mode_are_input_errors_not_queue_errors (test_seo_employee_agent_output.SeoEmployeeAgentOutputTest.test_unknown_target_and_invalid_mode_are_input_errors_not_queue_errors) ... ok
+test_default_cap_and_performance_sample_are_bounded (test_seo_employee_profiles.AuditPlanTests.test_default_cap_and_performance_sample_are_bounded) ... ok
+test_every_profile_builds_a_bounded_full_audit_plan (test_seo_employee_profiles.AuditPlanTests.test_every_profile_builds_a_bounded_full_audit_plan) ... ok
+test_invalid_profile_mode_and_page_values_are_rejected (test_seo_employee_profiles.AuditPlanTests.test_invalid_profile_mode_and_page_values_are_rejected) ... ok
+test_pilot_cap_cannot_be_bypassed (test_seo_employee_profiles.AuditPlanTests.test_pilot_cap_cannot_be_bypassed) ... ok
+test_supported_modes_have_exact_single_and_multi_page_deadlines (test_seo_employee_profiles.AuditPlanTests.test_supported_modes_have_exact_single_and_multi_page_deadlines) ... ok
+test_atomic_write_uses_same_directory_temp_flush_fsync_and_replace (test_seo_employee_queue.SeoEmployeeQueueTest.test_atomic_write_uses_same_directory_temp_flush_fsync_and_replace) ... ok
+test_claim_allows_only_one_running_item (test_seo_employee_queue.SeoEmployeeQueueTest.test_claim_allows_only_one_running_item) ... ok
+test_completion_requires_matching_running_queue_id (test_seo_employee_queue.SeoEmployeeQueueTest.test_completion_requires_matching_running_queue_id) ... ok
+test_concurrent_enqueue_is_serialized_by_process_local_mutex (test_seo_employee_queue.SeoEmployeeQueueTest.test_concurrent_enqueue_is_serialized_by_process_local_mutex) ... ok
+test_empty_queue_handle_validates_without_writing (test_seo_employee_queue.SeoEmployeeQueueTest.test_empty_queue_handle_validates_without_writing) ... ok
+test_failed_operation_preserves_other_items (test_seo_employee_queue.SeoEmployeeQueueTest.test_failed_operation_preserves_other_items) ... ok
+test_fifo_order_is_preserved_across_targets (test_seo_employee_queue.SeoEmployeeQueueTest.test_fifo_order_is_preserved_across_targets) ... ok
+test_interrupted_running_item_is_requeued_once_and_attempts_increment (test_seo_employee_queue.SeoEmployeeQueueTest.test_interrupted_running_item_is_requeued_once_and_attempts_increment) ... ok
+test_malformed_json_is_rejected_before_any_write (test_seo_employee_queue.SeoEmployeeQueueTest.test_malformed_json_is_rejected_before_any_write) ... ok
+test_path_traversal_is_rejected (test_seo_employee_queue.SeoEmployeeQueueTest.test_path_traversal_is_rejected) ... ok
+test_persisted_readback_has_only_public_queue_fields_and_no_temp_files (test_seo_employee_queue.SeoEmployeeQueueTest.test_persisted_readback_has_only_public_queue_fields_and_no_temp_files) ... ok
+test_same_target_and_trigger_deduplicate_only_while_active (test_seo_employee_queue.SeoEmployeeQueueTest.test_same_target_and_trigger_deduplicate_only_while_active) ... ok
+test_second_interrupted_recovery_fails_with_safe_reason (test_seo_employee_queue.SeoEmployeeQueueTest.test_second_interrupted_recovery_fails_with_safe_reason) ... ok
+test_terminal_history_is_bounded_when_new_work_is_enqueued (test_seo_employee_queue.SeoEmployeeQueueTest.test_terminal_history_is_bounded_when_new_work_is_enqueued) ... ok
+test_two_live_handles_preserve_running_item_and_never_duplicate_claim (test_seo_employee_queue.SeoEmployeeQueueTest.test_two_live_handles_preserve_running_item_and_never_duplicate_claim) ... ok
+test_unknown_fields_duplicate_ids_secret_fields_and_invalid_values_are_rejected (test_seo_employee_queue.SeoEmployeeQueueTest.test_unknown_fields_duplicate_ids_secret_fields_and_invalid_values_are_rejected) ... ok
+test_checked_in_catalog_is_sorted_complete_and_covers_all_profiles (test_seo_employee_rules.RuleCatalogTests.test_checked_in_catalog_is_sorted_complete_and_covers_all_profiles) ... ok
+test_crawlseo_twin_types_resolve_to_canonical_keys (test_seo_employee_rules.RuleCatalogTests.test_crawlseo_twin_types_resolve_to_canonical_keys) ... ok
+test_exporter_is_byte_repeatable_and_records_registry_provenance (test_seo_employee_rules.RuleCatalogTests.test_exporter_is_byte_repeatable_and_records_registry_provenance) ... ok
+test_known_coverage_rule_is_canonical_and_supported_by_its_observed_source (test_seo_employee_rules.RuleCatalogTests.test_known_coverage_rule_is_canonical_and_supported_by_its_observed_source) ... ok
+test_legacy_meta_description_mapping_remains_canonical_and_rule_specific (test_seo_employee_rules.RuleCatalogTests.test_legacy_meta_description_mapping_remains_canonical_and_rule_specific) ... ok
+test_loader_rejects_corroboration_source_absent_from_mapping (test_seo_employee_rules.RuleCatalogTests.test_loader_rejects_corroboration_source_absent_from_mapping) ... ok
+test_loader_rejects_duplicate_source_mapping (test_seo_employee_rules.RuleCatalogTests.test_loader_rejects_duplicate_source_mapping) ... ok
+test_loader_rejects_unknown_severity (test_seo_employee_rules.RuleCatalogTests.test_loader_rejects_unknown_severity) ... ok
+test_psi_metric_rules_are_canonical_and_supported_only (test_seo_employee_rules.RuleCatalogTests.test_psi_metric_rules_are_canonical_and_supported_only) ... ok
+test_psi_validity_twins_resolve_to_canonical_keys (test_seo_employee_rules.RuleCatalogTests.test_psi_validity_twins_resolve_to_canonical_keys) ... ok
+test_rule_definition_normalizes_mutable_public_inputs (test_seo_employee_rules.RuleCatalogTests.test_rule_definition_normalizes_mutable_public_inputs) ... ok
+test_unknown_rule_has_no_canonical_definition (test_seo_employee_rules.RuleCatalogTests.test_unknown_rule_has_no_canonical_definition) ... ok
+test_aggregate_coverage_breaks_down_pages_per_source (test_seo_employee_service.SeoEmployeeContractTest.test_aggregate_coverage_breaks_down_pages_per_source) ... ok
+test_baseline_preserves_full_fixed_cards_and_legacy_minimal_cards (test_seo_employee_service.SeoEmployeeContractTest.test_baseline_preserves_full_fixed_cards_and_legacy_minimal_cards) ... ok
+test_configure_returns_the_new_empty_state_envelope (test_seo_employee_service.SeoEmployeeContractTest.test_configure_returns_the_new_empty_state_envelope) ... ok
+test_ct_sc_001_validates_manual_command_run_id_and_public_url (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_001_validates_manual_command_run_id_and_public_url) ... ok
+test_ct_sc_002_validates_schedule_and_deduplicates_daily_start (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_002_validates_schedule_and_deduplicates_daily_start) ... ok
+test_ct_sc_003_recovers_sigkill_lock_for_a_new_single_replica_instance (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_003_recovers_sigkill_lock_for_a_new_single_replica_instance) ... ok
+test_ct_sc_003_returns_existing_active_run_and_keeps_its_lock (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_003_returns_existing_active_run_and_keeps_its_lock) ... ok
+test_ct_sc_003_serializes_stale_lock_recovery_within_single_replica (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_003_serializes_stale_lock_recovery_within_single_replica) ... ok
+test_ct_sc_004_calls_local_wrappers_with_argument_arrays_and_tracks_sources (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_004_calls_local_wrappers_with_argument_arrays_and_tracks_sources) ... ok
+test_ct_sc_004_rejects_source_outputs_that_exceed_one_page (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_004_rejects_source_outputs_that_exceed_one_page) ... ok
+test_ct_sc_005_normalizes_all_known_occurrences_merges_and_keeps_evidence (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_005_normalizes_all_known_occurrences_merges_and_keeps_evidence) ... ok
+test_ct_sc_006_keeps_one_verified_fact_and_rejects_invented_metrics (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_006_keeps_one_verified_fact_and_rejects_invented_metrics) ... ok
+test_ct_sc_007_stably_sorts_caps_ten_and_excludes_unverified (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_007_stably_sorts_caps_ten_and_excludes_unverified) ... ok
+test_ct_sc_008_compares_baseline_and_preserves_it_on_incomplete_runs (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_008_compares_baseline_and_preserves_it_on_incomplete_runs) ... ok
+test_ct_sc_009_all_states_and_empty_reader_satisfy_state_contract (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_009_all_states_and_empty_reader_satisfy_state_contract) ... ok
+test_ct_sc_010_ready_partial_failed_and_model_partial_are_terminal (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_010_ready_partial_failed_and_model_partial_are_terminal) ... ok
+test_ct_sc_011_writes_atomically_and_refuses_secret_fields (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_011_writes_atomically_and_refuses_secret_fields) ... ok
+test_ct_sc_012_has_no_external_write_and_state_reads_report (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_012_has_no_external_write_and_state_reads_report) ... ok
+test_ct_sc_013_enforces_allowlist_and_sanitizes_model_url (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_013_enforces_allowlist_and_sanitizes_model_url) ... ok
+test_ct_sc_014_is_provider_neutral_and_preflight_is_fixed (test_seo_employee_service.SeoEmployeeContractTest.test_ct_sc_014_is_provider_neutral_and_preflight_is_fixed) ... ok
+test_enrichment_fallback_preserved_after_exhausted_retries (test_seo_employee_service.SeoEmployeeContractTest.test_enrichment_fallback_preserved_after_exhausted_retries) ... ok
+test_enrichment_retries_twice_before_fallback (test_seo_employee_service.SeoEmployeeContractTest.test_enrichment_retries_twice_before_fallback) ... ok
+test_http_semantics_keep_partial_successful_and_duplicate_accepted (test_seo_employee_service.SeoEmployeeContractTest.test_http_semantics_keep_partial_successful_and_duplicate_accepted) ... ok
+test_mixed_fail_and_warn_keeps_catalog_severity (test_seo_employee_service.SeoEmployeeContractTest.test_mixed_fail_and_warn_keeps_catalog_severity) ... ok
+test_model_input_accepts_only_the_documented_downgrade (test_seo_employee_service.SeoEmployeeContractTest.test_model_input_accepts_only_the_documented_downgrade) ... ok
+test_partial_source_finding_is_supported_not_verified (test_seo_employee_service.SeoEmployeeContractTest.test_partial_source_finding_is_supported_not_verified) ... ok
+test_prioritize_breaks_ties_by_profile_category_priority (test_seo_employee_service.SeoEmployeeContractTest.test_prioritize_breaks_ties_by_profile_category_priority) ... ok
+test_psi_lane_contributes_findings_when_worker_answers (test_seo_employee_service.SeoEmployeeContractTest.test_psi_lane_contributes_findings_when_worker_answers) ... ok
+test_runtime_baseline_is_scoped_to_the_configured_site (test_seo_employee_service.SeoEmployeeContractTest.test_runtime_baseline_is_scoped_to_the_configured_site) ... ok
+test_state_exposes_exact_next_run_and_validated_bindings (test_seo_employee_service.SeoEmployeeContractTest.test_state_exposes_exact_next_run_and_validated_bindings) ... ok
+test_timeout_path_finishes_without_pending_source_work (test_seo_employee_service.SeoEmployeeContractTest.test_timeout_path_finishes_without_pending_source_work) ... ok
+test_url_identity_strips_default_ports_only (test_seo_employee_service.SeoEmployeeContractTest.test_url_identity_strips_default_ports_only) ... ok
+test_warn_only_finding_is_downgraded_one_step (test_seo_employee_service.SeoEmployeeContractTest.test_warn_only_finding_is_downgraded_one_step) ... ok
+test_exhausted_budget_skips_optional_workers_without_losing_required_results (test_seo_employee_service_v2.ProbeServiceTests.test_exhausted_budget_skips_optional_workers_without_losing_required_results) ... ok
+test_optional_workers_have_bounded_plans_and_fail_without_downgrading_report (test_seo_employee_service_v2.ProbeServiceTests.test_optional_workers_have_bounded_plans_and_fail_without_downgrading_report) ... ok
+test_action_proposal_requires_successful_nonempty_model_minimal_fix (test_seo_employee_service_v2.ServiceV2Tests.test_action_proposal_requires_successful_nonempty_model_minimal_fix) ... ok
+test_all_profiles_run_with_exact_worker_plan_keys_and_ten_task_cap (test_seo_employee_service_v2.ServiceV2Tests.test_all_profiles_run_with_exact_worker_plan_keys_and_ten_task_cap) ... ok
+test_complete_from_evidence_selects_target_then_rejects_cross_site_without_mutation (test_seo_employee_service_v2.ServiceV2Tests.test_complete_from_evidence_selects_target_then_rejects_cross_site_without_mutation) ... ok
+test_evidence_path_uses_full_v2_shape_and_proposals (test_seo_employee_service_v2.ServiceV2Tests.test_evidence_path_uses_full_v2_shape_and_proposals) ... ok
+test_invalid_required_source_is_partial_then_two_invalid_sources_fail (test_seo_employee_service_v2.ServiceV2Tests.test_invalid_required_source_is_partial_then_two_invalid_sources_fail) ... ok
+test_known_rules_use_catalog_corroboration_and_unknown_rules_are_coverage_only (test_seo_employee_service_v2.ServiceV2Tests.test_known_rules_use_catalog_corroboration_and_unknown_rules_are_coverage_only) ... ok
+test_load_migrates_v1_with_russian_global_defaults (test_seo_employee_service_v2.ServiceV2Tests.test_load_migrates_v1_with_russian_global_defaults) ... ok
+test_mixed_model_result_stays_unavailable_with_counts (test_seo_employee_service_v2.ServiceV2Tests.test_mixed_model_result_stays_unavailable_with_counts) ... ok
+test_model_boundary_rejects_dynamic_facts_over_limit_controls_and_secrets (test_seo_employee_service_v2.ServiceV2Tests.test_model_boundary_rejects_dynamic_facts_over_limit_controls_and_secrets) ... ok
+test_model_boundary_rejects_secret_key_value_forms_without_rejecting_ordinary_prose (test_seo_employee_service_v2.ServiceV2Tests.test_model_boundary_rejects_secret_key_value_forms_without_rejecting_ordinary_prose) ... ok
+test_model_boundary_rejects_unsafe_original_controls_but_collapses_ordinary_whitespace (test_seo_employee_service_v2.ServiceV2Tests.test_model_boundary_rejects_unsafe_original_controls_but_collapses_ordinary_whitespace) ... ok
+test_multi_target_upsert_preserves_target_name_and_other_target (test_seo_employee_service_v2.ServiceV2Tests.test_multi_target_upsert_preserves_target_name_and_other_target) ... ok
+test_non_ok_source_statuses_have_fixed_safe_messages_and_coverage (test_seo_employee_service_v2.ServiceV2Tests.test_non_ok_source_statuses_have_fixed_safe_messages_and_coverage) ... ok
+test_optional_not_configured_and_model_failure_do_not_downgrade_ready (test_seo_employee_service_v2.ServiceV2Tests.test_optional_not_configured_and_model_failure_do_not_downgrade_ready) ... ok
+test_ownership_rejects_before_runner_or_target_file_mutation (test_seo_employee_service_v2.ServiceV2Tests.test_ownership_rejects_before_runner_or_target_file_mutation) ... ok
+test_partial_does_not_fix_or_update_baseline_and_incompatible_plan_is_not_compared (test_seo_employee_service_v2.ServiceV2Tests.test_partial_does_not_fix_or_update_baseline_and_incompatible_plan_is_not_compared) ... ok
+test_plan_limits_and_exact_private_wrapper_protocol (test_seo_employee_service_v2.ServiceV2Tests.test_plan_limits_and_exact_private_wrapper_protocol) ... ok
+test_report_persistence_failure_leaves_terminal_failed_state (test_seo_employee_service_v2.ServiceV2Tests.test_report_persistence_failure_leaves_terminal_failed_state) ... ok
+test_search_performance_mode_uses_structured_crawlseo_result (test_seo_employee_service_v2.ServiceV2Tests.test_search_performance_mode_uses_structured_crawlseo_result) ... ok
+test_service_has_no_duplicate_top_level_definitions_or_stale_proposal_fallback (test_seo_employee_service_v2.ServiceV2Tests.test_service_has_no_duplicate_top_level_definitions_or_stale_proposal_fallback) ... ok
+test_target_storage_isolated_and_search_performance_is_not_configured (test_seo_employee_service_v2.ServiceV2Tests.test_target_storage_isolated_and_search_performance_is_not_configured) ... ok
+test_v2_command_and_public_state_select_one_target (test_seo_employee_service_v2.ServiceV2Tests.test_v2_command_and_public_state_select_one_target) ... ok
+test_all_probes_preserve_unavailable_without_findings (test_seo_employee_sources.ProbeAdapterTests.test_all_probes_preserve_unavailable_without_findings) ... ok
+test_common_crawl_is_historical_evidence_and_never_live_coverage (test_seo_employee_sources.ProbeAdapterTests.test_common_crawl_is_historical_evidence_and_never_live_coverage) ... ok
+test_nu_counts_map_to_one_rule_and_warnings_are_preserved (test_seo_employee_sources.ProbeAdapterTests.test_nu_counts_map_to_one_rule_and_warnings_are_preserved) ... ok
+test_security_rejects_malformed_and_over_cap_payloads (test_seo_employee_sources.ProbeAdapterTests.test_security_rejects_malformed_and_over_cap_payloads) ... ok
+test_security_thresholds_and_pending_are_honest (test_seo_employee_sources.ProbeAdapterTests.test_security_thresholds_and_pending_are_honest) ... ok
+test_blocking_conditions_have_distinct_machine_reasons (test_seo_employee_sources.SourceAdaptersTest.test_blocking_conditions_have_distinct_machine_reasons) ... ok
+test_crawlseo_e2e_corpus_types_are_all_mapped (test_seo_employee_sources.SourceAdaptersTest.test_crawlseo_e2e_corpus_types_are_all_mapped) ... ok
+test_crawlseo_exposes_bounded_structured_search_performance (test_seo_employee_sources.SourceAdaptersTest.test_crawlseo_exposes_bounded_structured_search_performance) ... ok
+test_crawlseo_issue_severity_maps_to_occurrence_status (test_seo_employee_sources.SourceAdaptersTest.test_crawlseo_issue_severity_maps_to_occurrence_status) ... ok
+test_crawlseo_rejects_unbounded_search_performance (test_seo_employee_sources.SourceAdaptersTest.test_crawlseo_rejects_unbounded_search_performance) ... ok
+test_crawlseo_success_reports_actual_coverage_and_known_occurrence (test_seo_employee_sources.SourceAdaptersTest.test_crawlseo_success_reports_actual_coverage_and_known_occurrence) ... ok
+test_declared_not_configured_and_unsupported_statuses_remain_distinct (test_seo_employee_sources.SourceAdaptersTest.test_declared_not_configured_and_unsupported_statuses_remain_distinct) ... ok
+test_declared_transport_failure_preserves_the_fixed_reason (test_seo_employee_sources.SourceAdaptersTest.test_declared_transport_failure_preserves_the_fixed_reason) ... ok
+test_incomplete_coverage_is_explicit_not_a_missing_finding (test_seo_employee_sources.SourceAdaptersTest.test_incomplete_coverage_is_explicit_not_a_missing_finding) ... ok
+test_invalid_payload_fails_with_fixed_reason (test_seo_employee_sources.SourceAdaptersTest.test_invalid_payload_fails_with_fixed_reason) ... ok
+test_malformed_source_elements_fail_instead_of_looking_clean (test_seo_employee_sources.SourceAdaptersTest.test_malformed_source_elements_fail_instead_of_looking_clean) ... ok
+test_non_string_machine_fields_are_failed_not_type_errors (test_seo_employee_sources.SourceAdaptersTest.test_non_string_machine_fields_are_failed_not_type_errors) ... ok
+test_psi_clean_corpus_emits_no_occurrences (test_seo_employee_sources.SourceAdaptersTest.test_psi_clean_corpus_emits_no_occurrences) ... ok
+test_psi_declared_unavailable_passes_through (test_seo_employee_sources.SourceAdaptersTest.test_psi_declared_unavailable_passes_through) ... ok
+test_psi_degraded_sections_surface_as_coverage_notes (test_seo_employee_sources.SourceAdaptersTest.test_psi_degraded_sections_surface_as_coverage_notes) ... ok
+test_psi_field_p75_can_fail_when_lab_passes (test_seo_employee_sources.SourceAdaptersTest.test_psi_field_p75_can_fail_when_lab_passes) ... ok
+test_psi_rejects_malformed_status_blocks (test_seo_employee_sources.SourceAdaptersTest.test_psi_rejects_malformed_status_blocks) ... ok
+test_psi_rejects_over_cap_foreign_and_unprobed_urls (test_seo_employee_sources.SourceAdaptersTest.test_psi_rejects_over_cap_foreign_and_unprobed_urls) ... ok
+test_psi_robots_parser_flags_orphan_rule_and_bad_line (test_seo_employee_sources.SourceAdaptersTest.test_psi_robots_parser_flags_orphan_rule_and_bad_line) ... ok
+test_psi_schema_parser_flags_broken_jsonld_only (test_seo_employee_sources.SourceAdaptersTest.test_psi_schema_parser_flags_broken_jsonld_only) ... ok
+test_psi_sitemap_parser_flags_malformed_and_doctype (test_seo_employee_sources.SourceAdaptersTest.test_psi_sitemap_parser_flags_malformed_and_doctype) ... ok
+test_psi_skips_unfetched_sitefiles (test_seo_employee_sources.SourceAdaptersTest.test_psi_skips_unfetched_sitefiles) ... ok
+test_psi_thresholds_emit_graded_occurrences (test_seo_employee_sources.SourceAdaptersTest.test_psi_thresholds_emit_graded_occurrences) ... ok
+test_required_source_helpers_do_not_count_optional_or_failed_sources (test_seo_employee_sources.SourceAdaptersTest.test_required_source_helpers_do_not_count_optional_or_failed_sources) ... ok
+test_robots_rule_id_does_not_override_a_successful_source_status (test_seo_employee_sources.SourceAdaptersTest.test_robots_rule_id_does_not_override_a_successful_source_status) ... ok
+test_seomator_bounds_upstream_message_to_500_characters (test_seo_employee_sources.SourceAdaptersTest.test_seomator_bounds_upstream_message_to_500_characters) ... ok
+test_seomator_coverage_uses_one_executed_sample_not_five_requested_samples (test_seo_employee_sources.SourceAdaptersTest.test_seomator_coverage_uses_one_executed_sample_not_five_requested_samples) ... ok
+test_seomator_known_coverage_rule_emits_a_supported_occurrence (test_seo_employee_sources.SourceAdaptersTest.test_seomator_known_coverage_rule_emits_a_supported_occurrence) ... ok
+test_seomator_normalizes_only_safe_upstream_message (test_seo_employee_sources.SourceAdaptersTest.test_seomator_normalizes_only_safe_upstream_message) ... ok
+test_seomator_real_rule_result_uses_details_page_url_and_actual_sample_coverage (test_seo_employee_sources.SourceAdaptersTest.test_seomator_real_rule_result_uses_details_page_url_and_actual_sample_coverage) ... ok
+test_seomator_rejects_empty_control_or_secret_like_message (test_seo_employee_sources.SourceAdaptersTest.test_seomator_rejects_empty_control_or_secret_like_message) ... ok
+test_seomator_unknown_rule_is_counted_not_emitted_as_task (test_seo_employee_sources.SourceAdaptersTest.test_seomator_unknown_rule_is_counted_not_emitted_as_task) ... ok
+test_seomator_warn_is_ingested_with_warn_status (test_seo_employee_sources.SourceAdaptersTest.test_seomator_warn_is_ingested_with_warn_status) ... ok
+test_seomator_warn_with_unusable_rule_fails_the_source (test_seo_employee_sources.SourceAdaptersTest.test_seomator_warn_with_unusable_rule_fails_the_source) ... ok
+test_file_migration_creates_backup_only_after_validated_v2_and_is_idempotent (test_seo_employee_targets.TargetConfigTests.test_file_migration_creates_backup_only_after_validated_v2_and_is_idempotent) ... ok
+test_invalid_v1_file_is_unchanged_and_has_no_backup (test_seo_employee_targets.TargetConfigTests.test_invalid_v1_file_is_unchanged_and_has_no_backup) ... ok
+test_language_and_region_accept_only_supported_values (test_seo_employee_targets.TargetConfigTests.test_language_and_region_accept_only_supported_values) ... ok
+test_stale_v1_backup_refuses_to_overwrite_current_source (test_seo_employee_targets.TargetConfigTests.test_stale_v1_backup_refuses_to_overwrite_current_source) ... ok
+test_target_id_survives_same_host_collision_lifecycle (test_seo_employee_targets.TargetConfigTests.test_target_id_survives_same_host_collision_lifecycle) ... ok
+test_target_paths_reject_traversal_and_keep_target_state_isolated (test_seo_employee_targets.TargetConfigTests.test_target_paths_reject_traversal_and_keep_target_state_isolated) ... ok
+test_v1_migrates_to_one_service_b2b_target_with_stable_id (test_seo_employee_targets.TargetConfigTests.test_v1_migrates_to_one_service_b2b_target_with_stable_id) ... ok
+test_v2_migration_is_idempotent (test_seo_employee_targets.TargetConfigTests.test_v2_migration_is_idempotent) ... ok
+test_v2_validation_rejects_invalid_profile_language_region_and_missing_consent (test_seo_employee_targets.TargetConfigTests.test_v2_validation_rejects_invalid_profile_language_region_and_missing_consent) ... ok
+
+----------------------------------------------------------------------
+Ran 279 tests in 14.094s
+
+OK

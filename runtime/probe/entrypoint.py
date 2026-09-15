@@ -639,6 +639,7 @@ class _ChildEntry:
         self.process = process
         self.kind = kind
         self.pending_reap = False
+        self.slot_owned = True
 
 
 class _ProbeSupervisor:
@@ -647,8 +648,18 @@ class _ProbeSupervisor:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._children: dict[int, _ChildEntry] = {}
+        self._slots = threading.BoundedSemaphore(MAX_CHILDREN)
         self._shutdown_requested = threading.Event()
         self._shutdown = False
+
+    def _remove_locked(self, entry: _ChildEntry) -> bool:
+        if self._children.get(entry.process.pid) is not entry:
+            return False
+        del self._children[entry.process.pid]
+        if entry.slot_owned:
+            entry.slot_owned = False
+            self._slots.release()
+        return True
 
     def _reap_exited_locked(self) -> None:
         for pid, entry in list(self._children.items()):
@@ -658,13 +669,12 @@ class _ProbeSupervisor:
                 entry.process.wait(timeout=0)
             except subprocess.TimeoutExpired:
                 continue
-            if self._children.get(pid) is entry:
-                del self._children[pid]
+            self._remove_locked(entry)
 
     def spawn(self, kind: str) -> _ChildEntry | None:
         with self._lock:
             self._reap_exited_locked()
-            if self._shutdown or self._shutdown_requested.is_set() or len(self._children) >= MAX_CHILDREN:
+            if self._shutdown or self._shutdown_requested.is_set() or not self._slots.acquire(blocking=False):
                 return None
             try:
                 process = subprocess.Popen(
@@ -677,6 +687,7 @@ class _ProbeSupervisor:
                     close_fds=True,
                 )
             except (OSError, ValueError):
+                self._slots.release()
                 return None
             entry = _ChildEntry(process, kind)
             self._children[process.pid] = entry
@@ -684,8 +695,7 @@ class _ProbeSupervisor:
 
     def _remove(self, entry: _ChildEntry) -> None:
         with self._lock:
-            if self._children.get(entry.process.pid) is entry:
-                del self._children[entry.process.pid]
+            self._remove_locked(entry)
 
     def _mark_pending(self, entry: _ChildEntry) -> None:
         with self._lock:

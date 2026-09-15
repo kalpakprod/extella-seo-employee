@@ -1,9 +1,9 @@
-"""P2 integration: source collection reaches the real probe HTTP handlers.
+"""P2 integration: collection reaches isolated probe children and an honest report.
 
-The three provider-facing calls are patched at the probe boundary.  The service,
-subprocess source proxy, loopback HTTP transport, probe handlers, adapters, and
-report builder remain real so this covers the user-visible collection path without
-calling paid or public providers during CI.
+The service, source proxy subprocesses, loopback HTTP transport, probe supervisors and
+children, adapters, and report builder remain real. A temporary child-only sitecustomize
+redirects the fixed public provider URLs to a local fixture, so CI never calls paid or
+public providers while preserving the production process boundary.
 """
 
 from __future__ import annotations

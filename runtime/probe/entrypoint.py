@@ -304,6 +304,13 @@ def _remaining(deadline: float) -> float:
     return remaining
 
 
+def _ipc_remaining(deadline: float) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("probe child deadline exceeded")
+    return remaining
+
+
 def _check_site_host(site_url: str, deadline: float | None = None) -> tuple[str, set[str]]:
     parsed = urllib.parse.urlsplit(site_url)
     if (parsed.scheme not in {"http", "https"} or not parsed.hostname
@@ -826,10 +833,11 @@ def _exchange_child(entry: _ChildEntry, request: bytes, deadline: float) -> byte
     stdout_closed = False
     try:
         while not stdout_closed or process.poll() is None:
-            remaining = _remaining(deadline)
+            remaining = _ipc_remaining(deadline)
             events = selector.select(remaining)
             if not events:
-                raise TimeoutError("probe child deadline exceeded")
+                _ipc_remaining(deadline)
+                continue
             for key, mask in events:
                 if key.data == "stdin" and mask & selectors.EVENT_WRITE:
                     if offset < len(request):
@@ -856,7 +864,7 @@ def _exchange_child(entry: _ChildEntry, request: bytes, deadline: float) -> byte
                         output.extend(chunk)
                         if len(output) > CHILD_IPC_BYTES:
                             raise ValueError("probe child stdout exceeds cap")
-            _remaining(deadline)
+            _ipc_remaining(deadline)
         return bytes(output)
     finally:
         selector.close()

@@ -7,6 +7,7 @@ import gzip
 import socket
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -216,6 +217,30 @@ class CcProbeTest(unittest.TestCase):
 
 
 class ProbeHonestyTests(unittest.TestCase):
+    def test_supervisor_ipc_wait_does_not_inherit_network_wait_cap(self):
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "import sys,time; sys.stdin.buffer.read(); time.sleep(.12); sys.stdout.buffer.write(b'{}'); sys.stdout.buffer.flush()",
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            close_fds=True,
+        )
+        entry = WORKER._ChildEntry(process, "nu")
+        try:
+            with mock.patch.object(WORKER, "CALL_TIMEOUT_SECONDS", 0.05):
+                raw = WORKER._exchange_child(entry, b"{}", WORKER.time.monotonic() + 0.3)
+            self.assertEqual(raw, b"{}")
+            self.assertEqual(process.wait(timeout=1), 0)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=1)
+
     def test_site_fetch_pins_the_validated_public_address(self):
         response = mock.MagicMock()
         response.status = 200

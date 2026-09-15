@@ -1,0 +1,222 @@
+{
+  "checked_at": "2026-09-15T03:18:58.299131+00:00",
+  "site_url": "https://books.toscrape.com/",
+  "timeout_ms": 20000,
+  "transport": "Compose worker HTTP /run",
+  "results": [
+    {
+      "source": "NuHTML",
+      "elapsed_seconds": 11.972,
+      "status": "ok",
+      "reason": null,
+      "coverage": {
+        "planned_pages": 25,
+        "crawled_pages": 1,
+        "sampled_pages": 0,
+        "categories": [
+          "core",
+          "technical",
+          "content",
+          "eeat",
+          "schema",
+          "perf",
+          "links",
+          "images",
+          "security",
+          "social",
+          "a11y",
+          "i18n",
+          "crawl",
+          "url",
+          "mobile",
+          "legal",
+          "redirect",
+          "geo",
+          "htmlval",
+          "js"
+        ],
+        "completed_sources": [
+          "NuHTML"
+        ],
+        "unavailable_sources": [],
+        "unmapped_rules": [],
+        "notes": []
+      },
+      "findings": [
+        {
+          "rule": "nu-html-errors",
+          "status": "fail",
+          "fact": "W3C Nu validator reports 1 error(s) and 9 warning(s) on the homepage"
+        }
+      ],
+      "payload": {
+        "schema": "extella.nu_source.v1",
+        "source": "NuHTML",
+        "site_url": "https://books.toscrape.com/",
+        "probed_urls": [
+          "https://books.toscrape.com/"
+        ],
+        "fetch": {
+          "http_status": 200,
+          "truncated": false,
+          "bytes": 51294
+        },
+        "errors": 1,
+        "warnings": 9,
+        "exemplars": [
+          {
+            "kind": "warning",
+            "line": 647,
+            "message": "Section lacks heading. Consider using “h2”-“h6” elements to add identifying headings to all sections, or else use a “div” element instead for any cases where no heading is needed."
+          },
+          {
+            "kind": "warning",
+            "line": 2208,
+            "message": "The “type” attribute is unnecessary for JavaScript resources."
+          },
+          {
+            "kind": "warning",
+            "line": 2210,
+            "message": "The “charset” attribute on the “script” element is obsolete."
+          }
+        ]
+      }
+    },
+    {
+      "source": "SecurityProbe",
+      "elapsed_seconds": 4.441,
+      "status": "ok",
+      "reason": null,
+      "coverage": {
+        "planned_pages": 25,
+        "crawled_pages": 0,
+        "sampled_pages": 1,
+        "categories": [
+          "core",
+          "technical",
+          "content",
+          "eeat",
+          "schema",
+          "perf",
+          "links",
+          "images",
+          "security",
+          "social",
+          "a11y",
+          "i18n",
+          "crawl",
+          "url",
+          "mobile",
+          "legal",
+          "redirect",
+          "geo",
+          "htmlval",
+          "js"
+        ],
+        "completed_sources": [
+          "SecurityProbe"
+        ],
+        "unavailable_sources": [],
+        "unmapped_rules": [],
+        "notes": [
+          "security headers sampled on one page; SSL Labs is a single cached assessment read"
+        ]
+      },
+      "findings": [
+        {
+          "rule": "probe-hsts",
+          "status": "fail",
+          "fact": "Homepage HSTS is missing, invalid, or has max-age below 31536000 seconds"
+        },
+        {
+          "rule": "probe-csp",
+          "status": "fail",
+          "fact": "Homepage response has no Content-Security-Policy header"
+        }
+      ],
+      "payload": {
+        "schema": "extella.tls_source.v1",
+        "source": "SecurityProbe",
+        "site_url": "https://books.toscrape.com/",
+        "probed_urls": [
+          "https://books.toscrape.com/"
+        ],
+        "fetch": {
+          "http_status": 200
+        },
+        "headers": {
+          "hsts": true,
+          "hsts_max_age": 0,
+          "csp": false,
+          "x_content_type_options": false,
+          "referrer_policy": false,
+          "frame_guard": false
+        },
+        "ssl_labs": {
+          "status": "ready",
+          "detail": null,
+          "grade": "A-"
+        }
+      }
+    },
+    {
+      "source": "CommonCrawl",
+      "elapsed_seconds": 15.798,
+      "status": "ok",
+      "reason": null,
+      "coverage": {
+        "planned_pages": 25,
+        "crawled_pages": 0,
+        "sampled_pages": 0,
+        "categories": [
+          "core",
+          "technical",
+          "content",
+          "eeat",
+          "schema",
+          "perf",
+          "links",
+          "images",
+          "security",
+          "social",
+          "a11y",
+          "i18n",
+          "crawl",
+          "url",
+          "mobile",
+          "legal",
+          "redirect",
+          "geo",
+          "htmlval",
+          "js"
+        ],
+        "completed_sources": [
+          "CommonCrawl"
+        ],
+        "unavailable_sources": [],
+        "unmapped_rules": [],
+        "notes": [
+          "common_crawl historical excerpt only; no live pages crawled"
+        ]
+      },
+      "findings": [],
+      "payload": {
+        "schema": "extella.cc_source.v1",
+        "source": "CommonCrawl",
+        "site_url": "https://books.toscrape.com/",
+        "probed_urls": [
+          "https://books.toscrape.com/"
+        ],
+        "index": "CC-MAIN-2026-34",
+        "record": {
+          "url": "https://books.toscrape.com/",
+          "filename": "crawl-data/CC-MAIN-2026-34/segments/1786091385428.43/warc/CC-MAIN-20260811132950-20260811162950-00857.warc.gz",
+          "offset": 122089894,
+          "length": 5600,
+          "status": "200"
+        },
+        "excerpt": "All products | Books to Scrape - Sandbox Books to Scrape We love being scraped! Home All products Books Travel Mystery Historical Fiction Sequential Art Classics Philosophy Romance Womens Fiction Fiction Childrens Religion Nonfiction Music Default Science Fiction Sports and Games Add a comment Fantasy New Adult Young Adult Science Poetry Paranormal Art Psychology Autobiography Parenting Adult Fiction Humor Horror History Food and Drink Christian Fiction Business Biography Thriller Contemporary S"
+      }
+    }
+  ]
+}

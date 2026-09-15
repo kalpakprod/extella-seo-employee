@@ -113,6 +113,117 @@ const SOURCE_TWINS = new Map([
   ['schema-valid', ['PSI', 'SCHEMA_INVALID']],
 ]);
 
+const PROBE_STATIC_RULES = [
+  {
+    "rule_key": "nu-html-errors",
+    "category": "htmlval",
+    "severity": "warning",
+    "source_name": "W3C Nu HTML validation",
+    "source_description": "W3C Nu reports HTML errors or warnings on the sampled homepage.",
+    "source_severity": "warn/fail",
+    "severity_policy": "p2-probe-threshold-v1",
+    "confirmed_fact": null,
+    "remediation": null,
+    "actionable": false,
+    "profiles": [
+      "service_b2b",
+      "ecommerce",
+      "local_business",
+      "content_media",
+      "saas_marketplace"
+    ],
+    "source_rules": {
+      "NuHTML": "NU_ERRORS"
+    },
+    "corroboration": {
+      "verified": []
+    },
+    "verification": null,
+    "version": "2.1.0"
+  },
+  {
+    "rule_key": "probe-csp",
+    "category": "security",
+    "severity": "warning",
+    "source_name": "Content Security Policy",
+    "source_description": "The sampled homepage response has no Content-Security-Policy header.",
+    "source_severity": "warn/fail",
+    "severity_policy": "p2-probe-threshold-v1",
+    "confirmed_fact": null,
+    "remediation": null,
+    "actionable": false,
+    "profiles": [
+      "service_b2b",
+      "ecommerce",
+      "local_business",
+      "content_media",
+      "saas_marketplace"
+    ],
+    "source_rules": {
+      "SecurityProbe": "TLS_CSP"
+    },
+    "corroboration": {
+      "verified": []
+    },
+    "verification": null,
+    "version": "2.1.0"
+  },
+  {
+    "rule_key": "probe-hsts",
+    "category": "security",
+    "severity": "warning",
+    "source_name": "HTTP Strict Transport Security",
+    "source_description": "HTTPS homepage HSTS is absent, invalid, or has max-age below one year.",
+    "source_severity": "warn/fail",
+    "severity_policy": "p2-probe-threshold-v1",
+    "confirmed_fact": null,
+    "remediation": null,
+    "actionable": false,
+    "profiles": [
+      "service_b2b",
+      "ecommerce",
+      "local_business",
+      "content_media",
+      "saas_marketplace"
+    ],
+    "source_rules": {
+      "SecurityProbe": "TLS_HSTS"
+    },
+    "corroboration": {
+      "verified": []
+    },
+    "verification": null,
+    "version": "2.1.0"
+  },
+  {
+    "rule_key": "probe-tls-grade",
+    "category": "security",
+    "severity": "warning",
+    "source_name": "Cached TLS assessment",
+    "source_description": "SSL Labs cached grade C is a warning; D, E, F, T or M is a failure.",
+    "source_severity": "warn/fail",
+    "severity_policy": "p2-probe-threshold-v1",
+    "confirmed_fact": null,
+    "remediation": null,
+    "actionable": false,
+    "profiles": [
+      "service_b2b",
+      "ecommerce",
+      "local_business",
+      "content_media",
+      "saas_marketplace"
+    ],
+    "source_rules": {
+      "SecurityProbe": "TLS_GRADE"
+    },
+    "corroboration": {
+      "verified": []
+    },
+    "verification": null,
+    "version": "2.1.0"
+  }
+];
+
 const PSI_STATIC_RULES = [
   {
     rule_key: 'psi-cls',
@@ -198,7 +309,7 @@ const revision = upstreamRevision();
 const documented = documentedRules();
 const statusById = new Map(documented.map((rule) => [rule.id, rule.severity]));
 const exported = registryRules();
-const rules = [...exported.map((rule) => catalogEntry(rule, statusById)), ...PSI_STATIC_RULES].sort((left, right) => left.rule_key.localeCompare(right.rule_key));
+const rules = [...exported.map((rule) => catalogEntry(rule, statusById)), ...PSI_STATIC_RULES, ...PROBE_STATIC_RULES].sort((left, right) => left.rule_key.localeCompare(right.rule_key));
 const output = {
   schema: 'extella.seo_employee_rule_catalog.v2',
   catalog_version: '2.1.0',

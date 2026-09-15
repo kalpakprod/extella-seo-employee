@@ -28,6 +28,9 @@ services:
       EXTELLA_DNS_RESOLVER_URL: http://dns-resolver:8083/resolve
       EXTELLA_SEOMATOR_URL: http://seomator:8082/run
       EXTELLA_PSI_URL: http://psi:8084/run
+      EXTELLA_NU_URL: http://nu:8085/run
+      EXTELLA_TLS_URL: http://tls:8086/run
+      EXTELLA_CC_URL: http://cc:8087/run
       EXTELLA_SEO_API_TOKEN_FILE: /run/secrets/seo_employee_api_token
       EXTELLA_DEVICE_BINDING_FILE: /run/bindings/device_binding.json
       EXTELLA_AGENT_BINDING_FILE: /run/bindings/agent_binding.json
@@ -44,7 +47,7 @@ services:
       - seo_reports:/opt/extella-seo-employee/reports
       - seo_history:/opt/extella-seo-employee/history
       - seo_evidence:/opt/extella-seo-employee/evidence
-    networks: [control, crawlseo_control, resolver_control, seomator_control, psi_control]
+    networks: [control, crawlseo_control, resolver_control, seomator_control, psi_control, probe_control]
     depends_on:
       crawlseo:
         condition: service_healthy
@@ -277,7 +280,81 @@ services:
       timeout: 5s
       retries: 12
 
+  nu:
+    image: extella-seo-probe:2.1.0
+    build:
+      context: ..
+      dockerfile: runtime/probe/Dockerfile
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: "0.25"
+    mem_limit: 128m
+    pids_limit: 32
+    logging: *container_logging
+    environment:
+      PROBE_KIND: nu
+      PORT: 8085
+    networks: [probe_control, nu_egress]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8085/health', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  tls:
+    image: extella-seo-probe:2.1.0
+    build:
+      context: ..
+      dockerfile: runtime/probe/Dockerfile
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: "0.25"
+    mem_limit: 128m
+    pids_limit: 32
+    logging: *container_logging
+    environment:
+      PROBE_KIND: tls
+      PORT: 8086
+    networks: [probe_control, tls_egress]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8086/health', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  cc:
+    image: extella-seo-probe:2.1.0
+    build:
+      context: ..
+      dockerfile: runtime/probe/Dockerfile
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: "0.25"
+    mem_limit: 128m
+    pids_limit: 32
+    logging: *container_logging
+    environment:
+      PROBE_KIND: cc
+      PORT: 8087
+    networks: [probe_control, cc_egress]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8087/health', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 networks:
+  probe_control:
+    internal: true
+  nu_egress: {}
+  tls_egress: {}
+  cc_egress: {}
   control:
     internal: true
   crawlseo_control:

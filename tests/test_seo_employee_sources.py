@@ -13,6 +13,9 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "experts"))
 from seo_employee_sources import (
     CrawlSEOAdapter,
     PSIAdapter,
+    NuHTMLAdapter,
+    SecurityProbeAdapter,
+    CommonCrawlAdapter,
     SEOmatorAdapter,
     missing_sources,
     required_sources_satisfied,
@@ -480,6 +483,102 @@ class SourceAdaptersTest(unittest.TestCase):
         seo = SEOmatorAdapter().parse({"error": {"code": "timeout"}}, PLAN)
         self.assertFalse(required_sources_satisfied(PLAN, (crawl, seo)))
         self.assertEqual(missing_sources(PLAN, (crawl, seo)), ("SEOmator",))
+
+
+class ProbeAdapterTests(unittest.TestCase):
+    def tls_payload(self, grade="F"):
+        return {
+            "schema": "extella.tls_source.v1", "source": "SecurityProbe",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "fetch": {"http_status": 200},
+            "headers": {"hsts": True, "hsts_max_age": 0, "csp": False,
+                        "x_content_type_options": False, "referrer_policy": False, "frame_guard": False},
+            "ssl_labs": {"status": "ready", "detail": None, "grade": grade},
+        }
+
+    def test_security_thresholds_and_pending_are_honest(self):
+        adapter = SecurityProbeAdapter()
+        payload = self.tls_payload()
+        result = adapter.parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual({o.source_rule for o in result.occurrences}, {"TLS_HSTS", "TLS_CSP", "TLS_GRADE"})
+        self.assertEqual(result.coverage.unmapped_rules, ())
+        self.assertEqual((result.coverage.crawled_pages, result.coverage.sampled_pages), (0, 1))
+        self.assertTrue(all(o.severity == "warning" for o in result.occurrences))
+        payload["headers"].update(hsts_max_age=31536000, csp=True)
+        payload["ssl_labs"]["grade"] = "A"
+        self.assertEqual(adapter.parse(payload, PLAN).occurrences, ())
+        payload["ssl_labs"]["grade"] = "C"
+        self.assertEqual(adapter.parse(payload, PLAN).occurrences[0].status, "warn")
+        payload["ssl_labs"] = {"status": "pending", "detail": "in_progress", "grade": None}
+        result = adapter.parse(payload, PLAN)
+        self.assertEqual(result.occurrences, ())
+        self.assertTrue(any("ssl_labs unavailable" in note for note in result.coverage.notes))
+
+    def test_security_rejects_malformed_and_over_cap_payloads(self):
+        for mutate in (
+            lambda p: p.update(probed_urls=["https://example.com/", "https://example.com/a"]),
+            lambda p: p["headers"].update(hsts_max_age=True),
+            lambda p: p["headers"].update(csp="yes"),
+            lambda p: p["ssl_labs"].update(grade="Z"),
+            lambda p: p["ssl_labs"].update(status="pending"),
+            lambda p: p.update(fetch={"http_status": 403}),
+        ):
+            payload = self.tls_payload()
+            mutate(payload)
+            self.assertEqual(SecurityProbeAdapter().parse(payload, PLAN).status, "failed")
+
+    def test_nu_counts_map_to_one_rule_and_warnings_are_preserved(self):
+        payload = {
+            "schema": "extella.nu_source.v1", "source": "NuHTML",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "fetch": {"http_status": 200, "truncated": False, "bytes": 100},
+            "errors": 2, "warnings": 3, "exemplars": [],
+        }
+        result = NuHTMLAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.occurrences[0].source_rule, "NU_ERRORS")
+        self.assertEqual(result.occurrences[0].status, "fail")
+        self.assertEqual(result.coverage.unmapped_rules, ())
+        payload["errors"] = 0
+        self.assertEqual(NuHTMLAdapter().parse(payload, PLAN).occurrences[0].status, "warn")
+        payload["warnings"] = 0
+        self.assertEqual(NuHTMLAdapter().parse(payload, PLAN).occurrences, ())
+        payload["exemplars"] = [{"kind": "error", "line": 1, "message": "x" * 201}]
+        self.assertEqual(NuHTMLAdapter().parse(payload, PLAN).status, "failed")
+
+    def test_common_crawl_is_historical_evidence_and_never_live_coverage(self):
+        payload = {
+            "schema": "extella.cc_source.v1", "source": "CommonCrawl",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "index": "CC-MAIN-2026-33", "excerpt": "An archived page title",
+            "record": {"url": "https://example.com/", "filename": "crawl-data/a.warc.gz",
+                       "offset": 10, "length": 1000, "status": "200"},
+        }
+        result = CommonCrawlAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.coverage.crawled_pages, 0)
+        self.assertEqual(result.occurrences, ())
+        for mutate in (
+            lambda p: p.update(excerpt="x" * 501),
+            lambda p: p["record"].update(url="https://other.example/"),
+            lambda p: p["record"].update(filename="crawl-data/../secret.warc.gz"),
+            lambda p: p["record"].update(length=True),
+            lambda p: p.update(excerpt="token=secret"),
+        ):
+            bad = deepcopy(payload)
+            mutate(bad)
+            self.assertEqual(CommonCrawlAdapter().parse(bad, PLAN).status, "failed")
+        payload.update(record=None, excerpt="")
+        self.assertTrue(any("no archived record" in n for n in CommonCrawlAdapter().parse(payload, PLAN).coverage.notes))
+
+    def test_all_probes_preserve_unavailable_without_findings(self):
+        for adapter in (NuHTMLAdapter(), SecurityProbeAdapter(), CommonCrawlAdapter()):
+            result = adapter.parse({"status": "unavailable", "reason": "timeout"}, PLAN)
+            self.assertEqual(result.status, "unavailable")
+            self.assertEqual(result.reason, "timeout")
+            self.assertEqual(result.occurrences, ())
+            self.assertEqual(result.coverage.unavailable_sources, (adapter.name,))
 
 
 if __name__ == "__main__":

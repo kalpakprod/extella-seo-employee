@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -725,7 +726,7 @@ class ContainerRuntimeTest(unittest.TestCase):
         compose = (ROOT / "deploy" / "compose.yaml").read_text(encoding="utf-8")
         product = compose.split("\n  api-gateway:", 1)[0]
         self.assertNotIn("\n    ports:", product)
-        self.assertIn("networks: [control, crawlseo_control, resolver_control, seomator_control, psi_control]", product)
+        self.assertIn("networks: [control, crawlseo_control, resolver_control, seomator_control, psi_control, probe_control]", product)
         self.assertIn("EXTELLA_DNS_RESOLVER_URL: http://dns-resolver:8083/resolve", product)
         self.assertIn("dns-resolver:\n        condition: service_healthy", product)
         self.assertIn("- ./bindings:/run/bindings:ro", product)
@@ -885,6 +886,47 @@ class ContainerRuntimeTest(unittest.TestCase):
         for field in ("target_id", "target_name", "profile", "max_pages", "ownership_confirmed"):
             self.assertIn(f'"{field}"', source)
         self.assertNotIn('{"site_url": args.site_url}', source)
+
+
+class ProbeContainerTests(unittest.TestCase):
+    def test_proxy_posts_single_page_probe_plan_and_preserves_unavailable(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = b'{"status":"unavailable","reason":"http_429"}'
+        with tempfile.TemporaryDirectory() as directory:
+            plan = Path(directory) / "plan.json"
+            plan.write_text('{"timeout_ms":20000}')
+            output = Path(directory) / "result.json"
+            for source in PROXY.PROBE_SOURCES:
+                with mock.patch.object(PROXY.urllib.request, "urlopen", return_value=response) as opener:
+                    PROXY.proxy_source(source, "https://example.com/", plan, output)
+                posted = json.loads(opener.call_args.args[0].data)
+                self.assertEqual(posted, {"site_url": "https://example.com/", "plan": {"timeout_ms": 20000}})
+                self.assertEqual(json.loads(output.read_text()), {"status": "unavailable", "reason": "http_429"})
+                self.assertEqual(list(Path(directory).glob("*.tmp")), [])
+            for bad in ({"timeout_ms": True}, {"timeout_ms": 0}, {"timeout_ms": 20000, "max_urls": 2}):
+                plan.write_text(json.dumps(bad))
+                with mock.patch.object(PROXY.urllib.request, "urlopen") as opener:
+                    with self.assertRaises(ValueError):
+                        PROXY.proxy_source("NuHTML", "https://example.com/", plan, output)
+                opener.assert_not_called()
+
+    def test_compose_probes_have_no_product_startup_dependency_and_no_host_ports(self):
+        compose = (ROOT / "deploy/compose.yaml").read_text()
+        product = compose.split("\n  seo-employee:\n")[1].split("\n  api-gateway:\n")[0]
+        dependencies = product.split("    depends_on:\n")[1].split("    healthcheck:\n")[0]
+        for kind, port in (("nu", 8085), ("tls", 8086), ("cc", 8087)):
+            block = re.split(r"\n(?:  [a-z]|networks:)", compose.split(f"\n  {kind}:\n")[1], maxsplit=1)[0]
+            self.assertNotIn(f"      {kind}:", dependencies)
+            self.assertIn(f"PROBE_KIND: {kind}", block)
+            self.assertIn(f"PORT: {port}", block)
+            self.assertIn("read_only: true", block)
+            self.assertIn("cap_drop: [ALL]", block)
+            self.assertIn("mem_limit: 128m", block)
+            self.assertNotIn("ports:", block)
+            self.assertNotIn("secrets:", block)
+            self.assertIn(f"networks: [probe_control, {kind}_egress]", block)
+        self.assertIn("probe_control:\n    internal: true", compose)
 
 
 if __name__ == "__main__":

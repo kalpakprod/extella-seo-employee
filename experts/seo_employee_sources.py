@@ -798,6 +798,228 @@ class PSIAdapter:
         )
 
 
+_NU_SOURCE_RULE = "NU_ERRORS"
+_TLS_HSTS_RULE = "TLS_HSTS"
+_TLS_CSP_RULE = "TLS_CSP"
+_TLS_GRADE_RULE = "TLS_GRADE"
+_TLS_FAIL_GRADES = frozenset({"D", "E", "F", "T", "M"})
+_TLS_WARN_GRADES = frozenset({"C"})
+_TLS_GRADES = ("A+", "A", "A-", "B", "C", "D", "E", "F", "T", "M")
+_HSTS_MIN_MAX_AGE = 31_536_000
+_NU_FETCH_BYTES = 262_144
+
+
+class NuHTMLAdapter:
+    name = "NuHTML"
+    capabilities = ("htmlval", "technical")
+
+    def __init__(self, _catalog: object | None = None) -> None:
+        self._catalog = _catalog
+
+    def validate(self, payload: Mapping[str, object], plan: AuditPlan) -> None:
+        if payload.get("schema") != "extella.nu_source.v1" or payload.get("source") != self.name:
+            raise SourceAdapterError("invalid_payload")
+        site_url = payload.get("site_url")
+        if not _safe_audit_url(site_url) or payload.get("probed_urls") != [site_url]:
+            raise SourceAdapterError("invalid_payload")
+        fetch = payload.get("fetch")
+        if (
+            not isinstance(fetch, Mapping)
+            or set(fetch) != {"http_status", "truncated", "bytes"}
+            or isinstance(fetch.get("http_status"), bool)
+            or not isinstance(fetch.get("http_status"), int)
+            or fetch["http_status"] != 200
+            or not isinstance(fetch.get("truncated"), bool)
+            or not isinstance(fetch.get("bytes"), int)
+            or isinstance(fetch.get("bytes"), bool)
+            or not 0 <= int(fetch["bytes"]) <= _NU_FETCH_BYTES
+            or fetch.get("truncated") is not False
+        ):
+            raise SourceAdapterError("invalid_payload")
+        for key in ("errors", "warnings"):
+            value = payload.get(key)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise SourceAdapterError("invalid_payload")
+        exemplars = payload.get("exemplars")
+        if not isinstance(exemplars, list) or len(exemplars) > 3:
+            raise SourceAdapterError("invalid_payload")
+        for exemplar in exemplars:
+            if (
+                not isinstance(exemplar, Mapping)
+                or set(exemplar) != {"kind", "line", "message"}
+                or exemplar.get("kind") not in {"error", "warning"}
+                or (
+                    exemplar.get("line") is not None
+                    and (not isinstance(exemplar.get("line"), int) or isinstance(exemplar.get("line"), bool))
+                )
+                or not isinstance(exemplar.get("message"), str)
+                or len(str(exemplar["message"])) > 200
+            ):
+                raise SourceAdapterError("invalid_payload")
+
+    def parse(self, payload: Mapping[str, object], plan: AuditPlan) -> SourceResult:
+        try:
+            declared_status = _declared_status(payload)
+        except SourceAdapterError as error:
+            return _result(self.name, plan, "failed", error.code)
+        if declared_status is not None:
+            return _result(self.name, plan, declared_status[0], declared_status[1])
+        blocking_reason = _blocking_reason(payload)
+        if blocking_reason is not None:
+            return _result(self.name, plan, "unavailable", blocking_reason)
+        try:
+            self.validate(payload, plan)
+        except SourceAdapterError as error:
+            return _result(self.name, plan, "failed", error.code)
+        site_url = str(payload["site_url"])
+        errors = int(payload["errors"])
+        warnings = int(payload["warnings"])
+        occurrences: list[SourceOccurrence] = []
+        unmapped: list[str] = []
+        status = "fail" if errors else ("warn" if warnings else None)
+        if status is not None:
+            known = _known_rule(self.name, _NU_SOURCE_RULE)
+            if known is None:
+                unmapped.append(_NU_SOURCE_RULE)
+            else:
+                occurrences.append(
+                    SourceOccurrence(
+                        source=self.name,
+                        source_rule=_NU_SOURCE_RULE,
+                        rule_key=known[0],
+                        severity=known[1],
+                        url=site_url,
+                        fact=f"W3C Nu validator reports {errors} error(s) and {warnings} warning(s) on the homepage",
+                        status=status,
+                    )
+                )
+        notes: list[str] = []
+        fetch = payload["fetch"]
+        assert isinstance(fetch, Mapping)
+        if fetch.get("truncated"):
+            notes.append(f"nu fetch truncated: validated the first {_NU_FETCH_BYTES} bytes")
+        return SourceResult(
+            source=self.name,
+            status="ok",
+            coverage=_coverage(self.name, plan, crawled_pages=1, notes=notes, unmapped_rules=unmapped),
+            occurrences=tuple(occurrences),
+        )
+
+
+class _SinglePageProbeAdapter:
+    schema: str
+    name: str
+
+    def validate(self, payload: Mapping[str, object], plan: AuditPlan) -> None:
+        if (payload.get("schema") != self.schema or payload.get("source") != self.name
+                or not _safe_audit_url(payload.get("site_url"))
+                or payload.get("probed_urls") != [payload.get("site_url")]):
+            raise SourceAdapterError("invalid_payload")
+
+    def parse(self, payload: Mapping[str, object], plan: AuditPlan) -> SourceResult:
+        try:
+            declared = _declared_status(payload)
+            if declared is not None:
+                return _result(self.name, plan, declared[0], declared[1])
+            blocking = _blocking_reason(payload)
+            if blocking is not None:
+                return _result(self.name, plan, "unavailable", blocking)
+            self.validate(payload, plan)
+            return self._validated_result(payload, plan)
+        except (SourceAdapterError, ValueError, TypeError, KeyError):
+            return _result(self.name, plan, "failed", "invalid_payload")
+
+
+class SecurityProbeAdapter(_SinglePageProbeAdapter):
+    name = "SecurityProbe"
+    schema = "extella.tls_source.v1"
+    capabilities = ("security",)
+
+    def validate(self, payload: Mapping[str, object], plan: AuditPlan) -> None:
+        super().validate(payload, plan)
+        headers = payload.get("headers")
+        labs = payload.get("ssl_labs")
+        if (payload.get("fetch") != {"http_status": 200}
+                or not isinstance(headers, Mapping)
+                or set(headers) != {"hsts", "hsts_max_age", "csp", "x_content_type_options", "referrer_policy", "frame_guard"}
+                or any(not isinstance(headers[key], bool) for key in headers if key != "hsts_max_age")
+                or not isinstance(labs, Mapping)
+                or set(labs) != {"status", "detail", "grade"}
+                or labs.get("status") not in {"ready", "pending", "unavailable"}
+                or (labs.get("detail") is not None and (not isinstance(labs["detail"], str) or len(labs["detail"]) > 80))
+                or (labs.get("grade") is not None and labs.get("grade") not in _TLS_GRADES)
+                or (labs.get("status") != "ready" and labs.get("grade") is not None)):
+            raise SourceAdapterError("invalid_payload")
+        age = headers["hsts_max_age"]
+        if age is not None and (isinstance(age, bool) or not isinstance(age, int) or age < 0):
+            raise SourceAdapterError("invalid_payload")
+        if not headers["hsts"] and age is not None:
+            raise SourceAdapterError("invalid_payload")
+
+    def _validated_result(self, payload: Mapping[str, object], plan: AuditPlan) -> SourceResult:
+        headers, labs = payload["headers"], payload["ssl_labs"]
+        url = str(payload["site_url"])
+        checks: list[tuple[str, str, str]] = []
+        notes = ["security headers sampled on one page; SSL Labs is a single cached assessment read"]
+        age = headers["hsts_max_age"]
+        if urllib.parse.urlsplit(url).scheme == "https" and (not headers["hsts"] or age is None or age < _HSTS_MIN_MAX_AGE):
+            checks.append((_TLS_HSTS_RULE, "fail", "Homepage HSTS is missing, invalid, or has max-age below 31536000 seconds"))
+        if not headers["csp"]:
+            checks.append((_TLS_CSP_RULE, "fail", "Homepage response has no Content-Security-Policy header"))
+        grade = labs["grade"]
+        if grade in _TLS_FAIL_GRADES | _TLS_WARN_GRADES:
+            checks.append((_TLS_GRADE_RULE, "fail" if grade in _TLS_FAIL_GRADES else "warn", f"SSL Labs cached TLS grade is {grade}"))
+        if labs["status"] != "ready" or grade is None:
+            notes.append("ssl_labs unavailable: no completed cached TLS grade; no polling performed")
+        occurrences, unmapped = [], []
+        for rule, status, fact in checks:
+            known = _known_rule(self.name, rule)
+            if known is None:
+                unmapped.append(rule)
+            else:
+                occurrences.append(SourceOccurrence(self.name, rule, known[0], known[1], url, fact, status))
+        return SourceResult(self.name, "ok", _coverage(self.name, plan, sampled_pages=1, notes=notes, unmapped_rules=unmapped), tuple(occurrences))
+
+
+class CommonCrawlAdapter(_SinglePageProbeAdapter):
+    name = "CommonCrawl"
+    schema = "extella.cc_source.v1"
+    capabilities = ("content",)
+
+    def validate(self, payload: Mapping[str, object], plan: AuditPlan) -> None:
+        super().validate(payload, plan)
+        if (not isinstance(payload.get("index"), str)
+                or not re.fullmatch(r"CC-MAIN-[0-9]{4}-[0-9]{2}", payload["index"])
+                or not isinstance(payload.get("excerpt"), str) or len(payload["excerpt"]) > 500):
+            raise SourceAdapterError("invalid_payload")
+        record = payload.get("record")
+        if record is None:
+            if payload["excerpt"]:
+                raise SourceAdapterError("invalid_payload")
+            return
+        if (not isinstance(record, Mapping)
+                or set(record) != {"url", "filename", "offset", "length", "status"}
+                or not _safe_audit_url(record.get("url"))
+                or urllib.parse.urlsplit(record["url"]).hostname != urllib.parse.urlsplit(str(payload["site_url"])).hostname
+                or not isinstance(record.get("filename"), str)
+                or not re.fullmatch(r"crawl-data/[a-zA-Z0-9_./-]+\.warc\.gz", record["filename"])
+                or ".." in record["filename"].split("/")
+                or any(isinstance(record.get(k), bool) or not isinstance(record.get(k), int) for k in ("offset", "length"))
+                or record["offset"] < 0 or record["length"] <= 0 or record.get("status") != "200"):
+            raise SourceAdapterError("invalid_payload")
+        if payload["excerpt"]:
+            _normalize_source_fact(payload["excerpt"])
+
+    def _validated_result(self, payload: Mapping[str, object], plan: AuditPlan) -> SourceResult:
+        # Historical text is evidence only, never a current-site defect or a model instruction.
+        notes = ["common_crawl historical excerpt only; no live pages crawled"]
+        if payload["record"] is None:
+            notes.append("common_crawl no archived record found in the selected index")
+        elif not payload["excerpt"]:
+            notes.append("common_crawl excerpt unavailable within the archive byte cap")
+        return SourceResult(self.name, "ok", _coverage(self.name, plan, notes=notes))
+
+
 def required_sources_satisfied(plan: AuditPlan, results: Sequence[SourceResult]) -> bool:
     statuses = {result.source: result.status for result in results}
     return all(statuses.get(source) == "ok" for source in plan.required_sources)

@@ -1,0 +1,1 @@
+- Before documenting coverage from another worker's harness, inspect its executable paths and assertions; attribute only behavior the harness actually runs.

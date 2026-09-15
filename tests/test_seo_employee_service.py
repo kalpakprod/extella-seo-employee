@@ -182,6 +182,8 @@ def _source_runner(
     def run(args: list[str], **kwargs: object) -> SimpleNamespace:
         calls.append(args)
         executable, _url, _plan, output = args
+        if executable.endswith(("run_nu", "run_tls", "run_cc")):
+            return SimpleNamespace(returncode=1)
         if executable.endswith("run_psi"):
             if psi is None or "PSI" in failures:
                 return SimpleNamespace(returncode=1)
@@ -220,7 +222,7 @@ class SeoEmployeeContractTest(unittest.TestCase):
             self.assertEqual(first["state"], "ready")
             self.assertTrue(second["duplicate"])
             self.assertEqual(second["run_id"], first["run_id"])
-            self.assertEqual(len(calls), 3)
+            self.assertEqual(len(calls), 6)
             self.assertEqual(list(paths["lock_dir"].glob("*.lock")), [])
 
             state = SERVICE.make_state("ready", checked_at="2026-08-29T18:00:00Z", config=SERVICE.load_configuration(paths["config_path"]))
@@ -340,14 +342,15 @@ class SeoEmployeeContractTest(unittest.TestCase):
                 evidence_dir=Path(directory),
                 runner=runner,
             )
-            self.assertEqual([item["status"] for item in statuses], ["ok", "ok", "ok", "not_configured", "not_configured"])
-            self.assertEqual(set(payloads), {"CrawlSEO", "SEOmator", "PSI"})
+            self.assertEqual([item["status"] for item in statuses], ["ok", "ok", "ok", "unavailable", "unavailable", "unavailable", "not_configured", "not_configured"])
+            self.assertEqual(set(payloads), {"CrawlSEO", "SEOmator", "PSI", "NuHTML", "SecurityProbe", "CommonCrawl"})
             self.assertEqual(
                 [call[0][0] for call in calls],
                 [
                     str(SERVICE.CRAWLSEO_EXECUTABLE),
                     str(SERVICE.SEOMATOR_EXECUTABLE),
                     str(SERVICE.PSI_EXECUTABLE),
+                    *(str(path) for path in SERVICE.PROBE_EXECUTABLES.values()),
                 ],
             )
             self.assertTrue(all(len(call[0]) == 4 for call in calls))
@@ -621,7 +624,7 @@ class SeoEmployeeContractTest(unittest.TestCase):
 
             paths["process_runner"] = runner
             result = SERVICE.run_seo_employee(site_url="", **paths)
-            self.assertEqual(observed, ["running", "running", "running"])
+            self.assertEqual(observed, ["running"] * 6)
             self.assertEqual(
                 json.loads(paths["state_path"].read_text(encoding="utf-8"))["state"],
                 "ready",
@@ -684,7 +687,7 @@ class SeoEmployeeContractTest(unittest.TestCase):
             paths["process_runner"] = timeout_runner
             result = SERVICE.run_seo_employee(site_url="", **paths)
             self.assertEqual(result["state"], "failed")
-            self.assertEqual(len(calls), 3)
+            self.assertEqual(len(calls), 6)
             self.assertEqual(list(paths["lock_dir"].glob("*.lock")), [])
 
     def test_http_semantics_keep_partial_successful_and_duplicate_accepted(self) -> None:
@@ -724,9 +727,9 @@ class SeoEmployeeContractTest(unittest.TestCase):
                 paths["enricher"] = enricher
                 result = SERVICE.run_seo_employee(site_url="", **paths)
                 self.assertEqual(result["state"], expected)
-                self.assertEqual(len(calls), 3)
+                self.assertEqual(len(calls), 6)
                 report = result["report"]
-                self.assertEqual(report["missing_data"], missing)
+                self.assertEqual(report["missing_data"], missing + ["NuHTML", "SecurityProbe", "CommonCrawl", "GoogleSearchConsole", "DataForSEO"])
                 if expected == "failed":
                     self.assertEqual(report["error"]["code"], "SEO_SOURCES_UNAVAILABLE")
                     self.assertNotIn("route down", json.dumps(result))
@@ -804,7 +807,7 @@ class SeoEmployeeContractTest(unittest.TestCase):
             paths["enricher"] = _enrich
             result = SERVICE.run_seo_employee(site_url="", **paths)
             self.assertEqual(result["state"], "ready")
-            self.assertEqual(len(calls), 3)
+            self.assertEqual(len(calls), 6)
             self.assertNotIn("PSI", result["report"]["missing_data"])
             rules = {task["rule_key"] for task in result["report"]["tasks"]}
             self.assertIn("psi-lcp", rules)

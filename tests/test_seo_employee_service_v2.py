@@ -65,7 +65,7 @@ def plan_payload(max_pages: int, source: str) -> dict[str, object]:
 def runner(calls: list[list[str]], *, fail: set[str] = set()):
     def run(argv: list[str], **_kwargs: object) -> SimpleNamespace:
         calls.append(argv)
-        if argv[0].endswith("run_psi"):
+        if argv[0].endswith(("run_psi", "run_nu", "run_tls", "run_cc")):
             return SimpleNamespace(returncode=1)
         plan = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
         source = "CrawlSEO" if argv[0].endswith("run_crawlseo") else "SEOmator"
@@ -134,14 +134,14 @@ class ServiceV2Tests(unittest.TestCase):
                     site_url="", target_id=target_id, config_path=config_path, process_runner=runner(calls), resolver=public_resolver, now_provider=now,
                 )
                 self.assertEqual(result["state"], "ready")
-                self.assertEqual(len(calls), 3)
+                self.assertEqual(len(calls), 6)
                 for argv in calls:
                     self.assertEqual(len(argv), 4)
                     self.assertEqual(argv[1], "https://example.com/")
                     self.assertFalse(Path(argv[2]).exists())
                     self.assertEqual(
                         Path(argv[3]).name,
-                        "crawlseo.json" if argv[0].endswith("run_crawlseo") else "psi.json" if argv[0].endswith("run_psi") else "seomator.json",
+                        Path(argv[0]).name.removeprefix("run_") + ".json",
                     )
                 self.assertEqual(result["report"]["plan"]["max_pages"], max_pages)
                 self.assertEqual(result["report"]["plan"]["source_timeout_seconds"] * 1000, timeout)
@@ -152,7 +152,7 @@ class ServiceV2Tests(unittest.TestCase):
         seo = plan_payload(1, "SEOmator")
         crawl["issues"].append({"type": "UNKNOWN", "url": "https://example.com/", "message": "ignored"})
         findings, coverage = service.normalize_v2_findings("target-example-com-0f115db0", plan, {"CrawlSEO": crawl, "SEOmator": seo})
-        self.assertEqual(len(service.load_rule_catalog()), 254)
+        self.assertEqual(len(service.load_rule_catalog()), 258)
         self.assertTrue(all(service.canonical_rule(source, source_rule) is definition for definition in service.load_rule_catalog().values() for source, source_rule in definition.source_rules.items()))
         levels = {item["rule_key"]: item["evidence_level"] for item in findings}
         self.assertEqual(levels["meta-description-missing"], "verified")
@@ -218,7 +218,7 @@ class ServiceV2Tests(unittest.TestCase):
 
             def invalid_runner(invalid: set[str]):
                 def run(argv: list[str], **_kwargs: object) -> SimpleNamespace:
-                    if argv[0].endswith("run_psi"):
+                    if argv[0].endswith(("run_psi", "run_nu", "run_tls", "run_cc")):
                         return SimpleNamespace(returncode=1)
                     plan = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
                     source = "CrawlSEO" if argv[0].endswith("run_crawlseo") else "SEOmator"
@@ -414,7 +414,7 @@ class ServiceV2Tests(unittest.TestCase):
             worker_plans: list[dict[str, object]] = []
 
             def profile_runner(argv: list[str], **_kwargs: object) -> SimpleNamespace:
-                if argv[0].endswith("run_psi"):
+                if argv[0].endswith(("run_psi", "run_nu", "run_tls", "run_cc")):
                     return SimpleNamespace(returncode=1)
                 plan = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
                 worker_plans.append(plan)
@@ -476,6 +476,74 @@ class ServiceV2Tests(unittest.TestCase):
             self.assertEqual(primary["target_name"], "Primary")
             self.assertEqual(primary["daily_run_time"], "22:00")
             self.assertEqual(retained, secondary)
+
+
+class ProbeServiceTests(unittest.TestCase):
+    def test_optional_workers_have_bounded_plans_and_fail_without_downgrading_report(self):
+        import subprocess
+        plan = service.build_audit_plan("service_b2b", requested_max_pages=25)
+        plans = {}
+        def run(argv, **kwargs):
+            name = Path(argv[0]).name
+            payload = json.loads(Path(argv[2]).read_text())
+            plans[name] = payload
+            if name in {"run_nu", "run_tls", "run_cc"}:
+                self.assertEqual(set(payload), {"timeout_ms"})
+                self.assertLessEqual(payload["timeout_ms"], 20000)
+                self.assertLessEqual(kwargs["timeout"], 20)
+            if name == "run_nu":
+                raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+            if name == "run_cc":
+                result = {"malformed": True}
+            elif name == "run_tls":
+                result = {
+                    "schema": "extella.tls_source.v1", "source": "SecurityProbe",
+                    "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+                    "fetch": {"http_status": 200},
+                    "headers": {"hsts": True, "hsts_max_age": 0, "csp": False,
+                                "x_content_type_options": False, "referrer_policy": False,
+                                "frame_guard": False},
+                }
+                result["ssl_labs"] = {"status": "pending", "detail": "in_progress", "grade": None}
+            elif name == "run_psi":
+                return SimpleNamespace(returncode=1)
+            else:
+                result = plan_payload(25, "CrawlSEO" if name == "run_crawlseo" else "SEOmator")
+            Path(argv[3]).write_text(json.dumps(result))
+            return SimpleNamespace(returncode=0)
+        with tempfile.TemporaryDirectory() as directory:
+            statuses, results = service.collect_sources("https://example.com/", "probe-test", plan=plan, evidence_dir=Path(directory), runner=run)
+            report, _ = service._build_v2_report(
+                target={"target_id": "target-example"}, plan=plan,
+                command={"site_url": "https://example.com/"}, run_id="test",
+                started_at="2026-09-15T00:00:00Z", completed_at="2026-09-15T00:00:01Z",
+                results=results, baseline=None, enricher=lambda _: (_ for _ in ()).throw(RuntimeError("offline")),
+            )
+        self.assertEqual(report["state"], "ready")
+        self.assertIn("NuHTML", report["missing_data"])
+        self.assertIn("CommonCrawl", report["missing_data"])
+        self.assertIn("SecurityProbe.ssl_labs", report["missing_data"])
+        self.assertIn("GoogleSearchConsole", report["missing_data"])
+        self.assertIn("DataForSEO", report["missing_data"])
+        self.assertEqual(results["CommonCrawl"].coverage.unavailable_sources, ("CommonCrawl",))
+        self.assertTrue({"probe-hsts", "probe-csp"}.issubset({t["rule_key"] for t in report["tasks"]}))
+        self.assertEqual(len(plans), 6)
+
+    def test_exhausted_budget_skips_optional_workers_without_losing_required_results(self):
+        class Deadline:
+            count = 0
+            def remaining(self, cap):
+                self.count += 1
+                if self.count > 2:
+                    raise service.SeoEmployeeError("SEO run deadline exceeded")
+                return cap
+        calls = []
+        with tempfile.TemporaryDirectory() as directory:
+            _, results = service.collect_sources("https://example.com/", "test", evidence_dir=Path(directory), runner=runner(calls), deadline=Deadline())
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(service.required_sources_satisfied(service.build_audit_plan("service_b2b"), list(results.values())))
+        for source in ("PSI", "NuHTML", "SecurityProbe", "CommonCrawl"):
+            self.assertEqual((results[source].status, results[source].reason), ("unavailable", "timeout"))
 
 
 if __name__ == "__main__":

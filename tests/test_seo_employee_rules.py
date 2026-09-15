@@ -37,8 +37,8 @@ class RuleCatalogTests(unittest.TestCase):
 
     def test_checked_in_catalog_is_sorted_complete_and_covers_all_profiles(self) -> None:
         catalog = load_rule_catalog()
-        # DQ-4: 251 registry rules + 3 static PSI rules.
-        self.assertEqual(len(catalog), 254)
+        # DQ-4: 251 registry rules + 3 PSI rules + 4 P2 probe rules.
+        self.assertEqual(len(catalog), 258)
         self.assertEqual(tuple(catalog), tuple(sorted(catalog)))
         self.assertEqual({definition.category for definition in catalog.values()}, {
             "a11y", "content", "core", "crawl", "eeat", "geo", "htmlval", "i18n",

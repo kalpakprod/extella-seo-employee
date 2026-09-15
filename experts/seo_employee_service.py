@@ -41,7 +41,7 @@ import sys
 
 sys.modules.setdefault("seo_employee_profiles", _seo_employee_profiles)
 sys.modules.setdefault("seo_employee_rules", _seo_employee_rules)
-from experts.seo_employee_sources import Coverage, CrawlSEOAdapter, PSIAdapter, SEOmatorAdapter, SourceResult, required_sources_satisfied
+from experts.seo_employee_sources import Coverage, CrawlSEOAdapter, PSIAdapter, SEOmatorAdapter, NuHTMLAdapter, SecurityProbeAdapter, CommonCrawlAdapter, SourceAdapter, SourceResult, required_sources_satisfied
 
 
 ROOT_PATH = Path(__file__).resolve().parents[1]
@@ -69,6 +69,12 @@ CRAWLSEO_EXECUTABLE = Path(
 SEOMATOR_EXECUTABLE = Path(
     os.environ.get("EXTELLA_SEOMATOR_EXECUTABLE", str(ROOT_PATH / "runtime" / "container" / "run_seomator"))
 )
+PROBE_EXECUTABLES = {
+    name: Path(os.environ.get(f"EXTELLA_{kind.upper()}_EXECUTABLE", str(ROOT_PATH / "runtime" / "container" / f"run_{kind}")))
+    for name, kind in (("NuHTML", "nu"), ("SecurityProbe", "tls"), ("CommonCrawl", "cc"))
+}
+PROBE_TIMEOUT_SECONDS = 20
+
 PSI_EXECUTABLE = Path(
     os.environ.get("EXTELLA_PSI_EXECUTABLE", str(ROOT_PATH / "runtime" / "container" / "run_psi"))
 )
@@ -938,9 +944,10 @@ def _run_v2_source_wrapper(
     timeout_seconds: float,
     best_effort: bool = False,
 ) -> tuple[dict[str, object], SourceResult]:
-    adapters = {"CrawlSEO": CrawlSEOAdapter(), "SEOmator": SEOmatorAdapter(), "PSI": PSIAdapter()}
+    adapters = {"CrawlSEO": CrawlSEOAdapter(), "SEOmator": SEOmatorAdapter(), "PSI": PSIAdapter(), "NuHTML": NuHTMLAdapter(), "SecurityProbe": SecurityProbeAdapter(), "CommonCrawl": CommonCrawlAdapter()}
     adapter = adapters[source]
-    worker_plan = _worker_psi_plan(plan) if source == "PSI" else _worker_plan(plan)
+    worker_plan = ({"timeout_ms": max(1, int(timeout_seconds * 1000))} if source in PROBE_EXECUTABLES
+                   else _worker_psi_plan(plan) if source == "PSI" else _worker_plan(plan))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plan_path: Path | None = None
     try:
@@ -970,9 +977,12 @@ def _run_v2_source_wrapper(
                 return _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict()), result
             result = SourceResult(source, "failed", adapter.parse({"status": "failed", "reason": "audit_failed"}, plan).coverage, reason="audit_failed")
             return _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict()), result
-        result = _parse_source_payload(source, adapter, _read_json_object(output_path), plan)
+        payload = _read_json_object(output_path)
+        result = _parse_source_payload(source, adapter, payload, plan)
+        if source in PROBE_EXECUTABLES and result.status == "ok" and payload.get("site_url") != site_url:
+            result = _failed_source_result(source, plan)
         if best_effort and result.status == "failed":
-            result = SourceResult(source, "unavailable", result.coverage, result.occurrences, result.reason, result.mode_result)
+            result = SourceResult(source, "unavailable", Coverage(plan.max_pages, 0, 0, tuple(plan.categories), (), (source,), ()), reason=result.reason)
         status = _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict())
         return status, result
     finally:
@@ -1004,13 +1014,23 @@ def collect_sources(
         ("CrawlSEO", crawlseo_executable, "crawlseo.json", False),
         ("SEOmator", seomator_executable, "seomator.json", False),
         ("PSI", psi_executable, "psi.json", True),
+        *((name, executable, f"{kind}.json", True) for (name, executable), kind in zip(PROBE_EXECUTABLES.items(), ("nu", "tls", "cc"))),
     )
     statuses: list[dict[str, object]] = []
     results: dict[str, SourceResult] = {}
     for source, executable, filename, best_effort in definitions:
+        try:
+            timeout = budget.remaining(PROBE_TIMEOUT_SECONDS if source in PROBE_EXECUTABLES else selected_plan.source_timeout_seconds)
+        except SeoEmployeeError:
+            if not best_effort:
+                raise
+            result = SourceResult(source, "unavailable", Coverage(selected_plan.max_pages, 0, 0, tuple(selected_plan.categories), (), (source,), ()), reason="timeout")
+            statuses.append(_source_status(source, result.status, timestamp, reason=result.reason, coverage=result.coverage.as_dict()))
+            results[source] = result
+            continue
         status, result = _run_v2_source_wrapper(
             source, executable, site_url, run_dir / filename, selected_plan, runner=runner,
-            obtained_at=timestamp, timeout_seconds=budget.remaining(selected_plan.source_timeout_seconds),
+            obtained_at=timestamp, timeout_seconds=timeout,
             best_effort=best_effort,
         )
         statuses.append(status)
@@ -1053,7 +1073,7 @@ def _failed_source_result(source: str, plan: AuditPlan) -> SourceResult:
 
 def _parse_source_payload(
     source: str,
-    adapter: CrawlSEOAdapter | SEOmatorAdapter,
+    adapter: SourceAdapter,
     payload: Mapping[str, object] | None,
     plan: AuditPlan,
 ) -> SourceResult:
@@ -1393,7 +1413,12 @@ def _build_v2_report(
         "coverage": _aggregate_coverage(plan, results),
         "mode_result": _mode_result(plan, results),
         "model_enrichment": model_status,
-        "missing_data": [item.source for item in results.values() if item.status != "ok"],
+        "missing_data": list(dict.fromkeys(
+            [item.source for item in results.values() if item.status != "ok"]
+            + list(plan.optional_sources)
+            + (["SecurityProbe.ssl_labs"] if any("ssl_labs unavailable" in note for item in results.values() for note in item.coverage.notes) else [])
+            + (["CommonCrawl.excerpt"] if any("common_crawl no archived" in note or "common_crawl excerpt unavailable" in note for item in results.values() for note in item.coverage.notes) else [])
+        )),
         "comparison": comparison,
         "tasks": tasks,
     }

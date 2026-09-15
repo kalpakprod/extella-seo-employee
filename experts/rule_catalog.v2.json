@@ -4380,6 +4380,33 @@
       "version": "2.1.0"
     },
     {
+      "rule_key": "nu-html-errors",
+      "category": "htmlval",
+      "severity": "warning",
+      "source_name": "W3C Nu HTML validation",
+      "source_description": "W3C Nu reports HTML errors or warnings on the sampled homepage.",
+      "source_severity": "warn/fail",
+      "severity_policy": "p2-probe-threshold-v1",
+      "confirmed_fact": null,
+      "remediation": null,
+      "actionable": false,
+      "profiles": [
+        "service_b2b",
+        "ecommerce",
+        "local_business",
+        "content_media",
+        "saas_marketplace"
+      ],
+      "source_rules": {
+        "NuHTML": "NU_ERRORS"
+      },
+      "corroboration": {
+        "verified": []
+      },
+      "verification": null,
+      "version": "2.1.0"
+    },
+    {
       "rule_key": "perf-brotli",
       "category": "perf",
       "severity": "warning",
@@ -4831,6 +4858,87 @@
       ],
       "source_rules": {
         "SEOmator": "perf-video-for-animations"
+      },
+      "corroboration": {
+        "verified": []
+      },
+      "verification": null,
+      "version": "2.1.0"
+    },
+    {
+      "rule_key": "probe-csp",
+      "category": "security",
+      "severity": "warning",
+      "source_name": "Content Security Policy",
+      "source_description": "The sampled homepage response has no Content-Security-Policy header.",
+      "source_severity": "warn/fail",
+      "severity_policy": "p2-probe-threshold-v1",
+      "confirmed_fact": null,
+      "remediation": null,
+      "actionable": false,
+      "profiles": [
+        "service_b2b",
+        "ecommerce",
+        "local_business",
+        "content_media",
+        "saas_marketplace"
+      ],
+      "source_rules": {
+        "SecurityProbe": "TLS_CSP"
+      },
+      "corroboration": {
+        "verified": []
+      },
+      "verification": null,
+      "version": "2.1.0"
+    },
+    {
+      "rule_key": "probe-hsts",
+      "category": "security",
+      "severity": "warning",
+      "source_name": "HTTP Strict Transport Security",
+      "source_description": "HTTPS homepage HSTS is absent, invalid, or has max-age below one year.",
+      "source_severity": "warn/fail",
+      "severity_policy": "p2-probe-threshold-v1",
+      "confirmed_fact": null,
+      "remediation": null,
+      "actionable": false,
+      "profiles": [
+        "service_b2b",
+        "ecommerce",
+        "local_business",
+        "content_media",
+        "saas_marketplace"
+      ],
+      "source_rules": {
+        "SecurityProbe": "TLS_HSTS"
+      },
+      "corroboration": {
+        "verified": []
+      },
+      "verification": null,
+      "version": "2.1.0"
+    },
+    {
+      "rule_key": "probe-tls-grade",
+      "category": "security",
+      "severity": "warning",
+      "source_name": "Cached TLS assessment",
+      "source_description": "SSL Labs cached grade C is a warning; D, E, F, T or M is a failure.",
+      "source_severity": "warn/fail",
+      "severity_policy": "p2-probe-threshold-v1",
+      "confirmed_fact": null,
+      "remediation": null,
+      "actionable": false,
+      "profiles": [
+        "service_b2b",
+        "ecommerce",
+        "local_business",
+        "content_media",
+        "saas_marketplace"
+      ],
+      "source_rules": {
+        "SecurityProbe": "TLS_GRADE"
       },
       "corroboration": {
         "verified": []

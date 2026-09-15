@@ -12,7 +12,7 @@ COPY --chown=10001:10001 runtime/product/gateway.py ./runtime/product/gateway.py
 COPY --chown=10001:10001 runtime/product/server.py ./runtime/product/server.py
 RUN mkdir -p config state reports history evidence \
     && chown -R 10001:10001 config state reports history evidence \
-    && chmod 0555 runtime/container/run_crawlseo runtime/container/run_seomator runtime/container/run_psi
+    && chmod 0555 runtime/container/run_*
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

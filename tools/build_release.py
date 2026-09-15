@@ -34,6 +34,10 @@ EXECUTABLES = {
     "deploy/probe.py",
     "runtime/container/run_crawlseo",
     "runtime/container/run_seomator",
+    "runtime/container/run_psi",
+    "runtime/container/run_nu",
+    "runtime/container/run_tls",
+    "runtime/container/run_cc",
 }
 LEGACY_RUNTIME = {
     "runtime/run_crawlseo",

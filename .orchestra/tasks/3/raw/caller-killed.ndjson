@@ -1,0 +1,16 @@
+{"label":"fixture_ready","wall_ns":"1789454591959000000","monotonic_ns":"60937525270911","pid":1930936,"port":41297}
+{"label":"caller_killed_child_active","wall_ns":"1789454592719000000","monotonic_ns":"60938285445682","parent":{"pid":1930963,"state":"S","ppid":1929381,"pgrp":1929340,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[{"pid":1931037,"state":"S","ppid":1930963,"pgrp":1931037,"command":"/usr/bin/python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py --probe-child nu"}]}
+{"label":"caller_killed_before_D","wall_ns":"1789454592719000000","monotonic_ns":"60938285695866","caller_pid":1931014,"child_pids":[1931037]}
+{"label":"caller_killed_exit","wall_ns":"1789454592721000000","monotonic_ns":"60938285814837","caller_pid":1931014,"signal":"SIGKILL"}
+{"label":"caller_killed_origin_close","wall_ns":1789454593435603500,"monotonic_ns":60939001427709,"event":"site_client_closed","pid":1930936,"path":"/caller-killed","error":"ConnectionResetError"}
+{"label":"caller_killed_remote_children_reaped","wall_ns":"1789454593770000000","monotonic_ns":"60939336799726","parent":{"pid":1930963,"state":"S","ppid":1929381,"pgrp":1929340,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[]}
+{"label":"caller_killed_remote_children_reaped_process_groups","wall_ns":"1789454593818000000","monotonic_ns":"60939384663083","groups":[1931037],"members":[]}
+{"label":"caller_killed_health","wall_ns":"1789454593820000000","monotonic_ns":"60939386364642","status":200,"headers":{"server":"ExtellaProbe/2.1 Python/3.14.7","date":"Tue, 15 Sep 2026 06:43:13 GMT","content-type":"application/json; charset=utf-8","content-length":"27","cache-control":"no-store"},"body":{"status":"ok","kind":"nu"},"elapsed_ms":1.409826}
+{"event":"fixture_ready","wall_ns":1789454591959220427,"monotonic_ns":60937525044060,"pid":1930936,"port":41297}
+{"event":"site_started","wall_ns":1789454592669614642,"monotonic_ns":60938235438015,"pid":1930936,"path":"/caller-killed","mode":"slow","client_port":52372}
+{"event":"site_body_byte","wall_ns":1789454592669891777,"monotonic_ns":60938235714778,"pid":1930936,"label":"/caller-killed","index":1}
+{"event":"site_body_byte","wall_ns":1789454592690461730,"monotonic_ns":60938256286074,"pid":1930936,"label":"/caller-killed","index":2}
+{"event":"site_body_byte","wall_ns":1789454592992571643,"monotonic_ns":60938558395527,"pid":1930936,"label":"/caller-killed","index":17}
+{"event":"site_body_byte","wall_ns":1789454593314777170,"monotonic_ns":60938880601495,"pid":1930936,"label":"/caller-killed","index":33}
+{"event":"site_client_closed","wall_ns":1789454593435603415,"monotonic_ns":60939001427709,"pid":1930936,"path":"/caller-killed","error":"ConnectionResetError"}
+{"event":"site_closed","wall_ns":1789454593435673916,"monotonic_ns":60939001496597,"pid":1930936,"path":"/caller-killed"}

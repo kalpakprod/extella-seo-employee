@@ -9,18 +9,23 @@ unavailable without turning a required-source-complete report into failure.
 
 | Check | Command | Expected evidence |
 |---|---|---|
-| Unit and integration suite | `python3 -m unittest discover -s tests -p 'test_*.py'` | `test_p2_probe_integration` runs the complete `collect_sources` path through subprocess source proxies and real loopback `/run` HTTP handlers. Its Nu, SSL Labs, and Common Crawl provider responses are deterministic mocks at the outbound boundary. |
+| Unit and integration suite | `python3 -m unittest discover -s tests -p 'test_*.py'` | `test_p2_probe_integration` runs the complete `collect_sources` path through subprocess source proxies, real loopback supervisor/child `/run` handlers, local fixture responses, adapters, and report building. |
 | Node suite | `node --test tests/safe_fetch.test.mjs tests/worker_plan.test.mjs tests/ui/ui_contract.test.mjs` | Existing worker, safe-fetch, and UI contracts remain green. |
 | Compose syntax | `docker compose -f deploy/compose.yaml config -q` | `nu`, `tls`, and `cc` are isolated internal services with no host ports or secrets. |
 | Pinned socket/TLS and IPC regressions | `python3 -m unittest discover -s tests -p 'test_probe_worker.py'` | Real loopback HTTP/TLS plus a real child IPC deadline test exercise numeric pinning, Host/SNI identity, bounded selectors, result-acceptance/idle timeouts, fallback, malformed responses, IPv6, and NAT64. |
-| External process-boundary acceptance | dedicated `extella-p2-luna-tests` harness; command/raw transcript copied from `.orchestra/tasks/3/` | Fresh supervisor parent/child PIDs, slow-drip site/provider, blocking DNS child, caller death, overload, `/proc` cleanup, dripper EOF/reset, health, and timeout `collect_sources` report. |
+| External process-boundary acceptance | `env EXTELLA_ACCEPTANCE_RUNTIME=$PWD/runtime/probe/entrypoint.py EXTELLA_P2_RAW_DIR=$PWD/.orchestra/tasks/3/raw node --test tests/probe_supervisor_acceptance.test.mjs` | Fresh supervisor parent/child PIDs, slow-drip site/provider, blocking DNS child, caller death, overload, `/proc` cleanup, dripper EOF/reset, health, and timeout `collect_sources` report. |
 | Isolated live workers | `python3 .orchestra/tasks/1/isolated_live_workers.py .orchestra/tasks/1/isolated-live-workers.json` | Three fresh processes execute the current `runtime/probe/entrypoint.py` against `https://books.toscrape.com/`; no existing Compose worker is reused. |
 | Isolated Docker workers | `docker build --no-cache -f runtime/probe/Dockerfile -t extella-p2-luna-probe:20260915 .` followed by the bounded `/run` calls recorded in `.orchestra/tasks/1/isolated-docker-workers.raw.txt` | A fresh image copied the current worker and three temporary containers returned bounded Nu, SecurityProbe, and CommonCrawl payloads. The image was removed with the temporary containers; no Compose project was changed. |
 | Gate definition | `.github/workflows/release-gate.yml` | CI runs the Python and Node commands above, deterministic build, self-check, manifest, Compose config, and pinned upstream gates. |
 
 ## What the integration test proves
 
-`tests/test_p2_probe_integration.py` starts the production `runtime/probe/entrypoint.py` HTTP handler once for each of `nu`, `tls`, and `cc`. `collect_sources` invokes real executable wrappers, which invoke `runtime/source_proxy.py`, which POSTs the bounded `{"timeout_ms": 20000}` plans over loopback HTTP. The returned payloads are parsed by the production adapters and become a report.
+`tests/test_p2_probe_integration.py` starts the production `runtime/probe/entrypoint.py`
+supervisor once for each of `nu`, `tls`, and `cc`. `collect_sources` invokes real executable
+wrappers, which invoke `runtime/source_proxy.py`, which POSTs bounded plans over loopback HTTP;
+each supervisor launches a real probe child. A child-only `sitecustomize` fixture redirects
+provider URLs to a local server without adding an acceptance hook to production runtime. The
+returned payloads are parsed by the production adapters and become a report.
 
 The assertion checks the user-facing distinction: required sources plus all three probes yield
 `state=ready`; unavailable PSI and not-configured Google Search Console/DataForSEO are listed in
@@ -55,7 +60,7 @@ The final run stores raw command output and the full handoff report under
 
 | Artifact | Contents |
 |---|---|
-| `python-suite.txt` | Full Python unittest discovery output (`279` tests). |
+| `python-suite.txt` | Full Python unittest discovery output (`284` tests). |
 | `node-suite.txt` | Node worker, safe-fetch, and UI contract output (`64` tests). |
 | `compose-config.txt` | Compose syntax check output. |
 | `test_probe_worker.txt` | Focused socket/TLS and containment output. |
@@ -63,7 +68,7 @@ The final run stores raw command output and the full handoff report under
 | `isolated-live-workers.json` and `isolated-live-workers.raw.txt` | Fresh-process public-site probe payloads and terminal output. |
 | `probe-image-build.txt`, `probe-image-id.txt`, `probe-image-remove.txt`, and `isolated-docker-workers.raw.txt` | Fresh worker image build/identity/removal and temporary-container payloads. |
 | `sol-f219de2-deadline.raw.txt` and `TODO.md` | Prior Sol threat reproduction plus selected process-boundary architecture/rollback limits. |
-| `.orchestra/tasks/3/raw/` | External acceptance raw transcript/NDJSON; latest rerun is `acceptance-suite-latest.raw.txt`. |
+| `.orchestra/tasks/3/raw/` | External acceptance raw transcript/NDJSON; latest rerun is `acceptance-suite-final.raw.txt`. |
 | `report.md` | Full verification report, exact HEAD, commands, results, limits, and restrictions. |
 
 ## Deliberately deferred

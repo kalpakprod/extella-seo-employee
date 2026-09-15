@@ -5,42 +5,35 @@
 #1 DONE 0.0s
 
 #2 [internal] load metadata for docker.io/library/python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7
-#2 DONE 1.4s
+#2 DONE 1.3s
 
 #3 [internal] load .dockerignore
 #3 transferring context: 223B done
-#3 DONE 0.1s
+#3 DONE 0.0s
 
-#4 [internal] load build context
+#4 [1/4] FROM docker.io/library/python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7
+#4 resolve docker.io/library/python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7 0.0s done
 #4 DONE 0.0s
 
-#5 [1/4] FROM docker.io/library/python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7
-#5 resolve docker.io/library/python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7
-#5 resolve docker.io/library/python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7 0.1s done
-#5 DONE 0.1s
+#5 [2/4] WORKDIR /app
+#5 CACHED
 
-#6 [2/4] WORKDIR /app
-#6 CACHED
-
-#4 [internal] load build context
-#4 transferring context: 27.89kB done
-#4 DONE 0.1s
+#6 [internal] load build context
+#6 transferring context: 44.50kB done
+#6 DONE 0.0s
 
 #7 [3/4] COPY --chown=10001:10001 runtime/probe/entrypoint.py /app/entrypoint.py
-#7 DONE 0.8s
+#7 DONE 0.1s
 
 #8 [4/4] RUN groupadd --gid 10001 extella     && useradd --uid 10001 --gid 10001 --no-create-home --home-dir /nonexistent extella
-#8 DONE 0.9s
+#8 DONE 0.2s
 
 #9 exporting to image
-#9 exporting layers
-#9 exporting layers 0.6s done
-#9 exporting manifest sha256:6a2622c314ac94bd684ac86cdbd402dbbbbcbeb048ec2333f96ae7564c5a4ea5 0.0s done
-#9 exporting config sha256:e3d7484fcd622324ff34f25fd3c468e3da94ca953d259ebf08cb8086ae668773 0.1s done
-#9 exporting attestation manifest sha256:27921a771c66498795c8f9e3c04660bca95e5bba665cf8073a0108d2662f7758 0.1s done
-#9 exporting manifest list sha256:7e7954390db94a0c564fdbcbbcd3fcf23e5812622d5dc9a922886851902cae6c
-#9 exporting manifest list sha256:7e7954390db94a0c564fdbcbbcd3fcf23e5812622d5dc9a922886851902cae6c 0.1s done
-#9 naming to docker.io/library/extella-p2-luna-probe:20260915 0.0s done
-#9 unpacking to docker.io/library/extella-p2-luna-probe:20260915
-#9 unpacking to docker.io/library/extella-p2-luna-probe:20260915 0.2s done
-#9 DONE 1.3s
+#9 exporting layers 0.1s done
+#9 exporting manifest sha256:245cca36f23cb45b0dbf6ea34d951929aebeb1ef237bc37b50c02c73798a75fe done
+#9 exporting config sha256:a6f94987ca63f84db9797e34edc4ceaea92150e5baa906796d3f4434b28320af done
+#9 exporting attestation manifest sha256:f1d4a7c9ff430c386abc12ba9af70bf1521a535d50f32050b07d333babe779be 0.0s done
+#9 exporting manifest list sha256:c0da79cd5e92f08b423aeeb28435856186cb0d0e8b6d95368a4f6ba899c75622 0.0s done
+#9 naming to docker.io/library/extella-p2-luna-probe:20260915-final done
+#9 unpacking to docker.io/library/extella-p2-luna-probe:20260915-final 0.0s done
+#9 DONE 0.2s

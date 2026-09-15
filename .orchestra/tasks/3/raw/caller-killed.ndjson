@@ -1,16 +1,16 @@
-{"label":"fixture_ready","wall_ns":"1789455190860000000","monotonic_ns":"61536426204675","pid":2484084,"port":39969}
-{"label":"caller_killed_child_active","wall_ns":"1789455191592000000","monotonic_ns":"61537158062956","parent":{"pid":2484119,"state":"S","ppid":2481097,"pgrp":2481057,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[{"pid":2484770,"state":"S","ppid":2484119,"pgrp":2484770,"command":"/usr/bin/python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py --probe-child nu"}]}
-{"label":"caller_killed_before_D","wall_ns":"1789455191592000000","monotonic_ns":"61537158303763","caller_pid":2484733,"child_pids":[2484770]}
-{"label":"caller_killed_exit","wall_ns":"1789455191593000000","monotonic_ns":"61537158378712","caller_pid":2484733,"signal":"SIGKILL"}
-{"label":"caller_killed_origin_close","wall_ns":1789455192340577300,"monotonic_ns":61537906401063,"event":"site_client_closed","pid":2484084,"path":"/caller-killed","error":"BrokenPipeError"}
-{"label":"caller_killed_remote_children_reaped","wall_ns":"1789455192630000000","monotonic_ns":"61538196524492","parent":{"pid":2484119,"state":"S","ppid":2481097,"pgrp":2481057,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[]}
-{"label":"caller_killed_remote_children_reaped_process_groups","wall_ns":"1789455192667000000","monotonic_ns":"61538232901555","groups":[2484770],"members":[]}
-{"label":"caller_killed_health","wall_ns":"1789455192668000000","monotonic_ns":"61538233961640","status":200,"headers":{"server":"ExtellaProbe/2.1 Python/3.14.7","date":"Tue, 15 Sep 2026 06:53:12 GMT","content-type":"application/json; charset=utf-8","content-length":"27","cache-control":"no-store"},"body":{"status":"ok","kind":"nu"},"elapsed_ms":0.88977}
-{"event":"fixture_ready","wall_ns":1789455190860157457,"monotonic_ns":61536425980890,"pid":2484084,"port":39969}
-{"event":"site_started","wall_ns":1789455191555174646,"monotonic_ns":61537120997888,"pid":2484084,"path":"/caller-killed","mode":"slow","client_port":40132}
-{"event":"site_body_byte","wall_ns":1789455191555374576,"monotonic_ns":61537121197278,"pid":2484084,"label":"/caller-killed","index":1}
-{"event":"site_body_byte","wall_ns":1789455191575795927,"monotonic_ns":61537141620021,"pid":2484084,"label":"/caller-killed","index":2}
-{"event":"site_body_byte","wall_ns":1789455191877741313,"monotonic_ns":61537443565086,"pid":2484084,"label":"/caller-killed","index":17}
-{"event":"site_body_byte","wall_ns":1789455192199756779,"monotonic_ns":61537765580512,"pid":2484084,"label":"/caller-killed","index":33}
-{"event":"site_client_closed","wall_ns":1789455192340577170,"monotonic_ns":61537906401063,"pid":2484084,"path":"/caller-killed","error":"BrokenPipeError"}
-{"event":"site_closed","wall_ns":1789455192340638473,"monotonic_ns":61537906461145,"pid":2484084,"path":"/caller-killed"}
+{"label":"fixture_ready","wall_ns":"1789457544602000000","monotonic_ns":"63890168352141","pid":338952,"port":40655}
+{"label":"caller_killed_child_active","wall_ns":"1789457545323000000","monotonic_ns":"63890889162014","parent":{"pid":338954,"state":"S","ppid":336571,"pgrp":336505,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[{"pid":338964,"state":"S","ppid":338954,"pgrp":338964,"command":"/usr/bin/python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py --probe-child nu"}]}
+{"label":"caller_killed_before_D","wall_ns":"1789457545323000000","monotonic_ns":"63890889356164","caller_pid":338961,"child_pids":[338964]}
+{"label":"caller_killed_exit","wall_ns":"1789457545324000000","monotonic_ns":"63890889413391","caller_pid":338961,"signal":"SIGKILL"}
+{"label":"caller_killed_origin_close","wall_ns":1789457546074579000,"monotonic_ns":63891640402710,"event":"site_client_closed","pid":338952,"path":"/caller-killed","error":"BrokenPipeError"}
+{"label":"caller_killed_remote_children_reaped","wall_ns":"1789457546371000000","monotonic_ns":"63891937171113","parent":{"pid":338954,"state":"S","ppid":336571,"pgrp":336505,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[]}
+{"label":"caller_killed_remote_children_reaped_process_groups","wall_ns":"1789457546423000000","monotonic_ns":"63891989117373","groups":[338964],"members":[]}
+{"label":"caller_killed_health","wall_ns":"1789457546424000000","monotonic_ns":"63891990483749","status":200,"headers":{"server":"ExtellaProbe/2.1 Python/3.14.7","date":"Tue, 15 Sep 2026 07:32:26 GMT","content-type":"application/json; charset=utf-8","content-length":"27","cache-control":"no-store"},"body":{"status":"ok","kind":"nu"},"elapsed_ms":1.144774}
+{"event":"fixture_ready","wall_ns":1789457544602315322,"monotonic_ns":63890168138544,"pid":338952,"port":40655}
+{"event":"site_started","wall_ns":1789457545289520433,"monotonic_ns":63890855343846,"pid":338952,"path":"/caller-killed","mode":"slow","client_port":45650}
+{"event":"site_body_byte","wall_ns":1789457545289763053,"monotonic_ns":63890855585795,"pid":338952,"label":"/caller-killed","index":1}
+{"event":"site_body_byte","wall_ns":1789457545310199739,"monotonic_ns":63890876023913,"pid":338952,"label":"/caller-killed","index":2}
+{"event":"site_body_byte","wall_ns":1789457545611922065,"monotonic_ns":63891177745958,"pid":338952,"label":"/caller-killed","index":17}
+{"event":"site_body_byte","wall_ns":1789457545933744882,"monotonic_ns":63891499568766,"pid":338952,"label":"/caller-killed","index":33}
+{"event":"site_client_closed","wall_ns":1789457546074578917,"monotonic_ns":63891640402710,"pid":338952,"path":"/caller-killed","error":"BrokenPipeError"}
+{"event":"site_closed","wall_ns":1789457546074652964,"monotonic_ns":63891640475626,"pid":338952,"path":"/caller-killed"}

@@ -122,23 +122,23 @@ test_ssl_labs_grade_is_unavailable_for_unsupported_origins (test_probe_worker.Tl
 test_access_log_records_request_without_secret_values (test_product_api_v2.ProductApiV2Test.test_access_log_records_request_without_secret_values) ... ok
 test_exact_request_allowlists_and_queue_status (test_product_api_v2.ProductApiV2Test.test_exact_request_allowlists_and_queue_status) ... ok
 test_execution_failure_is_the_only_503_case (test_product_api_v2.ProductApiV2Test.test_execution_failure_is_the_only_503_case) ... ok
-test_handler_distinguishes_client_input_from_state_targets_and_configure_backend_failures (test_product_api_v2.ProductApiV2Test.test_handler_distinguishes_client_input_from_state_targets_and_configure_backend_failures) ... {"ts": "2026-09-15T07:03:51Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
-{"ts": "2026-09-15T07:03:52Z", "client": "127.0.0.1", "method": "POST", "route": "/api/configure", "status": 503}
-{"ts": "2026-09-15T07:03:52Z", "client": "127.0.0.1", "method": "GET", "route": "/api/state", "status": 503}
-{"ts": "2026-09-15T07:03:53Z", "client": "127.0.0.1", "method": "GET", "route": "/api/targets", "status": 503}
-{"ts": "2026-09-15T07:03:53Z", "client": "127.0.0.1", "method": "GET", "route": "/api/targets", "status": 503}
-{"ts": "2026-09-15T07:03:54Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+test_handler_distinguishes_client_input_from_state_targets_and_configure_backend_failures (test_product_api_v2.ProductApiV2Test.test_handler_distinguishes_client_input_from_state_targets_and_configure_backend_failures) ... {"ts": "2026-09-15T07:19:06Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+{"ts": "2026-09-15T07:19:06Z", "client": "127.0.0.1", "method": "POST", "route": "/api/configure", "status": 503}
+{"ts": "2026-09-15T07:19:07Z", "client": "127.0.0.1", "method": "GET", "route": "/api/state", "status": 503}
+{"ts": "2026-09-15T07:19:07Z", "client": "127.0.0.1", "method": "GET", "route": "/api/targets", "status": 503}
+{"ts": "2026-09-15T07:19:08Z", "client": "127.0.0.1", "method": "GET", "route": "/api/targets", "status": 503}
+{"ts": "2026-09-15T07:19:08Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
 ok
-test_handler_enforces_auth_body_cap_transfer_encoding_and_routes (test_product_api_v2.ProductApiV2Test.test_handler_enforces_auth_body_cap_transfer_encoding_and_routes) ... {"ts": "2026-09-15T07:03:54Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 401}
-{"ts": "2026-09-15T07:03:55Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
-{"ts": "2026-09-15T07:03:55Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
-{"ts": "2026-09-15T07:03:56Z", "client": "127.0.0.1", "method": "GET", "route": "/api/unknown", "status": 404}
-{"ts": "2026-09-15T07:03:56Z", "client": "127.0.0.1", "method": "GET", "route": "/api/state", "status": 400}
+test_handler_enforces_auth_body_cap_transfer_encoding_and_routes (test_product_api_v2.ProductApiV2Test.test_handler_enforces_auth_body_cap_transfer_encoding_and_routes) ... {"ts": "2026-09-15T07:19:09Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 401}
+{"ts": "2026-09-15T07:19:09Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+{"ts": "2026-09-15T07:19:10Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 400}
+{"ts": "2026-09-15T07:19:10Z", "client": "127.0.0.1", "method": "GET", "route": "/api/unknown", "status": 404}
+{"ts": "2026-09-15T07:19:11Z", "client": "127.0.0.1", "method": "GET", "route": "/api/state", "status": 400}
 ok
-test_handler_maps_backend_failures_to_503_without_exposing_details (test_product_api_v2.ProductApiV2Test.test_handler_maps_backend_failures_to_503_without_exposing_details) ... {"ts": "2026-09-15T07:03:57Z", "client": "127.0.0.1", "method": "POST", "route": "/api/configure", "status": 503}
-{"ts": "2026-09-15T07:03:57Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 503}
+test_handler_maps_backend_failures_to_503_without_exposing_details (test_product_api_v2.ProductApiV2Test.test_handler_maps_backend_failures_to_503_without_exposing_details) ... {"ts": "2026-09-15T07:19:11Z", "client": "127.0.0.1", "method": "POST", "route": "/api/configure", "status": 503}
+{"ts": "2026-09-15T07:19:12Z", "client": "127.0.0.1", "method": "POST", "route": "/api/run", "status": 503}
 ok
-test_health_reports_version_queue_and_consumer (test_product_api_v2.ProductApiV2Test.test_health_reports_version_queue_and_consumer) ... {"ts": "2026-09-15T07:03:58Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
+test_health_reports_version_queue_and_consumer (test_product_api_v2.ProductApiV2Test.test_health_reports_version_queue_and_consumer) ... {"ts": "2026-09-15T07:19:12Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
 ok
 test_state_error_mapping_is_input_400_or_storage_503 (test_product_api_v2.ProductApiV2Test.test_state_error_mapping_is_input_400_or_storage_503) ... ok
 test_state_requires_target_unless_exactly_one_is_configured (test_product_api_v2.ProductApiV2Test.test_state_requires_target_unless_exactly_one_is_configured) ... ok
@@ -148,12 +148,12 @@ test_targets_route_returns_target_summaries (test_product_api_v2.ProductApiV2Tes
 test_unknown_get_route_and_malformed_state_query_have_v2_codes (test_product_api_v2.ProductApiV2Test.test_unknown_get_route_and_malformed_state_query_have_v2_codes) ... ok
 test_access_log_omits_authorization_value (test_product_gateway.ProductGatewayTest.test_access_log_omits_authorization_value) ... ok
 test_parse_rate_limit_defaults_and_rejects_garbage (test_product_gateway.ProductGatewayTest.test_parse_rate_limit_defaults_and_rejects_garbage) ... ok
-test_rate_limit_counts_rejected_routes_too (test_product_gateway.ProductGatewayTest.test_rate_limit_counts_rejected_routes_too) ... {"ts": "2026-09-15T07:03:59Z", "client": "127.0.0.1", "method": "GET", "route": "/no-such-route", "status": 404}
-{"ts": "2026-09-15T07:03:59Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 429}
+test_rate_limit_counts_rejected_routes_too (test_product_gateway.ProductGatewayTest.test_rate_limit_counts_rejected_routes_too) ... {"ts": "2026-09-15T07:19:13Z", "client": "127.0.0.1", "method": "GET", "route": "/no-such-route", "status": 404}
+{"ts": "2026-09-15T07:19:13Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 429}
 ok
-test_rate_limit_returns_429_with_retry_after (test_product_gateway.ProductGatewayTest.test_rate_limit_returns_429_with_retry_after) ... {"ts": "2026-09-15T07:04:00Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
-{"ts": "2026-09-15T07:04:00Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
-{"ts": "2026-09-15T07:04:00Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 429}
+test_rate_limit_returns_429_with_retry_after (test_product_gateway.ProductGatewayTest.test_rate_limit_returns_429_with_retry_after) ... {"ts": "2026-09-15T07:19:14Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
+{"ts": "2026-09-15T07:19:14Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 200}
+{"ts": "2026-09-15T07:19:14Z", "client": "127.0.0.1", "method": "GET", "route": "/health", "status": 429}
 ok
 test_extractors_read_google_shapes (test_psi_worker.PsiWorkerTest.test_extractors_read_google_shapes) ... ok
 test_fetch_follows_same_origin_redirects_and_caps_bytes (test_psi_worker.PsiWorkerTest.test_fetch_follows_same_origin_redirects_and_caps_bytes) ... /usr/lib/python3.14/tempfile.py:484: ResourceWarning: Implicitly cleaning up <HTTPError 302: 'Found'>
@@ -340,6 +340,6 @@ test_v2_migration_is_idempotent (test_seo_employee_targets.TargetConfigTests.tes
 test_v2_validation_rejects_invalid_profile_language_region_and_missing_consent (test_seo_employee_targets.TargetConfigTests.test_v2_validation_rejects_invalid_profile_language_region_and_missing_consent) ... ok
 
 ----------------------------------------------------------------------
-Ran 284 tests in 15.263s
+Ran 284 tests in 15.189s
 
 OK

@@ -120,6 +120,23 @@ _AGENT_ID_RE = re.compile(r"^agent_[A-Za-z0-9_][A-Za-z0-9_-]{2,127}$")
 _SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
 _SEVERITY_DOWNGRADE = {"critical": "warning", "warning": "info", "info": "info"}
 _EVIDENCE_ORDER = {"verified": 0, "supported": 1, "unverified": 2}
+SEVERITY_LEVELS = ("critical", "warning", "info")
+SEVERITY_METHODOLOGY_VERSION = "1"
+
+
+def effective_severity(catalog_severity: str, *, confirmed_failure: bool) -> tuple[str, str]:
+    """Return the reported severity and the basis that justifies it.
+
+    The catalog holds the severity for a confirmed failure of the rule. An
+    occurrence that was only reported as a warning is not a confirmed failure,
+    so it keeps the rule severity only as its ceiling and is downgraded one
+    level instead of claiming a failure that the source did not confirm.
+    """
+    if confirmed_failure:
+        return catalog_severity, "confirmed_failure"
+    return _SEVERITY_DOWNGRADE.get(catalog_severity, catalog_severity), "unconfirmed_occurrence"
+
+
 _ALLOWED_FACT_WHITESPACE = frozenset({" ", "\t", "\n", "\r"})
 _SAFE_SOURCE_REASONS = frozenset(
     {
@@ -423,6 +440,55 @@ def prioritize_findings(
             str(item.get("rule_key", "")),
         ),
     )[:limit]
+
+
+GROUP_PAGE_LIMIT = 50
+RECOMMENDATION_LIMIT = 10
+
+
+def group_findings_by_rule(findings: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
+    """Collapse identical rule_key findings into one recommendation per problem.
+
+    Per-URL findings keep their own identity in the bounded snapshot so that
+    comparison stays honest. The recommendation layer shows one card per
+    rule_key with the affected pages, so one mass problem does not consume the
+    whole limited task list.
+    """
+    groups: list[dict[str, object]] = []
+    index: dict[str, dict[str, object]] = {}
+    for finding in findings:
+        rule_key = str(finding.get("rule_key", ""))
+        url = str(finding.get("url", ""))
+        evidence = [dict(item) for item in finding.get("evidence", []) if isinstance(item, Mapping)]
+        group = index.get(rule_key)
+        if group is None:
+            group = {
+                **finding,
+                "affected_pages_count": 1,
+                "affected_pages": [{"url": url, "evidence": evidence}],
+                "affected_pages_truncated": False,
+            }
+            groups.append(group)
+            index[rule_key] = group
+            continue
+        group["affected_pages_count"] = int(group["affected_pages_count"]) + 1
+        pages = group["affected_pages"]
+        assert isinstance(pages, list)
+        if len(pages) < GROUP_PAGE_LIMIT:
+            pages.append({"url": url, "evidence": evidence})
+        else:
+            group["affected_pages_truncated"] = True
+        merged = group["evidence"]
+        assert isinstance(merged, list)
+        for item in evidence:
+            if item not in merged:
+                merged.append(item)
+        if _SEVERITY_ORDER.get(str(finding.get("severity")), 99) < _SEVERITY_ORDER.get(str(group.get("severity")), 99):
+            group["severity"] = finding.get("severity")
+            group["severity_basis"] = finding.get("severity_basis")
+        if _EVIDENCE_ORDER.get(str(finding.get("evidence_level")), 99) < _EVIDENCE_ORDER.get(str(group.get("evidence_level")), 99):
+            group["evidence_level"] = finding.get("evidence_level")
+    return groups
 
 
 def _default_agent_call(message: str, *, timeout_seconds: float = AGENT_ZERO_TIMEOUT_SECONDS) -> Mapping[str, str]:
@@ -1069,6 +1135,7 @@ def _optional_source_status(source: str, obtained_at: str, plan: AuditPlan) -> d
         "completed_sources": [],
         "unavailable_sources": [source],
         "unmapped_rules": [],
+        "subchecks": [],
     }
     return _source_status(source, "not_configured", obtained_at, reason="not_configured", coverage=coverage)
 
@@ -1150,10 +1217,21 @@ def _aggregate_coverage(plan: AuditPlan, results: Mapping[str, SourceResult]) ->
                 "sampled_pages": item.coverage.sampled_pages,
                 "unmapped_rules": list(item.coverage.unmapped_rules),
                 "notes": list(item.coverage.notes),
+                "subchecks": [subcheck.as_dict() for subcheck in item.coverage.subchecks],
             }
             for item in sorted(values, key=lambda item: item.source)
         },
     }
+
+
+def _missing_data(plan: AuditPlan, results: Mapping[str, SourceResult]) -> list[str]:
+    missing = [item.source for item in results.values() if item.status != "ok"]
+    missing.extend(plan.optional_sources)
+    for item in results.values():
+        for subcheck in item.coverage.subchecks:
+            if subcheck.status in {"unavailable", "partial"}:
+                missing.append(f"{item.source}.{subcheck.name}")
+    return list(dict.fromkeys(missing))
 
 
 def normalize_v2_findings(
@@ -1207,8 +1285,9 @@ def _normalize_v2_results(target_id: str, plan: AuditPlan, results: Mapping[str,
     findings: list[dict[str, object]] = []
     for key, finding in merged.items():
         definition = catalog[str(finding["rule_key"])]
-        if key not in failed:
-            finding["severity"] = _SEVERITY_DOWNGRADE.get(definition.severity, definition.severity)
+        severity, basis = effective_severity(definition.severity, confirmed_failure=key in failed)
+        finding["severity"] = severity
+        finding["severity_basis"] = basis
         sources = [str(item["source"]) for item in finding["evidence"] if isinstance(item, Mapping)]
         finding["evidence"] = sorted(finding["evidence"], key=lambda item: (str(item["source"]), str(item["source_rule"]), str(item["fact"])))
         finding["evidence_level"] = evidence_level(definition, sources)
@@ -1236,7 +1315,11 @@ def validate_model_input(value: Mapping[str, object]) -> None:
     if set(value) != MODEL_FIELDS:
         raise ModelInputError("model input fields do not match SC-SEO-031")
     definition = load_rule_catalog().get(str(value.get("rule_key")))
-    allowed_severities = {definition.severity, _SEVERITY_DOWNGRADE.get(definition.severity, definition.severity)} if definition is not None else set()
+    allowed_severities = (
+        {definition.severity, effective_severity(definition.severity, confirmed_failure=False)[0]}
+        if definition is not None
+        else set()
+    )
     if definition is None or value.get("severity") not in allowed_severities or value.get("evidence_level") not in {"verified", "supported"}:
         raise ModelInputError("model input is invalid")
     sources = value.get("sources")
@@ -1408,21 +1491,30 @@ def _build_tasks(
     enriched_count = 0
     total_attempts = 0
     failed = False
+    reasons = {"invalid_input": 0, "deadline": 0, "model_error": 0}
     for finding in findings:
         task: dict[str, object] = {"task_id": _task_identity(finding), **finding}
         try:
             model_input = build_model_input(finding)
         except (SeoEmployeeError, OSError, RuntimeError, ImportError):
             failed = True
+            reasons["invalid_input"] += 1
             model_input = None
         if model_input is not None:
             enriched_ok = False
             for _ in range(_ENRICH_ATTEMPTS):
+                timeout_seconds: float | None = None
+                if enricher is enrich_with_agent_zero and deadline is not None:
+                    try:
+                        timeout_seconds = deadline.remaining(AGENT_ZERO_TIMEOUT_SECONDS)
+                    except SeoEmployeeError:
+                        reasons["deadline"] += 1
+                        break
                 total_attempts += 1
                 try:
                     enriched = (
-                        enrich_with_agent_zero(model_input, timeout_seconds=deadline.remaining(AGENT_ZERO_TIMEOUT_SECONDS))
-                        if enricher is enrich_with_agent_zero and deadline is not None
+                        enrich_with_agent_zero(model_input, timeout_seconds=timeout_seconds)
+                        if timeout_seconds is not None
                         else _validate_enrichment(enricher(model_input))
                     )
                     task.update(enriched)
@@ -1430,6 +1522,7 @@ def _build_tasks(
                     enriched_ok = True
                     break
                 except (SeoEmployeeError, OSError, RuntimeError, ImportError):
+                    reasons["model_error"] += 1
                     continue
             if not enriched_ok:
                 failed = True
@@ -1438,17 +1531,22 @@ def _build_tasks(
             task["action_proposal"] = proposal
         tasks.append(task)
     total = len(tasks)
+    counts: dict[str, object] = {
+        "enriched": enriched_count,
+        "total": total,
+        "unavailable": total - enriched_count,
+        "attempts": total_attempts,
+        "reasons": dict(reasons),
+    }
     if total == 0:
-        return tasks, {"status": "not_needed", "limitation": "No deterministic findings require explanation.", "enriched": 0, "total": 0, "attempts": 0}
+        return tasks, {"status": "not_needed", "limitation": "No deterministic findings require explanation.", **counts}
     if failed:
         return tasks, {
             "status": "unavailable",
             "limitation": "One or more model enrichments are unavailable; deterministic evidence is preserved.",
-            "enriched": enriched_count,
-            "total": total,
-            "attempts": total_attempts,
+            **counts,
         }
-    return tasks, {"status": "ok", "limitation": "", "enriched": enriched_count, "total": total, "attempts": total_attempts}
+    return tasks, {"status": "ok", "limitation": "", **counts}
 
 
 def _mode_result(plan: AuditPlan, results: Mapping[str, SourceResult]) -> dict[str, object]:
@@ -1483,9 +1581,9 @@ def _build_v2_report(
         limit=BASELINE_ITEM_LIMIT,
         category_priority=plan.categories,
     )
-    display_findings = findings[:10]
+    groups = group_findings_by_rule(findings)
     tasks, model_status = _build_tasks(
-        display_findings,
+        groups[:RECOMMENDATION_LIMIT],
         target_id=target_id,
         site_url=command["site_url"],
         expires_at=_iso(datetime.fromisoformat(completed_at.replace("Z", "+00:00")) + timedelta(days=7)),
@@ -1495,6 +1593,8 @@ def _build_v2_report(
     required_ok = required_sources_satisfied(plan, list(results.values()))
     any_factual = any(item.status == "ok" for item in results.values())
     state = "ready" if required_ok else "partial" if any_factual else "failed"
+    model_status["findings"] = len(findings)
+    model_status["recommendations"] = len(groups)
     comparison_cards = [{"task_id": _task_identity(finding), **finding} for finding in findings]
     comparison, next_baseline = _comparison_for_v2(
         comparison_cards, baseline, target_id=target_id, plan=plan, terminal_state=state, results=results
@@ -1510,12 +1610,7 @@ def _build_v2_report(
         "coverage": _aggregate_coverage(plan, results),
         "mode_result": _mode_result(plan, results),
         "model_enrichment": model_status,
-        "missing_data": list(dict.fromkeys(
-            [item.source for item in results.values() if item.status != "ok"]
-            + list(plan.optional_sources)
-            + (["SecurityProbe.ssl_labs"] if any("ssl_labs unavailable" in note for item in results.values() for note in item.coverage.notes) else [])
-            + (["CommonCrawl.excerpt"] if any("common_crawl no archived" in note or "common_crawl excerpt unavailable" in note for item in results.values() for note in item.coverage.notes) else [])
-        )),
+        "missing_data": _missing_data(plan, results),
         "comparison": comparison,
         "tasks": tasks,
     }

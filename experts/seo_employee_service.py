@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import json
+import math
 import os
 import re
 import socket
@@ -74,6 +75,7 @@ PROBE_EXECUTABLES = {
     for name, kind in (("NuHTML", "nu"), ("SecurityProbe", "tls"), ("CommonCrawl", "cc"))
 }
 PROBE_TIMEOUT_SECONDS = 20
+PROBE_IPC_MARGIN_SECONDS = 1.0
 
 PSI_EXECUTABLE = Path(
     os.environ.get("EXTELLA_PSI_EXECUTABLE", str(ROOT_PATH / "runtime" / "container" / "run_psi"))
@@ -932,6 +934,10 @@ def _worker_psi_plan(plan: AuditPlan) -> dict[str, object]:
     }
 
 
+def _probe_wire_timeout_ms(source_budget_seconds: float) -> int:
+    return math.floor((source_budget_seconds - PROBE_IPC_MARGIN_SECONDS) * 1000)
+
+
 def _run_v2_source_wrapper(
     source: str,
     executable: Path,
@@ -946,7 +952,11 @@ def _run_v2_source_wrapper(
 ) -> tuple[dict[str, object], SourceResult]:
     adapters = {"CrawlSEO": CrawlSEOAdapter(), "SEOmator": SEOmatorAdapter(), "PSI": PSIAdapter(), "NuHTML": NuHTMLAdapter(), "SecurityProbe": SecurityProbeAdapter(), "CommonCrawl": CommonCrawlAdapter()}
     adapter = adapters[source]
-    worker_plan = ({"timeout_ms": max(1, int(timeout_seconds * 1000))} if source in PROBE_EXECUTABLES
+    wire_timeout_ms = _probe_wire_timeout_ms(timeout_seconds) if source in PROBE_EXECUTABLES else None
+    if wire_timeout_ms is not None and wire_timeout_ms < 1:
+        result = SourceResult(source, "unavailable", adapter.parse({"status": "unavailable", "reason": "timeout"}, plan).coverage, reason="timeout")
+        return _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict()), result
+    worker_plan = ({"timeout_ms": wire_timeout_ms} if wire_timeout_ms is not None
                    else _worker_psi_plan(plan) if source == "PSI" else _worker_plan(plan))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plan_path: Path | None = None

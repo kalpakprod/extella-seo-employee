@@ -12,10 +12,15 @@ from __future__ import annotations
 import http.client
 import ipaddress
 import json
+import math
 import os
+import selectors
+import signal
 import socket
 import ssl
+import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -31,6 +36,13 @@ FETCH_BYTES = {"robots_txt": 65_536, "sitemap_xml": 65_536, "homepage_html": 262
 CALL_TIMEOUT_SECONDS = 60.0
 MAX_BODY_BYTES = 65_536
 MAX_PINNED_ADDRESSES = 4
+MAX_TIMEOUT_MS = 720_000
+MAX_CHILDREN = 2
+MAX_HANDLERS = 4
+CHILD_IPC_BYTES = 65_536
+CHILD_CLEANUP_SECONDS = 0.25
+HANDLER_IDLE_SECONDS = 2.0
+CHILD_MODE = "--psi-child"
 PORT = int(os.environ.get("PORT", "8084"))
 
 _NAT64_PREFIX = ipaddress.IPv6Network("64:ff9b::/96")
@@ -535,11 +547,11 @@ def _post_json(url: str, payload: dict[str, object], timeout: float) -> object:
     return _api_request(url, timeout, payload=payload)
 
 
-def handle_run(body: bytes) -> tuple[int, dict[str, object]]:
+def _request_parts(body: bytes) -> tuple[dict[str, object], int] | None:
     try:
         payload = json.loads(body)
     except (TypeError, ValueError, json.JSONDecodeError):
-        return 400, {"status": "error", "code": "invalid_request"}
+        return None
     if (
         not isinstance(payload, dict)
         or not isinstance(payload.get("site_url"), str)
@@ -550,9 +562,17 @@ def handle_run(body: bytes) -> tuple[int, dict[str, object]]:
         or not 1 <= payload["plan"]["max_urls"] <= MAX_URLS
         or not isinstance(payload["plan"]["timeout_ms"], int)
         or isinstance(payload["plan"]["timeout_ms"], bool)
-        or not 1 <= payload["plan"]["timeout_ms"] <= 720_000
+        or not 1 <= payload["plan"]["timeout_ms"] <= MAX_TIMEOUT_MS
     ):
+        return None
+    return payload, payload["plan"]["timeout_ms"]
+
+
+def handle_run(body: bytes) -> tuple[int, dict[str, object]]:
+    parts = _request_parts(body)
+    if parts is None:
         return 400, {"status": "error", "code": "invalid_request"}
+    payload, _timeout_ms = parts
     try:
         return 200, run_probe(
             payload["site_url"],
@@ -566,8 +586,326 @@ def handle_run(body: bytes) -> tuple[int, dict[str, object]]:
         return 200, {"status": "unavailable", "reason": _reason_for(error)}
 
 
+class _ChildEntry:
+    def __init__(self, process: subprocess.Popen[bytes]) -> None:
+        self.process = process
+        self.pending_reap = False
+        self.slot_owned = True
+
+
+class _PSISupervisor:
+    """Own bounded worker children and their slots for the long-lived HTTP parent."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._children: dict[int, _ChildEntry] = {}
+        self._slots = threading.BoundedSemaphore(MAX_CHILDREN)
+        self._shutdown_requested = threading.Event()
+        self._shutdown = False
+
+    def _remove_locked(self, entry: _ChildEntry) -> bool:
+        if self._children.get(entry.process.pid) is not entry:
+            return False
+        del self._children[entry.process.pid]
+        if entry.slot_owned:
+            entry.slot_owned = False
+            self._slots.release()
+        return True
+
+    def _reap_exited_locked(self) -> None:
+        for pid, entry in list(self._children.items()):
+            if entry.process.poll() is None:
+                continue
+            try:
+                entry.process.wait(timeout=0)
+            except subprocess.TimeoutExpired:
+                continue
+            self._remove_locked(entry)
+
+    def spawn(self) -> _ChildEntry | None:
+        with self._lock:
+            self._reap_exited_locked()
+            if self._shutdown or self._shutdown_requested.is_set() or not self._slots.acquire(blocking=False):
+                return None
+            try:
+                process = subprocess.Popen(
+                    [sys.executable, os.path.abspath(__file__), CHILD_MODE],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    shell=False,
+                    start_new_session=True,
+                    close_fds=True,
+                )
+            except (OSError, ValueError):
+                self._slots.release()
+                return None
+            entry = _ChildEntry(process)
+            self._children[process.pid] = entry
+            return entry
+
+    def _remove(self, entry: _ChildEntry) -> None:
+        with self._lock:
+            self._remove_locked(entry)
+
+    def _mark_pending(self, entry: _ChildEntry) -> None:
+        with self._lock:
+            if self._children.get(entry.process.pid) is entry:
+                entry.pending_reap = True
+
+    def finish(self, entry: _ChildEntry) -> bool:
+        if entry.process.poll() is None:
+            return False
+        try:
+            entry.process.wait(timeout=0)
+        except subprocess.TimeoutExpired:
+            return False
+        self._remove(entry)
+        return True
+
+    def kill_and_reap(self, entry: _ChildEntry) -> bool:
+        process = entry.process
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            except OSError:
+                self._mark_pending(entry)
+        try:
+            process.wait(timeout=CHILD_CLEANUP_SECONDS)
+        except subprocess.TimeoutExpired:
+            self._mark_pending(entry)
+            return False
+        self._remove(entry)
+        return True
+
+    def health(self) -> _ChildEntry | None:
+        with self._lock:
+            self._reap_exited_locked()
+            for entry in self._children.values():
+                if entry.pending_reap:
+                    return entry
+        return None
+
+    def begin_shutdown(self) -> None:
+        self._shutdown_requested.set()
+
+    def shutdown(self) -> None:
+        with self._lock:
+            self._shutdown = True
+            self._shutdown_requested.set()
+            entries = list(self._children.values())
+        for entry in entries:
+            self.kill_and_reap(entry)
+
+
+SUPERVISOR = _PSISupervisor()
+
+
+def _child_envelope(body: bytes, deadline: float) -> bytes | None:
+    parts = _request_parts(body)
+    if parts is None:
+        return None
+    payload, _timeout_ms = parts
+    envelope = {
+        "site_url": payload["site_url"],
+        "plan": payload["plan"],
+        "deadline": deadline,
+    }
+    try:
+        encoded = json.dumps(envelope, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    except (TypeError, ValueError):
+        return None
+    return encoded if len(encoded) <= CHILD_IPC_BYTES else None
+
+
+def _unavailable(reason: str) -> tuple[int, dict[str, object]]:
+    return 200, {"status": "unavailable", "reason": reason}
+
+
+def _exchange_child(entry: _ChildEntry, request: bytes, deadline: float) -> bytes:
+    process = entry.process
+    if process.stdin is None or process.stdout is None:
+        raise OSError("psi child pipes unavailable")
+    selector = selectors.DefaultSelector()
+    stdin_fd = process.stdin.fileno()
+    stdout_fd = process.stdout.fileno()
+    os.set_blocking(stdin_fd, False)
+    os.set_blocking(stdout_fd, False)
+    selector.register(stdin_fd, selectors.EVENT_WRITE, "stdin")
+    selector.register(stdout_fd, selectors.EVENT_READ, "stdout")
+    offset = 0
+    output = bytearray()
+    stdin_closed = False
+    stdout_closed = False
+    try:
+        while not stdout_closed or process.poll() is None:
+            remaining = _remaining(deadline)
+            events = selector.select(remaining)
+            if not events:
+                _remaining(deadline)
+                continue
+            for key, mask in events:
+                if key.data == "stdin" and mask & selectors.EVENT_WRITE:
+                    if offset < len(request):
+                        try:
+                            written = os.write(stdin_fd, request[offset:])
+                        except BlockingIOError:
+                            continue
+                        if written <= 0:
+                            raise OSError("psi child stdin closed")
+                        offset += written
+                    if offset == len(request) and not stdin_closed:
+                        selector.unregister(stdin_fd)
+                        process.stdin.close()
+                        stdin_closed = True
+                if key.data == "stdout" and mask & selectors.EVENT_READ:
+                    try:
+                        chunk = os.read(stdout_fd, min(8192, CHILD_IPC_BYTES + 1 - len(output)))
+                    except BlockingIOError:
+                        continue
+                    if not chunk:
+                        selector.unregister(stdout_fd)
+                        stdout_closed = True
+                    else:
+                        output.extend(chunk)
+                        if len(output) > CHILD_IPC_BYTES:
+                            raise ValueError("psi child stdout exceeds cap")
+            _remaining(deadline)
+        return bytes(output)
+    finally:
+        selector.close()
+        if not stdin_closed:
+            process.stdin.close()
+        process.stdout.close()
+
+
+def _decode_child_envelope(raw: bytes) -> tuple[int, dict[str, object]] | None:
+    try:
+        text = raw.decode("utf-8")
+        envelope = json.loads(text)
+    except (UnicodeDecodeError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(envelope, dict) or set(envelope) != {"http_status", "payload"}:
+        return None
+    status = envelope["http_status"]
+    payload = envelope["payload"]
+    if isinstance(status, bool) or not isinstance(status, int) or status not in {200, 400}:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return status, payload
+
+
+def _write_child_output(raw: bytes) -> None:
+    fd = sys.stdout.buffer.fileno()
+    offset = 0
+    while offset < len(raw):
+        try:
+            written = os.write(fd, raw[offset:])
+        except InterruptedError:
+            continue
+        if written <= 0:
+            raise OSError("psi child stdout closed")
+        offset += written
+
+
+def run_isolated(body: bytes) -> tuple[int, dict[str, object]]:
+    parts = _request_parts(body)
+    if parts is None:
+        return 400, {"status": "error", "code": "invalid_request"}
+    _payload, timeout_ms = parts
+    deadline = time.monotonic() + timeout_ms / 1000
+    encoded = _child_envelope(body, deadline)
+    if encoded is None:
+        return 400, {"status": "error", "code": "invalid_request"}
+    try:
+        _remaining(deadline)
+    except TimeoutError:
+        return _unavailable("timeout")
+    entry = SUPERVISOR.spawn()
+    if entry is None:
+        return _unavailable("http_503")
+    try:
+        try:
+            raw = _exchange_child(entry, encoded, deadline)
+        except TimeoutError:
+            SUPERVISOR.kill_and_reap(entry)
+            return _unavailable("timeout")
+        except (OSError, ValueError):
+            SUPERVISOR.kill_and_reap(entry)
+            return _unavailable("http_503")
+        if time.monotonic() >= deadline:
+            SUPERVISOR.kill_and_reap(entry)
+            return _unavailable("timeout")
+        decoded = _decode_child_envelope(raw)
+        if decoded is None:
+            SUPERVISOR.kill_and_reap(entry)
+            return _unavailable("http_503")
+        status, payload = decoded
+        if entry.process.poll() is None:
+            SUPERVISOR.kill_and_reap(entry)
+            return _unavailable("timeout")
+        returncode = entry.process.returncode
+        if not SUPERVISOR.finish(entry) or returncode != 0:
+            return _unavailable("http_503")
+        if time.monotonic() >= deadline:
+            return _unavailable("timeout")
+        return status, payload
+    except BaseException:
+        SUPERVISOR.kill_and_reap(entry)
+        raise
+
+
+def _child_main() -> int:
+    raw = sys.stdin.buffer.read(CHILD_IPC_BYTES + 1)
+    try:
+        envelope = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, TypeError, ValueError, json.JSONDecodeError):
+        return 2
+    if (
+        len(raw) > CHILD_IPC_BYTES
+        or not isinstance(envelope, dict)
+        or set(envelope) != {"site_url", "plan", "deadline"}
+        or not isinstance(envelope.get("site_url"), str)
+        or not isinstance(envelope.get("plan"), dict)
+        or not isinstance(envelope.get("deadline"), (int, float))
+        or isinstance(envelope.get("deadline"), bool)
+        or not math.isfinite(float(envelope["deadline"]))
+    ):
+        return 2
+    deadline = float(envelope["deadline"])
+    if time.monotonic() >= deadline:
+        status, payload = _unavailable("timeout")
+    else:
+        remaining_ms = math.floor((deadline - time.monotonic()) * 1000)
+        if remaining_ms < 1:
+            status, payload = _unavailable("timeout")
+        else:
+            body = json.dumps(
+                {
+                    "site_url": envelope["site_url"],
+                    "plan": {"max_urls": envelope["plan"].get("max_urls"), "timeout_ms": remaining_ms},
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            status, payload = handle_run(body)
+    encoded = json.dumps(
+        {"http_status": status, "payload": payload}, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    if len(encoded) > CHILD_IPC_BYTES:
+        return 3
+    _write_child_output(encoded)
+    return 0
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "ExtellaPSI/2.1"
+
+    def setup(self) -> None:
+        super().setup()
+        self.connection.settimeout(HANDLER_IDLE_SECONDS)
 
     def _send(self, status: int, payload: dict[str, object]) -> None:
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -580,7 +918,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._send(200, {"status": "ok"})
+            pending = SUPERVISOR.health()
+            if pending is not None:
+                self._send(503, {"status": "degraded", "reason": "child_cleanup_pending"})
+            else:
+                self._send(200, {"status": "ok"})
             return
         self._send(404, {"status": "error", "code": "route_not_found"})
 
@@ -591,24 +933,96 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
+            self.close_connection = True
             self._send(400, {"status": "error", "code": "invalid_request"})
             return
         if length < 0 or length > MAX_BODY_BYTES:
+            self.close_connection = True
             self._send(400, {"status": "error", "code": "invalid_request"})
             return
-        status, payload = handle_run(self.rfile.read(length) if length else b"")
-        self._send(status, payload)
+        try:
+            body = self.rfile.read(length) if length else b""
+        except OSError:
+            self.close_connection = True
+            self._send(400, {"status": "error", "code": "invalid_request"})
+            return
+        if len(body) != length:
+            self.close_connection = True
+            self._send(400, {"status": "error", "code": "invalid_request"})
+            return
+        try:
+            status, payload = run_isolated(body)
+        except (OSError, ValueError):
+            status, payload = _unavailable("http_503")
+        try:
+            self._send(status, payload)
+        except OSError:
+            return
 
     def log_message(self, _format: str, *_args: object) -> None:
         return
 
 
+def _send_prethread_unavailable(request: socket.socket) -> None:
+    body = b'{"status":"error","code":"http_503"}'
+    response = (
+        b"HTTP/1.1 503 Service Unavailable\r\n"
+        b"Content-Type: application/json\r\n"
+        b"Content-Length: " + str(len(body)).encode("ascii") + b"\r\n"
+        b"Connection: close\r\n\r\n" + body
+    )
+    try:
+        request.settimeout(HANDLER_IDLE_SECONDS)
+        request.sendall(response)
+    except OSError:
+        return
+    finally:
+        request.close()
+
+
+class _BoundedPSIHTTPServer(ThreadingHTTPServer):
+    daemon_threads = True
+    block_on_close = False
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self._handler_slots = threading.BoundedSemaphore(MAX_HANDLERS)
+
+    def process_request(self, request: socket.socket, client_address: object) -> None:
+        if not self._handler_slots.acquire(blocking=False):
+            _send_prethread_unavailable(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._handler_slots.release()
+            raise
+
+    def process_request_thread(self, request: socket.socket, client_address: object) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._handler_slots.release()
+
+
 def main() -> int:
-    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    server.daemon_threads = True
-    server.serve_forever()
+    server = _BoundedPSIHTTPServer(("0.0.0.0", PORT), Handler)
+
+    def request_shutdown(_signum: int, _frame: object) -> None:
+        SUPERVISOR.begin_shutdown()
+        server._BaseServer__shutdown_request = True
+
+    signal.signal(signal.SIGTERM, request_shutdown)
+    signal.signal(signal.SIGINT, request_shutdown)
+    try:
+        server.serve_forever(poll_interval=0.1)
+    finally:
+        SUPERVISOR.shutdown()
+        server.server_close()
     return 0
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 2 and sys.argv[1] == CHILD_MODE:
+        raise SystemExit(_child_main())
     raise SystemExit(main())

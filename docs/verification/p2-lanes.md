@@ -15,6 +15,7 @@ unavailable without turning a required-source-complete report into failure.
 | Node suite | `node --test tests/safe_fetch.test.mjs tests/worker_plan.test.mjs tests/ui/ui_contract.test.mjs` | Existing worker, safe-fetch, and UI contracts remain green. |
 | Compose syntax | `docker compose -f deploy/compose.yaml config -q` | `nu`, `tls`, and `cc` are isolated internal services with no host ports or secrets. |
 | Pinned socket/TLS and IPC regressions | `python3 -m unittest discover -s tests -p 'test_probe_worker.py'` | Real loopback HTTP/TLS plus a real child IPC deadline test exercise numeric pinning, Host/SNI identity, bounded selectors, result-acceptance/idle timeouts, fallback, malformed responses, IPv6, and NAT64. |
+| PSI pinning and supervisor regressions (R2) | `python3 -m unittest discover -s tests -p 'test_psi_worker.py'` | Real loopback fetches plus forked children exercise numeric DNS pinning, Host/SNI identity, NAT64, bounded bodies, absolute deadlines, bounded child slots, deadline kill/reap, child-envelope validation, and the `/health` degraded state. |
 | External process-boundary acceptance | `env EXTELLA_ACCEPTANCE_RUNTIME=$PWD/runtime/probe/entrypoint.py EXTELLA_P2_RAW_DIR=$PWD/.orchestra/tasks/3/raw node --test tests/probe_supervisor_acceptance.test.mjs` | Fresh supervisor parent/child PIDs, slow-drip site/provider, blocking DNS child, caller death, overload, `/proc` cleanup, dripper EOF/reset, and health. This harness does not call `collect_sources` or build a report. |
 | Isolated live workers | `python3 .orchestra/tasks/1/isolated_live_workers.py .orchestra/tasks/1/isolated-live-workers.json` | Three fresh processes execute the current `runtime/probe/entrypoint.py` against `https://books.toscrape.com/`; no existing Compose worker is reused. |
 | Isolated Docker workers | `docker build --no-cache -f runtime/probe/Dockerfile -t extella-p2-luna-probe:20260915 .` followed by the bounded `/run` calls recorded in `.orchestra/tasks/1/isolated-docker-workers.raw.txt` | A fresh image copied the current worker and three temporary containers returned bounded Nu, SecurityProbe, and CommonCrawl payloads. The image was removed with the temporary containers; no Compose project was changed. |
@@ -55,6 +56,26 @@ timeout is a safety margin and does not serve as the worker cancellation mechani
 architecture and rollback/limits are recorded in `.orchestra/tasks/1/architecture.md` and
 `TODO.md`.
 
+## PSI lane network hardening (R2)
+
+`runtime/psi/entrypoint.py` is the only egress point of the PSI lane, so it carries the same
+process and address discipline as the probes:
+
+- DNS is resolved once per hop, every answer must be global (NAT64 `64:ff9b::/96` is accepted only
+  when its embedded IPv4 address is global), and the validated numeric address is pinned into the
+  socket connect. HTTPS keeps the origin hostname for SNI and certificate verification, and the
+  Host header preserves the URI authority including IPv6 brackets.
+- Google API calls are pinned the same way and are restricted to the two fixed Google hosts.
+- Each `/run` request runs in a fresh child process from the same entrypoint under a bounded
+  supervisor (`MAX_CHILDREN` slots, `CHILD_IPC_BYTES` cap, absolute deadline, `SIGKILL` of the
+  child process group and bounded reap). `source_proxy` keeps its outer timeout only as a safety
+  margin. `/health` reports `degraded` while a child cleanup is pending.
+- `PSI_ALLOW_PRIVATE` exists only for tests and is not set in `deploy/compose.yaml`; the
+  production path rejects private answers. In-process `handle_run` remains the direct execution
+  path used by focused tests and the child.
+
+Verify with `python3 -m unittest discover -s tests -p 'test_psi_worker.py'`.
+
 ## Verification artifacts
 
 The final run stores raw command output and the full handoff report under
@@ -64,7 +85,7 @@ The final run stores raw command output and the full handoff report under
 |---|---|
 | `python-suite.txt` | Full Python unittest discovery output (`284` tests). |
 | `node-suite.txt` | Node worker, safe-fetch, and UI contract output (`64` tests). |
-| `compose-config.txt` | Compose syntax check output. |
+| Post-R1/R2 rerun (this branch) | `python3 -m unittest discover -s tests -p 'test_*.py'` → `311` tests OK; `node --test tests/safe_fetch.test.mjs tests/worker_plan.test.mjs tests/ui/ui_contract.test.mjs` → `64` pass. || `compose-config.txt` | Compose syntax check output. |
 | `test_probe_worker.txt` | Focused socket/TLS and containment output. |
 | `collect-sources-report.raw.txt` | End-to-end `collect_sources` → source proxies → probe handlers → adapters → report test. |
 | `isolated-live-workers.json` and `isolated-live-workers.raw.txt` | Fresh-process public-site probe payloads and terminal output. |

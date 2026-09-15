@@ -72,15 +72,15 @@ All output below is committed under `.orchestra/tasks/1/`.
 
 | Check | Result | Raw output |
 |---|---:|---|
-| Python discovery: `python3 -m unittest discover -s tests -p 'test_*.py' -v` | 284 passed | `python-suite.txt` |
+| Python unit discovery: `python3 -m unittest discover -s tests -p 'test_*.py' -v` | 284 passed | `python-suite.txt` |
 | Node contracts: `node --test tests/safe_fetch.test.mjs tests/worker_plan.test.mjs tests/ui/ui_contract.test.mjs` | 64 passed | `node-suite.txt` |
 | Focused probe regressions: `python3 -m unittest discover -s tests -p 'test_probe_worker.py' -v` | 38 passed | `test_probe_worker.txt` |
-| Service budget regressions: `python3 -m unittest discover -s tests -p 'test_seo_employee_service_v2.py' -v` | 27 passed | `python-suite.txt` |
-| `collect_sources` → source proxies → real supervisor children → adapters → `_build_v2_report` | 1 passed; report state `ready`; `missing_data` includes unavailable PSI and not-configured GSC/DataForSEO | `collect-sources-report.raw.txt` |
+| Service timeout/report regression (mocked runner): `python3 -m unittest discover -s tests -p 'test_seo_employee_service_v2.py' -v` | 27 passed; optional timeout remains ready and is surfaced in missing data | `python-suite.txt` |
+| Subprocess successful `collect_sources` → source proxies → real supervisor children → adapters → `_build_v2_report` | 1 passed; report state `ready`; exact baseline `missing_data={PSI,GoogleSearchConsole,DataForSEO}` | `collect-sources-report.raw.txt` |
 | Compose syntax: `docker compose -f deploy/compose.yaml config -q` | OK | `compose-config.txt` |
 | Diff whitespace: `git diff --check` | OK | `diff-check.txt` |
 | Corrected Sol runtime reproductions | all assertions passed | `sol-followup-runtime.raw.txt` |
-| External process-boundary acceptance | 6 passed, exit 0, 11.2s | `.orchestra/tasks/3/raw/acceptance-suite-final.raw.txt` and NDJSON raw files |
+| External process-boundary acceptance | 6 passed, exit 0, 11.2s; direct supervisor/source-proxy/process/health cases only | `.orchestra/tasks/3/raw/acceptance-suite-final.raw.txt` and NDJSON raw files |
 | Failed optional model-review route | dedicated executor refused requester; Sol is the only reviewer | `luna-review-tool-error.raw.txt` |
 
 The focused suite includes actual loopback HTTP and TLS sockets plus a scaled real-child IPC

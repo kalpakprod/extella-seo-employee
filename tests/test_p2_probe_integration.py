@@ -166,7 +166,7 @@ class P2ProbeCollectionIntegrationTest(unittest.TestCase):
             results=results, baseline=None, enricher=lambda _item: (_ for _ in ()).throw(OSError("offline")),
         )
         self.assertEqual(report["state"], "ready")
-        self.assertIn("PSI", report["missing_data"])
+        self.assertEqual(set(report["missing_data"]), {"PSI", "GoogleSearchConsole", "DataForSEO"})
         self.assertNotIn("NuHTML", report["missing_data"])
         self.assertNotIn("SecurityProbe", report["missing_data"])
         self.assertEqual({item.source_rule for item in results["NuHTML"].occurrences}, {"NU_ERRORS"})

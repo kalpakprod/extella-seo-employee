@@ -46,6 +46,6 @@ test_ssl_grade_keeps_the_worst_ready_endpoint (test_probe_worker.TlsProbeTest.te
 test_ssl_labs_grade_is_unavailable_for_unsupported_origins (test_probe_worker.TlsProbeTest.test_ssl_labs_grade_is_unavailable_for_unsupported_origins) ... ok
 
 ----------------------------------------------------------------------
-Ran 36 tests in 0.051s
+Ran 36 tests in 0.059s
 
 OK

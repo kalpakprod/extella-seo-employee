@@ -1,5 +1,10 @@
 # Дорожная карта HR-агента Extella (исследование 2026-09-15)
 
+> **Статус.** Документ описывает исследование и план. Реализованный объём MVP — в
+> `docs/hr-agent-spec.md`, принятые границы и отклонения — в
+> `docs/decisions/0001-hr-analysis-boundary.md`. Этапы M4–M5 и реальные интеграции остаются
+> невыполненными.
+
 ## Объём исследования и граница
 
 Изучены исходники `/home/kukuruza/orca/extella-seo-employee` (Extella SEO Employee 2.0.3), его контракты, queue/state/service/server, automation passport и bridge. Локальный OfferClawProject как каталог исходников не найден. Найден полный архив `/home/kukuruza/.cache/offerclaw-migration-20260913/offerclaw-ct165.tar.zst`; индекс содержит 306925 строк и подтверждает эксплуатационный контур CT165 (`/opt/offerclaw-next`), но архив без извлечения исходников не позволяет утверждать детали реализации. По owner memory это Telegram-ассистент поиска вакансий, сборщик, модератор, браузерный автоотклик, PostgreSQL и OmniRoute; старый CT160-контур остановлен и удалён. Это не доказательство, что архив — названный пользователем OfferClawProject.

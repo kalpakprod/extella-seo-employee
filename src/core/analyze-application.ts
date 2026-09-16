@@ -67,9 +67,9 @@ function failure(code: AnalysisError['code'], message: string, recoverable = fal
 }
 
 /**
- * Runs one analysis end to end. The model is optional: when the expert is
- * unavailable the deterministic results are still returned as a partial
- * report, with an explicit reason.
+ * Runs one deterministic analysis end to end. Model-assisted explanations
+ * are intentionally outside the current pipeline until the provider and PII
+ * boundary are approved.
  */
 export async function analyzeApplication(
   request: AnalysisRequest,

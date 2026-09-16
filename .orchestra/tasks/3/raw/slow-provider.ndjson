@@ -1,0 +1,14 @@
+{"label":"fixture_ready","wall_ns":"1789457543079000000","monotonic_ns":"63888645100405","pid":338097,"port":40463}
+{"label":"slow_provider_child_active","wall_ns":"1789457543730000000","monotonic_ns":"63889295961560","parent":{"pid":338140,"state":"S","ppid":336571,"pgrp":336505,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[{"pid":338660,"state":"R","ppid":338140,"pgrp":338660,"command":"/usr/bin/python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py --probe-child nu"}]}
+{"label":"slow_provider_response","wall_ns":"1789457544041000000","monotonic_ns":"63889607743614","status":200,"headers":{"server":"ExtellaProbe/2.1 Python/3.14.7","date":"Tue, 15 Sep 2026 07:32:24 GMT","content-type":"application/json; charset=utf-8","content-length":"43","cache-control":"no-store"},"body":{"status":"unavailable","reason":"timeout"},"elapsed_ms":356.075282}
+{"label":"slow_provider_children_reaped","wall_ns":"1789457544205000000","monotonic_ns":"63889771293554","parent":{"pid":338140,"state":"S","ppid":336571,"pgrp":336505,"command":"python3 /home/kukuruza/orca/projects/orchestra/worktrees/home-kukuruza-orca-extella-seo-employee/extella-p2-luna/runtime/probe/entrypoint.py"},"children":[]}
+{"label":"slow_provider_children_reaped_process_groups","wall_ns":"1789457544242000000","monotonic_ns":"63889808149910","groups":[338660],"members":[]}
+{"event":"fixture_ready","wall_ns":1789457543079051625,"monotonic_ns":63888644874927,"pid":338097,"port":40463}
+{"event":"site_started","wall_ns":1789457543736640784,"monotonic_ns":63889302464177,"pid":338097,"path":"/fast-site","mode":"fast","client_port":50386}
+{"event":"site_completed","wall_ns":1789457543736758252,"monotonic_ns":63889302581054,"pid":338097,"path":"/fast-site"}
+{"event":"site_closed","wall_ns":1789457543736776707,"monotonic_ns":63889302599438,"pid":338097,"path":"/fast-site"}
+{"event":"provider_started","wall_ns":1789457543742389883,"monotonic_ns":63889308212975,"pid":338097,"source":"nu","path":"https://validator.w3.org/nu/?out=json","mode":"drip"}
+{"event":"provider_body_byte","wall_ns":1789457543742496852,"monotonic_ns":63889308319583,"pid":338097,"label":"nu","index":1}
+{"event":"provider_body_byte","wall_ns":1789457543762651855,"monotonic_ns":63889328475698,"pid":338097,"label":"nu","index":2}
+{"event":"provider_client_closed","wall_ns":1789457544064550578,"monotonic_ns":63889630374271,"pid":338097,"source":"nu","error":"BrokenPipeError"}
+{"event":"provider_closed","wall_ns":1789457544064616480,"monotonic_ns":63889630439141,"pid":338097,"source":"nu"}

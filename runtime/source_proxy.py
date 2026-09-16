@@ -16,8 +16,13 @@ import urllib.request
 ENDPOINTS = {
     "CrawlSEO": os.environ.get("EXTELLA_CRAWLSEO_URL", "http://crawlseo:8081/run"),
     "SEOmator": os.environ.get("EXTELLA_SEOMATOR_URL", "http://seomator:8082/run"),
+    "PSI": os.environ.get("EXTELLA_PSI_URL", "http://psi:8084/run"),
+    "NuHTML": os.environ.get("EXTELLA_NU_URL", "http://nu:8085/run"),
+    "SecurityProbe": os.environ.get("EXTELLA_TLS_URL", "http://tls:8086/run"),
+    "CommonCrawl": os.environ.get("EXTELLA_CC_URL", "http://cc:8087/run"),
 }
-ALLOWED_HOSTS = {"crawlseo", "seomator", "127.0.0.1", "localhost"}
+ALLOWED_HOSTS = {"crawlseo", "seomator", "psi", "nu", "tls", "cc", "127.0.0.1", "localhost"}
+PROBE_SOURCES = frozenset({"NuHTML", "SecurityProbe", "CommonCrawl"})
 MAX_RESPONSE_BYTES = 10_000_000
 WORKER_UNAVAILABLE_REASONS = frozenset({"waf", "captcha", "http_403", "http_429", "http_503", "robots_denied", "timeout"})
 SEO_CATEGORIES = frozenset(
@@ -44,8 +49,12 @@ def _endpoint(value: str) -> str:
     return value
 
 
-def _plan(plan_path: pathlib.Path) -> dict[str, object]:
+def _plan(source: str, plan_path: pathlib.Path) -> dict[str, object]:
     payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    if source == "PSI":
+        return _psi_plan(payload)
+    if source in PROBE_SOURCES:
+        return _probe_plan(payload)
     if not isinstance(payload, dict) or set(payload) != {
         "max_pages", "categories", "performance_sample_pages", "timeout_ms"
     }:
@@ -66,6 +75,36 @@ def _plan(plan_path: pathlib.Path) -> dict[str, object]:
         or not isinstance(sample_pages, int)
         or not 1 <= sample_pages <= min(5, max_pages)
         or isinstance(timeout_ms, bool)
+        or not isinstance(timeout_ms, int)
+        or not 1 <= timeout_ms <= 720_000
+    ):
+        raise ValueError("source plan is invalid")
+    return payload
+
+
+def _psi_plan(payload: object) -> dict[str, object]:
+    if not isinstance(payload, dict) or set(payload) != {"max_urls", "timeout_ms"}:
+        raise ValueError("source plan is invalid")
+    max_urls = payload["max_urls"]
+    timeout_ms = payload["timeout_ms"]
+    if (
+        isinstance(max_urls, bool)
+        or not isinstance(max_urls, int)
+        or not 1 <= max_urls <= 3
+        or isinstance(timeout_ms, bool)
+        or not isinstance(timeout_ms, int)
+        or not 1 <= timeout_ms <= 720_000
+    ):
+        raise ValueError("source plan is invalid")
+    return payload
+
+
+def _probe_plan(payload: object) -> dict[str, object]:
+    if not isinstance(payload, dict) or set(payload) != {"timeout_ms"}:
+        raise ValueError("source plan is invalid")
+    timeout_ms = payload["timeout_ms"]
+    if (
+        isinstance(timeout_ms, bool)
         or not isinstance(timeout_ms, int)
         or not 1 <= timeout_ms <= 720_000
     ):
@@ -98,7 +137,7 @@ def _worker_error_payload(raw: bytes) -> dict[str, str]:
 
 def proxy_source(source: str, site_url: str, plan_path: pathlib.Path, output_path: pathlib.Path) -> None:
     endpoint = _endpoint(ENDPOINTS[source])
-    plan = _plan(plan_path)
+    plan = _plan(source, plan_path)
     request = urllib.request.Request(
         endpoint,
         data=json.dumps({"site_url": site_url, "plan": plan}, separators=(",", ":")).encode("utf-8"),
@@ -134,7 +173,7 @@ def proxy_source(source: str, site_url: str, plan_path: pathlib.Path, output_pat
 
 def main(argv: list[str]) -> int:
     if len(argv) != 4 or argv[0] not in ENDPOINTS:
-        print("usage: source_proxy.py <CrawlSEO|SEOmator> <public-url> <plan-json> <output-json>", file=sys.stderr)
+        print("usage: source_proxy.py <CrawlSEO|SEOmator|PSI|NuHTML|SecurityProbe|CommonCrawl> <public-url> <plan-json> <output-json>", file=sys.stderr)
         return 2
     try:
         proxy_source(argv[0], argv[1], pathlib.Path(argv[2]), pathlib.Path(argv[3]))

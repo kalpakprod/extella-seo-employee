@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -103,6 +104,50 @@ class ContainerRuntimeTest(unittest.TestCase):
             server.server_close()
             thread.join(timeout=2)
 
+    def test_source_proxy_posts_psi_plan_to_psi_worker(self) -> None:
+        server = ThreadingHTTPServer(("127.0.0.1", 0), _SourceStub)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "psi.json"
+                plan = Path(directory) / "plan.json"
+                plan.write_text(
+                    json.dumps({"max_urls": 2, "timeout_ms": 120000}), encoding="utf-8"
+                )
+                with mock.patch.dict(
+                    PROXY.ENDPOINTS,
+                    {"PSI": f"http://127.0.0.1:{server.server_port}/run"},
+                ):
+                    PROXY.proxy_source("PSI", "https://example.com/", plan, output)
+                self.assertEqual(
+                    _SourceStub.received,
+                    {
+                        "site_url": "https://example.com/",
+                        "plan": {"max_urls": 2, "timeout_ms": 120000},
+                    },
+                )
+                self.assertTrue(output.is_file())
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_source_proxy_rejects_an_invalid_psi_plan_before_network_io(self) -> None:
+        for bad in (
+            {"max_urls": 4, "timeout_ms": 120000},
+            {"max_urls": 0, "timeout_ms": 120000},
+            {"timeout_ms": 120000},
+            {"max_urls": 2, "timeout_ms": 120000, "extra": True},
+        ):
+            with self.subTest(plan=bad), tempfile.TemporaryDirectory() as directory:
+                plan = Path(directory) / "plan.json"
+                plan.write_text(json.dumps(bad), encoding="utf-8")
+                with mock.patch("urllib.request.urlopen") as open_url:
+                    with self.assertRaisesRegex(ValueError, "plan is invalid"):
+                        PROXY.proxy_source("PSI", "https://example.com/", plan, Path(directory) / "output.json")
+                open_url.assert_not_called()
+
     def test_source_proxy_rejects_an_invalid_plan_before_network_io(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             plan = Path(directory) / "plan.json"
@@ -183,6 +228,122 @@ class ContainerRuntimeTest(unittest.TestCase):
             token.write_text("a" * 16 + "\n", encoding="utf-8")
             PREPARE.ensure_generated_secret("agent_zero_api_key", 16)
             self.assertEqual(token.read_text(encoding="utf-8").strip(), "a" * 16)
+
+    def test_prepare_refuses_non_root_deploy_user(self) -> None:
+        argv = [
+            "prepare.py",
+            "--device-id", "device-seo-01",
+            "--hosting-profile", "client_server",
+            "--agent-id", "agent_seo_employee",
+        ]
+        output = io.StringIO()
+        with (
+            mock.patch.object(PREPARE.os, "geteuid", return_value=1000, create=True),
+            mock.patch.object(PREPARE.sys, "argv", argv),
+            mock.patch("sys.stdout", output),
+        ):
+            self.assertEqual(PREPARE.main(), 1)
+        self.assertEqual(json.loads(output.getvalue())["code"], "prepare_requires_root")
+
+    def test_prepare_hands_secrets_to_root_only_when_privileged(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            PREPARE, "SECRETS", Path(directory)
+        ):
+            token = Path(directory) / "seo_employee_api_token"
+            token.write_text("b" * 32 + "\n", encoding="utf-8")
+            with (
+                mock.patch.object(PREPARE.os, "geteuid", return_value=0, create=True),
+                mock.patch.object(PREPARE.os, "chown", create=True) as chown,
+            ):
+                PREPARE.ensure_generated_secret("seo_employee_api_token")
+            chown.assert_called_once_with(token, 0, 0)
+            with (
+                mock.patch.object(PREPARE.os, "geteuid", return_value=1000, create=True),
+                mock.patch.object(PREPARE.os, "chown", create=True) as chown,
+            ):
+                PREPARE.ensure_generated_secret("seo_employee_api_token")
+            chown.assert_not_called()
+
+    def test_prepare_rotate_replaces_token_and_keeps_owner_only_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            PREPARE, "SECRETS", Path(directory)
+        ):
+            token = Path(directory) / "seo_employee_api_token"
+            token.write_text("b" * 32 + "\n", encoding="utf-8")
+            PREPARE.rotate_generated_secret("seo_employee_api_token")
+            rotated = token.read_text(encoding="utf-8").strip()
+            self.assertNotEqual(rotated, "b" * 32)
+            self.assertGreaterEqual(len(rotated), 32)
+            self.assertEqual(oct(token.stat().st_mode & 0o777), "0o600")
+
+    def test_prepare_rotate_refuses_missing_or_invalid_secret(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            PREPARE, "SECRETS", Path(directory)
+        ):
+            with self.assertRaises(RuntimeError):
+                PREPARE.rotate_generated_secret("seo_employee_api_token")
+            token = Path(directory) / "seo_employee_api_token"
+            token.write_text("short\n", encoding="utf-8")
+            with self.assertRaises(RuntimeError):
+                PREPARE.rotate_generated_secret("seo_employee_api_token")
+            with self.assertRaises(RuntimeError):
+                PREPARE.rotate_generated_secret("crawlseo_db_password")
+
+    def test_prepare_rotate_cli_requires_root_and_reports_name_only(self) -> None:
+        argv = ["prepare.py", "--rotate-secret", "seo_employee_api_token"]
+        output = io.StringIO()
+        with (
+            mock.patch.object(PREPARE.os, "geteuid", return_value=1000, create=True),
+            mock.patch.object(PREPARE.sys, "argv", argv),
+            mock.patch("sys.stdout", output),
+        ):
+            self.assertEqual(PREPARE.main(), 1)
+        self.assertEqual(json.loads(output.getvalue())["code"], "prepare_requires_root")
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            PREPARE, "SECRETS", Path(directory)
+        ):
+            token = Path(directory) / "seo_employee_api_token"
+            token.write_text("c" * 32 + "\n", encoding="utf-8")
+            output = io.StringIO()
+            with (
+                mock.patch.object(PREPARE.os, "geteuid", return_value=0, create=True),
+                mock.patch.object(PREPARE.os, "chown", create=True),
+                mock.patch.object(PREPARE.sys, "argv", argv),
+                mock.patch("sys.stdout", output),
+            ):
+                self.assertEqual(PREPARE.main(), 0)
+            payload = json.loads(output.getvalue())
+            self.assertEqual(payload["status"], "success")
+            self.assertEqual(payload["rotated"], "seo_employee_api_token")
+            self.assertNotIn("c" * 32, output.getvalue())
+            self.assertNotEqual(token.read_text(encoding="utf-8").strip(), "c" * 32)
+
+    def test_prepare_rotate_cli_rejects_unknown_secret_name(self) -> None:
+        with mock.patch.object(PREPARE.sys, "argv", ["prepare.py", "--rotate-secret", "nope"]):
+            with self.assertRaises(SystemExit) as exited:
+                PREPARE.main()
+        self.assertEqual(exited.exception.code, 2)
+
+    def test_prepare_syncs_token_with_pinned_interpreter(self) -> None:
+        token = "A" * 32
+        completed = SimpleNamespace(returncode=0, stdout=token + "\n")
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            PREPARE, "SECRETS", Path(directory)
+        ), mock.patch.object(
+            PREPARE, "run", return_value="agent-zero-test-container"
+        ), mock.patch.object(
+            PREPARE.subprocess, "run", return_value=completed
+        ) as run_call:
+            self.assertEqual(PREPARE.sync_managed_token(), "agent-zero-test-container")
+            command = run_call.call_args.args[0]
+            joined = " ".join(command)
+            self.assertIn("/opt/venv-a0/bin/python", joined)
+            self.assertIn("cd /a0", joined)
+            self.assertIn("create_auth_token", joined)
+            self.assertEqual(
+                (Path(directory) / "agent_zero_api_key").read_text(encoding="utf-8").strip(),
+                token,
+            )
 
     def test_prepare_starts_restarts_and_checks_loopback_health(self) -> None:
         compose = ("docker", "compose", "-f", str(PREPARE.COMPOSE))
@@ -565,7 +726,7 @@ class ContainerRuntimeTest(unittest.TestCase):
         compose = (ROOT / "deploy" / "compose.yaml").read_text(encoding="utf-8")
         product = compose.split("\n  api-gateway:", 1)[0]
         self.assertNotIn("\n    ports:", product)
-        self.assertIn("networks: [control, crawlseo_control, resolver_control, seomator_control]", product)
+        self.assertIn("networks: [control, crawlseo_control, resolver_control, seomator_control, psi_control, probe_control]", product)
         self.assertIn("EXTELLA_DNS_RESOLVER_URL: http://dns-resolver:8083/resolve", product)
         self.assertIn("dns-resolver:\n        condition: service_healthy", product)
         self.assertIn("- ./bindings:/run/bindings:ro", product)
@@ -606,6 +767,19 @@ class ContainerRuntimeTest(unittest.TestCase):
         self.assertIn("resolver_control:\n    internal: true", compose)
         self.assertIn("resolver_egress: {}", compose)
         self.assertIn("networks: [seomator_control, seomator_egress]", compose)
+        psi = compose.split("\n  psi:\n", 1)[1].split("\nnetworks:", 1)[0]
+        self.assertIn("image: extella-seo-psi:2.1.0", psi)
+        self.assertIn("dockerfile: runtime/psi/Dockerfile", psi)
+        self.assertIn("networks: [psi_control, psi_egress]", psi)
+        self.assertIn("read_only: true", psi)
+        self.assertIn("cap_drop: [ALL]", psi)
+        self.assertIn("security_opt: [no-new-privileges:true]", psi)
+        self.assertIn("http://127.0.0.1:8084/health", psi)
+        self.assertNotIn("ports:", psi)
+        self.assertNotIn("secrets:", psi)
+        self.assertNotIn("volumes:", psi)
+        self.assertIn("psi_control:\n    internal: true", compose)
+        self.assertIn("psi_egress: {}", compose)
         self.assertNotIn("\n  egress:", compose)
         self.assertIn("cpus:", compose)
         self.assertIn("mem_limit:", compose)
@@ -712,6 +886,47 @@ class ContainerRuntimeTest(unittest.TestCase):
         for field in ("target_id", "target_name", "profile", "max_pages", "ownership_confirmed"):
             self.assertIn(f'"{field}"', source)
         self.assertNotIn('{"site_url": args.site_url}', source)
+
+
+class ProbeContainerTests(unittest.TestCase):
+    def test_proxy_posts_single_page_probe_plan_and_preserves_unavailable(self):
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        response.read.return_value = b'{"status":"unavailable","reason":"http_429"}'
+        with tempfile.TemporaryDirectory() as directory:
+            plan = Path(directory) / "plan.json"
+            plan.write_text('{"timeout_ms":20000}')
+            output = Path(directory) / "result.json"
+            for source in PROXY.PROBE_SOURCES:
+                with mock.patch.object(PROXY.urllib.request, "urlopen", return_value=response) as opener:
+                    PROXY.proxy_source(source, "https://example.com/", plan, output)
+                posted = json.loads(opener.call_args.args[0].data)
+                self.assertEqual(posted, {"site_url": "https://example.com/", "plan": {"timeout_ms": 20000}})
+                self.assertEqual(json.loads(output.read_text()), {"status": "unavailable", "reason": "http_429"})
+                self.assertEqual(list(Path(directory).glob("*.tmp")), [])
+            for bad in ({"timeout_ms": True}, {"timeout_ms": 0}, {"timeout_ms": 20000, "max_urls": 2}):
+                plan.write_text(json.dumps(bad))
+                with mock.patch.object(PROXY.urllib.request, "urlopen") as opener:
+                    with self.assertRaises(ValueError):
+                        PROXY.proxy_source("NuHTML", "https://example.com/", plan, output)
+                opener.assert_not_called()
+
+    def test_compose_probes_have_no_product_startup_dependency_and_no_host_ports(self):
+        compose = (ROOT / "deploy/compose.yaml").read_text()
+        product = compose.split("\n  seo-employee:\n")[1].split("\n  api-gateway:\n")[0]
+        dependencies = product.split("    depends_on:\n")[1].split("    healthcheck:\n")[0]
+        for kind, port in (("nu", 8085), ("tls", 8086), ("cc", 8087)):
+            block = re.split(r"\n(?:  [a-z]|networks:)", compose.split(f"\n  {kind}:\n")[1], maxsplit=1)[0]
+            self.assertNotIn(f"      {kind}:", dependencies)
+            self.assertIn(f"PROBE_KIND: {kind}", block)
+            self.assertIn(f"PORT: {port}", block)
+            self.assertIn("read_only: true", block)
+            self.assertIn("cap_drop: [ALL]", block)
+            self.assertIn("mem_limit: 128m", block)
+            self.assertNotIn("ports:", block)
+            self.assertNotIn("secrets:", block)
+            self.assertIn(f"networks: [probe_control, {kind}_egress]", block)
+        self.assertIn("probe_control:\n    internal: true", compose)
 
 
 if __name__ == "__main__":

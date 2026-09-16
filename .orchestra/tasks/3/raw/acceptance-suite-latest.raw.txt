@@ -1,0 +1,14 @@
+✔ production entrypoint cancels a slow-drip site child at remote D and reaps its PID (1485.516002ms)
+✔ production child reaches a redirected slow-drip provider and cancellation closes it (1524.512941ms)
+✔ caller source_proxy can die while the remote supervisor still stops its child at D (2295.320388ms)
+✔ two child slots overload with HTTP 200 unavailable while health stays ready, then the next request works (1931.432107ms)
+✔ DNS hang is provided only by the test-local child fixture and is cancelled/reaped (1561.882622ms)
+✔ repeated and concurrent cancellation leaves no orphan and the next request works (1656.842138ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11175.084046

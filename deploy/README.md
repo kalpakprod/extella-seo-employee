@@ -12,18 +12,22 @@
 
 ```sh
 cp deploy/.env.example deploy/.env
-python3 deploy/prepare.py \
+sudo python3 deploy/prepare.py \
   --device-id '<Extella device id>' \
   --hosting-profile client_server \
   --agent-id '<agent_... from Extella>'
 ```
+
+`prepare.py` требует root: секреты и привязки должны принадлежать root, иначе
+контейнеры без capabilities не прочитают bind-mounted файлы с правами `600`.
+Без root скрипт сразу завершается кодом `prepare_requires_root`.
 
 `prepare.py` создаёт и перечитывает привязку устройства, собирает закреплённые образы, создаёт локальные secret-файлы с правами `600`, запускает Agent Zero и синхронизирует его внутренний API-токен без вывода значения. Затем он сам поднимает Compose, перезапускает продуктовые контейнеры и ждёт loopback health. Это однократный recovery/первичный путь для отсутствующей device binding; последующие установки через Extella запускают ту же последовательность автоматически. Затем владелец открывает `http://127.0.0.1:50081`, вручную подключает свой провайдер и выбирает модель. Код SEO Employee не ограничивает модель; живым E2E подтверждён только `agy/gemini-3.7-flash-high`, работа через пользовательскую подписку, BYOK и другие модели пока не подтверждена.
 
 ## Существующий Agent Zero
 
 ```sh
-python3 deploy/prepare.py \
+sudo python3 deploy/prepare.py \
   --device-id '<Extella device id>' \
   --hosting-profile client_server \
   --agent-id '<agent_... from Extella>' \
@@ -32,6 +36,17 @@ python3 deploy/prepare.py \
 ```
 
 Путь к ключу передаётся локально; значение не печатается и не попадает в образ. Скрипт проверяет закреплённый образ и подключает уже работающий Docker-контейнер к внутренней сети под алиасом `agent-zero`, без перезапуска. Agent Zero в этом режиме Compose не создаёт.
+
+## Agent Zero: задокументированное исключение закалки
+
+Сервис `agent-zero` — сторонний образ `agent0ai/agent-zero` (пин по sha256), работающий
+от root и исполняющий агентские инструменты. В отличие от собственных сервисов, для него
+намеренно НЕ выставлены `read_only`, `cap_drop: [ALL]` и `user`: поверхность записи
+(код/память/логи вне `/a0/usr`) и нужные capabilities не верифицированы, и их отзыв
+может молча сломать выполнение инструментов. Что сделано: `no-new-privileges`,
+`pids_limit`, лимиты CPU/RAM, loopback-публикация порта и `healthcheck` по
+`http://127.0.0.1:80/`. Пересмотр исключения — отдельной задачей с матрицей
+запись/capability на версионированном образе.
 
 ## Доступ и перенос
 
@@ -50,3 +65,44 @@ python3 deploy/probe.py state
 ```
 
 Для обычной проверки API используйте `GET /health` без токена и `GET /api/state` с `Authorization: Bearer <локальный токен>`.
+
+## PSI lane и ключ Google API
+
+PSI-лейн (PageSpeed + CrUX + проверка robots/sitemap/schema) работает всегда, но его
+секции зависят от доступа к Google:
+
+- Без ключа: PageSpeed вызывается keyless (общая квота, может быть исчерпана —
+  тогда в отчёте честно `psi api http_429: lab metrics unavailable`), CrUX пропущен
+  (`crux not_configured`), sitefiles проверяются как обычно.
+- С ключом: `PSI_API_KEY=<ключ>` в окружении Compose-проекта (Google Cloud Console,
+  PageSpeed Insights API + Chrome UX Report API; бесплатных квот хватает на пилот).
+  Ключ уходит только в `*.googleapis.com`, никогда не пишется в логи и отчёты.
+
+```sh
+PSI_API_KEY=<ключ> docker compose --project-name extella-seo-release -f deploy/compose.yaml up -d psi
+```
+
+Проверить: следующий аудит должен показать в `coverage.sources.PSI.notes` пустой
+список вместо `http_429`, а при медленных страницах — задачи `psi-lcp`/`psi-cls`/`psi-inp`.
+
+## Ротация API-токена
+
+Токен читается сервером один раз при старте, поэтому ротация — это замена файла плюс
+рестарт контейнеров. Имя файла печатается, значение — никогда.
+
+```sh
+# 1. Заменить секрет новым случайным значением (только root):
+sudo python3 deploy/prepare.py --rotate-secret seo_employee_api_token
+# {"status": "success", "rotated": "seo_employee_api_token"}
+
+# 2. Перезапустить контур тем же --project-name, что при запуске:
+docker compose --project-name extella-seo-release -f deploy/compose.yaml restart seo-employee api-gateway
+
+# 3. Проверка: старый токен -> 401, новый -> 200:
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer <старый>" http://127.0.0.1:8088/api/state?target_id=<id>  # 401
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(sudo cat deploy/secrets/seo_employee_api_token)" http://127.0.0.1:8088/api/state?target_id=<id>  # 200
+```
+
+Ротируется только `seo_employee_api_token`. Пароль БД (`crawlseo_db_password`) и ключ
+Agent Zero (`agent_zero_api_key`) через эту команду не меняются: первый рассинхронизирует
+PostgreSQL, второй принадлежит Agent Zero и пересоздаётся его `sync_managed_token`.

@@ -37,7 +37,8 @@ class RuleCatalogTests(unittest.TestCase):
 
     def test_checked_in_catalog_is_sorted_complete_and_covers_all_profiles(self) -> None:
         catalog = load_rule_catalog()
-        self.assertEqual(len(catalog), 251)
+        # DQ-4: 251 registry rules + 3 PSI rules + 4 P2 probe rules.
+        self.assertEqual(len(catalog), 258)
         self.assertEqual(tuple(catalog), tuple(sorted(catalog)))
         self.assertEqual({definition.category for definition in catalog.values()}, {
             "a11y", "content", "core", "crawl", "eeat", "geo", "htmlval", "i18n",
@@ -55,6 +56,13 @@ class RuleCatalogTests(unittest.TestCase):
         self.assertEqual(catalog["core-title-present"].source_severity, "fail")
         self.assertEqual(catalog["core-title-present"].severity, "critical")
         self.assertEqual(catalog["core-title-present"].severity_policy, "seomator-documentation-status-v1")
+
+    def test_every_catalog_severity_fits_the_documented_methodology(self) -> None:
+        catalog = load_rule_catalog()
+        self.assertTrue(
+            {definition.severity for definition in catalog.values()} <= {"critical", "warning", "info"}
+        )
+        self.assertTrue(all(definition.severity_policy for definition in catalog.values()))
 
     def test_legacy_meta_description_mapping_remains_canonical_and_rule_specific(self) -> None:
         definition = canonical_rule("CrawlSEO", "MISSING_DESCRIPTION")
@@ -77,6 +85,62 @@ class RuleCatalogTests(unittest.TestCase):
 
     def test_unknown_rule_has_no_canonical_definition(self) -> None:
         self.assertIsNone(canonical_rule("SEOmator", "not-a-real-rule"))
+
+    def test_psi_validity_twins_resolve_to_canonical_keys(self) -> None:
+        twins = {
+            "ROBOTS_TXT_INVALID": ("technical-robots-txt-valid", "warning"),
+            "SITEMAP_INVALID": ("technical-sitemap-valid", "warning"),
+            "SCHEMA_INVALID": ("schema-valid", "critical"),
+        }
+        for psi_type, (rule_key, severity) in twins.items():
+            with self.subTest(psi_type=psi_type):
+                definition = canonical_rule("PSI", psi_type)
+                self.assertIsNotNone(definition)
+                assert definition is not None
+                self.assertEqual(definition.rule_key, rule_key)
+                self.assertEqual(definition.severity, severity)
+                self.assertEqual(
+                    evidence_level(definition, {"PSI", "SEOmator"}), "verified"
+                )
+                self.assertEqual(evidence_level(definition, {"PSI"}), "supported")
+
+    def test_psi_metric_rules_are_canonical_and_supported_only(self) -> None:
+        for rule_key in ("psi-lcp", "psi-cls", "psi-inp"):
+            with self.subTest(rule_key=rule_key):
+                definition = canonical_rule("PSI", rule_key)
+                self.assertIsNotNone(definition)
+                assert definition is not None
+                self.assertEqual(definition.rule_key, rule_key)
+                self.assertEqual(definition.category, "perf")
+                self.assertFalse(definition.actionable)
+                self.assertEqual(evidence_level(definition, {"PSI"}), "supported")
+
+    def test_crawlseo_twin_types_resolve_to_canonical_keys(self) -> None:
+        twins = {
+            "DUPLICATE_DESCRIPTION": ("content-duplicate-description", "content-duplicate-description", "critical"),
+            "DUPLICATE_TITLE": ("core-title-unique", "core-title-unique", "critical"),
+            "MISSING_CANONICAL": ("core-canonical-present", "core-canonical-present", "critical"),
+            "MISSING_ROBOTS": ("technical-robots-txt-exists", "technical-robots-txt-exists", "warning"),
+            "MISSING_SCHEMA": ("schema-present", "schema-present", "warning"),
+            "MISSING_SITEMAP": ("technical-sitemap-exists", "technical-sitemap-exists", "warning"),
+            "MIXED_CONTENT": ("security-mixed-content", "security-mixed-content", "critical"),
+        }
+        for crawlseo_type, (rule_key, seomator_id, severity) in twins.items():
+            with self.subTest(crawlseo_type=crawlseo_type):
+                definition = canonical_rule("CrawlSEO", crawlseo_type)
+                self.assertIsNotNone(definition)
+                assert definition is not None
+                self.assertEqual(definition.rule_key, rule_key)
+                self.assertEqual(definition.severity, severity)
+                self.assertEqual(
+                    canonical_rule("SEOmator", seomator_id), definition
+                )
+                self.assertEqual(
+                    evidence_level(definition, {"CrawlSEO", "SEOmator"}), "verified"
+                )
+                self.assertEqual(
+                    evidence_level(definition, {"CrawlSEO"}), "supported"
+                )
 
     def test_rule_definition_normalizes_mutable_public_inputs(self) -> None:
         sources = {"SEOmator": "core-title-present"}

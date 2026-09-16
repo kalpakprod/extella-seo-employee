@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import importlib.util
 import http.client
+import io
 import json
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -105,6 +107,59 @@ class ProductApiV2Test(unittest.TestCase):
             self.assertEqual(SERVER.dispatch("POST", "/api/run", {"target_id": "target-example-com-0f115db0"})[0], 503)
         with mock.patch.object(SERVER, "seo_employee_run", return_value=json.dumps({"status": "error", "error": {"code": "SEO_QUEUE_UNAVAILABLE"}})):
             self.assertEqual(SERVER.dispatch("POST", "/api/run", {"target_id": "target-example-com-0f115db0"})[0], 503)
+
+    def _get_json(self, path: str, headers: dict[str, str] | None = None) -> tuple[int, dict]:
+        server = ThreadingHTTPServer(("127.0.0.1", 0), SERVER.handler("x" * 32))
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        try:
+            connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=2)
+            connection.request("GET", path, headers=headers or {})
+            response = connection.getresponse()
+            return response.status, json.loads(response.read())
+        finally:
+            server.shutdown(); server.server_close(); thread.join(1)
+
+    def test_health_reports_version_queue_and_consumer(self) -> None:
+        status, payload = self._get_json("/health")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["version"], SERVER.VERSION)
+        self.assertEqual(payload["queue"], {"depth": "unknown", "consumer": "unknown"})
+        consumer = mock.Mock()
+        consumer.queue.snapshot.return_value = [
+            mock.Mock(status="queued"), mock.Mock(status="completed"), mock.Mock(status="running"),
+        ]
+        consumer.thread.is_alive.return_value = True
+        with mock.patch.object(SERVER, "QUEUE_CONSUMER", consumer):
+            self.assertEqual(
+                SERVER.health_payload()["queue"], {"depth": 2, "consumer": "alive"}
+            )
+        consumer.queue.snapshot.side_effect = OSError("disk gone")
+        with mock.patch.object(SERVER, "QUEUE_CONSUMER", consumer):
+            self.assertEqual(
+                SERVER.health_payload()["queue"], {"depth": "unknown", "consumer": "unknown"}
+            )
+
+    def test_access_log_records_request_without_secret_values(self) -> None:
+        original_bearer = "s3cr3t-authorization-value"
+        stream = io.StringIO()
+        lines: list[str] = []
+        with mock.patch.object(SERVER.sys, "stderr", stream):
+            self.assertEqual(
+                self._request("GET", "/api/unknown", headers={"Authorization": f"Bearer {original_bearer}"}),
+                401,
+            )
+            for _ in range(300):
+                lines = [line for line in stream.getvalue().splitlines() if line.strip()]
+                if lines:
+                    break
+                time.sleep(0.01)
+        self.assertEqual(len(lines), 1)
+        record = json.loads(lines[0])
+        self.assertEqual(record["method"], "GET")
+        self.assertEqual(record["route"], "/api/unknown")
+        self.assertEqual(record["status"], 401)
+        self.assertNotIn(original_bearer, stream.getvalue())
 
 
 if __name__ == "__main__":

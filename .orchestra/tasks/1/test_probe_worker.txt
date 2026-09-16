@@ -1,0 +1,53 @@
+test_archive_record_must_match_the_exact_requested_url (test_probe_worker.CcProbeTest.test_archive_record_must_match_the_exact_requested_url) ... probe cc detail=ValueError
+ok
+test_excerpt_is_capped (test_probe_worker.CcProbeTest.test_excerpt_is_capped) ... ok
+test_index_outage_is_unavailable_not_an_exception (test_probe_worker.CcProbeTest.test_index_outage_is_unavailable_not_an_exception) ... probe cc detail=OSError
+ok
+test_missing_record_is_ok_with_empty_excerpt (test_probe_worker.CcProbeTest.test_missing_record_is_ok_with_empty_excerpt) ... probe cc detail=no record
+ok
+test_record_rejects_paths_outside_crawl_data (test_probe_worker.CcProbeTest.test_record_rejects_paths_outside_crawl_data) ... ok
+test_exemplars_are_capped_and_truncated (test_probe_worker.NuProbeTest.test_exemplars_are_capped_and_truncated) ... ok
+test_fetch_failure_is_unavailable_not_an_exception (test_probe_worker.NuProbeTest.test_fetch_failure_is_unavailable_not_an_exception) ... probe nu detail=fetch OSError
+ok
+test_messages_count_errors_and_warnings_only (test_probe_worker.NuProbeTest.test_messages_count_errors_and_warnings_only) ... ok
+test_validator_failure_is_unavailable_not_an_exception (test_probe_worker.NuProbeTest.test_validator_failure_is_unavailable_not_an_exception) ... probe nu detail=validator OSError
+ok
+test_cc_kind_never_fetches_the_site_host (test_probe_worker.ProbeHandleRunTest.test_cc_kind_never_fetches_the_site_host) ... probe cc detail=OSError
+ok
+test_each_kind_rejects_a_bad_plan (test_probe_worker.ProbeHandleRunTest.test_each_kind_rejects_a_bad_plan) ... ok
+test_public_handle_run_routes_through_isolated_supervisor (test_probe_worker.ProbeHandleRunTest.test_public_handle_run_routes_through_isolated_supervisor) ... ok
+test_site_fetching_kinds_reject_a_private_site_host (test_probe_worker.ProbeHandleRunTest.test_site_fetching_kinds_reject_a_private_site_host) ... ok
+test_unknown_kind_is_rejected (test_probe_worker.ProbeHandleRunTest.test_unknown_kind_is_rejected) ... ok
+test_absolute_deadline_rejects_slow_request_response_and_body (test_probe_worker.ProbeHonestyTests.test_absolute_deadline_rejects_slow_request_response_and_body) ... ok
+test_archive_crawler_encoding_metadata_does_not_hide_plain_html (test_probe_worker.ProbeHonestyTests.test_archive_crawler_encoding_metadata_does_not_hide_plain_html) ... ok
+test_archive_decompression_is_bounded (test_probe_worker.ProbeHonestyTests.test_archive_decompression_is_bounded) ... ok
+test_archive_excerpt_decompresses_and_omits_scripts (test_probe_worker.ProbeHonestyTests.test_archive_excerpt_decompresses_and_omits_scripts) ... ok
+test_deadline_cannot_be_extended_by_another_request (test_probe_worker.ProbeHonestyTests.test_deadline_cannot_be_extended_by_another_request) ... ok
+test_dns_stage_cannot_complete_after_the_absolute_deadline (test_probe_worker.ProbeHonestyTests.test_dns_stage_cannot_complete_after_the_absolute_deadline) ... ok
+test_first_public_address_failure_falls_back_without_reresolving (test_probe_worker.ProbeHonestyTests.test_first_public_address_failure_falls_back_without_reresolving) ... ok
+test_index_json_lines_and_cap (test_probe_worker.ProbeHonestyTests.test_index_json_lines_and_cap) ... ok
+test_ipv6_host_header_keeps_uri_authority_brackets (test_probe_worker.ProbeHonestyTests.test_ipv6_host_header_keeps_uri_authority_brackets) ... ok
+test_mixed_public_private_dns_answer_is_rejected (test_probe_worker.ProbeHonestyTests.test_mixed_public_private_dns_answer_is_rejected) ... ok
+test_nat64_address_with_non_global_embedded_ipv4_is_rejected (test_probe_worker.ProbeHonestyTests.test_nat64_address_with_non_global_embedded_ipv4_is_rejected) ... ok
+test_real_socket_path_uses_pinned_numeric_address_and_host (test_probe_worker.ProbeHonestyTests.test_real_socket_path_uses_pinned_numeric_address_and_host) ... ok
+test_real_tls_path_uses_pinned_address_and_preserves_sni (test_probe_worker.ProbeHonestyTests.test_real_tls_path_uses_pinned_address_and_preserves_sni) ... ok
+test_response_failure_does_not_fall_back_to_another_address (test_probe_worker.ProbeHonestyTests.test_response_failure_does_not_fall_back_to_another_address) ... ok
+test_site_fetch_pins_the_validated_public_address (test_probe_worker.ProbeHonestyTests.test_site_fetch_pins_the_validated_public_address) ... ok
+test_supervisor_ipc_wait_does_not_inherit_network_wait_cap (test_probe_worker.ProbeHonestyTests.test_supervisor_ipc_wait_does_not_inherit_network_wait_cap) ... ok
+test_truncated_html_is_not_reported_as_invalid_html (test_probe_worker.ProbeHonestyTests.test_truncated_html_is_not_reported_as_invalid_html) ... ok
+test_validator_internal_errors_are_not_a_clean_validation (test_probe_worker.ProbeHonestyTests.test_validator_internal_errors_are_not_a_clean_validation) ... ok
+test_fetch_failure_is_unavailable_not_an_exception (test_probe_worker.TlsProbeTest.test_fetch_failure_is_unavailable_not_an_exception) ... probe tls detail=fetch OSError
+ok
+test_hsts_max_age_parsing (test_probe_worker.TlsProbeTest.test_hsts_max_age_parsing) ... ok
+test_labs_is_queried_once_and_never_polled (test_probe_worker.TlsProbeTest.test_labs_is_queried_once_and_never_polled) ... ok
+test_malformed_http_is_an_unavailable_json_result_for_every_lane (test_probe_worker.TlsProbeTest.test_malformed_http_is_an_unavailable_json_result_for_every_lane) ... probe nu detail=fetch BadStatusLine
+probe tls detail=fetch BadStatusLine
+probe cc detail=BadStatusLine
+ok
+test_ssl_grade_keeps_the_worst_ready_endpoint (test_probe_worker.TlsProbeTest.test_ssl_grade_keeps_the_worst_ready_endpoint) ... ok
+test_ssl_labs_grade_is_unavailable_for_unsupported_origins (test_probe_worker.TlsProbeTest.test_ssl_labs_grade_is_unavailable_for_unsupported_origins) ... ok
+
+----------------------------------------------------------------------
+Ran 38 tests in 0.325s
+
+OK

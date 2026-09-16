@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import json
+import math
 import os
 import re
 import socket
@@ -41,7 +42,7 @@ import sys
 
 sys.modules.setdefault("seo_employee_profiles", _seo_employee_profiles)
 sys.modules.setdefault("seo_employee_rules", _seo_employee_rules)
-from experts.seo_employee_sources import Coverage, CrawlSEOAdapter, SEOmatorAdapter, SourceResult, required_sources_satisfied
+from experts.seo_employee_sources import Coverage, CrawlSEOAdapter, PSIAdapter, SEOmatorAdapter, NuHTMLAdapter, SecurityProbeAdapter, CommonCrawlAdapter, SourceAdapter, SourceResult, required_sources_satisfied
 
 
 ROOT_PATH = Path(__file__).resolve().parents[1]
@@ -69,12 +70,24 @@ CRAWLSEO_EXECUTABLE = Path(
 SEOMATOR_EXECUTABLE = Path(
     os.environ.get("EXTELLA_SEOMATOR_EXECUTABLE", str(ROOT_PATH / "runtime" / "container" / "run_seomator"))
 )
+PROBE_EXECUTABLES = {
+    name: Path(os.environ.get(f"EXTELLA_{kind.upper()}_EXECUTABLE", str(ROOT_PATH / "runtime" / "container" / f"run_{kind}")))
+    for name, kind in (("NuHTML", "nu"), ("SecurityProbe", "tls"), ("CommonCrawl", "cc"))
+}
+PROBE_TIMEOUT_SECONDS = 20
+PROBE_IPC_MARGIN_SECONDS = 1.0
+
+PSI_EXECUTABLE = Path(
+    os.environ.get("EXTELLA_PSI_EXECUTABLE", str(ROOT_PATH / "runtime" / "container" / "run_psi"))
+)
 DNS_RESOLVER_URL = os.environ.get("EXTELLA_DNS_RESOLVER_URL", "")
 
 REPORT_SCHEMA = "extella.seo_employee_report.v2"
 STATE_SCHEMA = "extella.seo_employee_state.v2"
 CONFIG_SCHEMA = TARGET_CONFIG_SCHEMA
-NORMALIZER_VERSION = "2.0.0"
+NORMALIZER_VERSION = "2.1.0"
+COMPARISON_VERSION = 2
+BASELINE_ITEM_LIMIT = 10000
 ACTIVE_VERSION = "2.0.0"
 MODEL_FIELDS = frozenset(
     {
@@ -105,7 +118,25 @@ _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 _DEVICE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$")
 _AGENT_ID_RE = re.compile(r"^agent_[A-Za-z0-9_][A-Za-z0-9_-]{2,127}$")
 _SEVERITY_ORDER = {"critical": 0, "warning": 1, "info": 2}
+_SEVERITY_DOWNGRADE = {"critical": "warning", "warning": "info", "info": "info"}
 _EVIDENCE_ORDER = {"verified": 0, "supported": 1, "unverified": 2}
+SEVERITY_LEVELS = ("critical", "warning", "info")
+SEVERITY_METHODOLOGY_VERSION = "1"
+
+
+def effective_severity(catalog_severity: str, *, confirmed_failure: bool) -> tuple[str, str]:
+    """Return the reported severity and the basis that justifies it.
+
+    The catalog holds the severity for a confirmed failure of the rule. An
+    occurrence that was only reported as a warning is not a confirmed failure,
+    so it keeps the rule severity only as its ceiling and is downgraded one
+    level instead of claiming a failure that the source did not confirm.
+    """
+    if confirmed_failure:
+        return catalog_severity, "confirmed_failure"
+    return _SEVERITY_DOWNGRADE.get(catalog_severity, catalog_severity), "unconfirmed_occurrence"
+
+
 _ALLOWED_FACT_WHITESPACE = frozenset({" ", "\t", "\n", "\r"})
 _SAFE_SOURCE_REASONS = frozenset(
     {
@@ -337,7 +368,8 @@ def sanitize_url_for_model(value: str) -> str:
         raise ModelInputError("model input URL is invalid")
     if ":" in host and not host.startswith("["):
         host = f"[{host}]"
-    netloc = host if port is None else f"{host}:{port}"
+    default_port = {"http": 80, "https": 443}[parsed.scheme]
+    netloc = host if port is None or port == default_port else f"{host}:{port}"
     return urllib.parse.urlunsplit((parsed.scheme, netloc, parsed.path or "/", "", ""))
 
 
@@ -382,20 +414,81 @@ def _source_payload_is_valid(
     return adapter is not None and adapter.parse(payload, selected_plan).status == "ok"
 
 
-def prioritize_findings(findings: Iterable[Mapping[str, object]], limit: int = 10) -> list[dict[str, object]]:
+def prioritize_findings(
+    findings: Iterable[Mapping[str, object]],
+    limit: int = 10,
+    *,
+    category_priority: Sequence[str] | None = None,
+) -> list[dict[str, object]]:
     if limit <= 0:
         raise SeoEmployeeError("task limit must be positive")
+    order = {category: index for index, category in enumerate(category_priority or ())}
+    catalog = load_rule_catalog() if order else {}
+    def _category_index(item: Mapping[str, object]) -> int:
+        definition = catalog.get(str(item.get("rule_key")))
+        category = definition.category if definition is not None else ""
+        return order.get(category, len(order))
     verified = [dict(item) for item in findings if item.get("evidence_level") != "unverified"]
     return sorted(
         verified,
         key=lambda item: (
             _SEVERITY_ORDER.get(str(item.get("severity")), 99),
             _EVIDENCE_ORDER.get(str(item.get("evidence_level")), 99),
+            _category_index(item),
             -int(item.get("affected_pages_count", 0)),
             str(item.get("url", "")),
             str(item.get("rule_key", "")),
         ),
     )[:limit]
+
+
+GROUP_PAGE_LIMIT = 50
+RECOMMENDATION_LIMIT = 10
+
+
+def group_findings_by_rule(findings: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
+    """Collapse identical rule_key findings into one recommendation per problem.
+
+    Per-URL findings keep their own identity in the bounded snapshot so that
+    comparison stays honest. The recommendation layer shows one card per
+    rule_key with the affected pages, so one mass problem does not consume the
+    whole limited task list.
+    """
+    groups: list[dict[str, object]] = []
+    index: dict[str, dict[str, object]] = {}
+    for finding in findings:
+        rule_key = str(finding.get("rule_key", ""))
+        url = str(finding.get("url", ""))
+        evidence = [dict(item) for item in finding.get("evidence", []) if isinstance(item, Mapping)]
+        group = index.get(rule_key)
+        if group is None:
+            group = {
+                **finding,
+                "affected_pages_count": 1,
+                "affected_pages": [{"url": url, "evidence": evidence}],
+                "affected_pages_truncated": False,
+            }
+            groups.append(group)
+            index[rule_key] = group
+            continue
+        group["affected_pages_count"] = int(group["affected_pages_count"]) + 1
+        pages = group["affected_pages"]
+        assert isinstance(pages, list)
+        if len(pages) < GROUP_PAGE_LIMIT:
+            pages.append({"url": url, "evidence": evidence})
+        else:
+            group["affected_pages_truncated"] = True
+        merged = group["evidence"]
+        assert isinstance(merged, list)
+        for item in evidence:
+            if item not in merged:
+                merged.append(item)
+        if _SEVERITY_ORDER.get(str(finding.get("severity")), 99) < _SEVERITY_ORDER.get(str(group.get("severity")), 99):
+            group["severity"] = finding.get("severity")
+            group["severity_basis"] = finding.get("severity_basis")
+        if _EVIDENCE_ORDER.get(str(finding.get("evidence_level")), 99) < _EVIDENCE_ORDER.get(str(group.get("evidence_level")), 99):
+            group["evidence_level"] = finding.get("evidence_level")
+    return groups
 
 
 def _default_agent_call(message: str, *, timeout_seconds: float = AGENT_ZERO_TIMEOUT_SECONDS) -> Mapping[str, str]:
@@ -623,16 +716,16 @@ def _safe_failure(code: str) -> dict[str, str]:
 
 
 def compare_with_baseline(
-    tasks: Sequence[Mapping[str, object]], baseline: Mapping[str, object] | None
+    tasks: Sequence[Mapping[str, object]],
+    baseline: Mapping[str, object] | None,
+    *,
+    can_declare_fixed: Callable[[Mapping[str, object]], bool] | None = None,
 ) -> tuple[dict[str, object], dict[str, object]]:
     current: dict[str, dict[str, object]] = {}
     for task in tasks:
         card = dict(task)
         _assert_no_secret_material(card)
         current[str(card["task_id"])] = card
-    # Reports are capped to ten tasks. Preserve the same bounded, deterministic
-    # set in the baseline even when this helper is called directly.
-    current = {task_id: current[task_id] for task_id in sorted(current)[:10]}
     previous_items = baseline.get("items", []) if isinstance(baseline, Mapping) else []
     previous: dict[str, dict[str, object]] = {}
     if isinstance(previous_items, list):
@@ -646,19 +739,26 @@ def compare_with_baseline(
                 continue
             previous[str(card["task_id"])] = card
     new_ids = sorted(set(current) - set(previous))
-    fixed_ids = sorted(set(previous) - set(current))
+    absent_ids = sorted(set(previous) - set(current))
     unchanged_ids = sorted(set(current) & set(previous))
+    evaluated = can_declare_fixed or (lambda _previous: True)
+    fixed_ids = [item for item in absent_ids if evaluated(previous[item])]
+    fixed_set = set(fixed_ids)
+    not_evaluated_ids = [item for item in absent_ids if item not in fixed_set]
     comparison: dict[str, object] = {
         "baseline": "compared" if baseline is not None else "created",
         "new": len(new_ids),
         "fixed": len(fixed_ids),
         "unchanged": len(unchanged_ids),
+        "not_evaluated": len(not_evaluated_ids),
         "new_items": [current[item] for item in new_ids],
         "fixed_items": [previous[item] for item in fixed_ids],
         "unchanged_items": [current[item] for item in unchanged_ids],
+        "not_evaluated_items": [previous[item] for item in not_evaluated_ids],
     }
     next_baseline: dict[str, object] = {
         "schema": "extella.seo_employee_baseline.v1",
+        "comparison_version": COMPARISON_VERSION,
         "items": [current[item] for item in sorted(current)],
     }
     return comparison, next_baseline
@@ -902,6 +1002,17 @@ def _worker_plan(plan: AuditPlan) -> dict[str, object]:
     }
 
 
+def _worker_psi_plan(plan: AuditPlan) -> dict[str, object]:
+    return {
+        "max_urls": plan.psi_max_urls,
+        "timeout_ms": plan.source_timeout_seconds * 1000,
+    }
+
+
+def _probe_wire_timeout_ms(source_budget_seconds: float) -> int:
+    return math.floor((source_budget_seconds - PROBE_IPC_MARGIN_SECONDS) * 1000)
+
+
 def _run_v2_source_wrapper(
     source: str,
     executable: Path,
@@ -912,15 +1023,23 @@ def _run_v2_source_wrapper(
     runner: Callable[..., object],
     obtained_at: str,
     timeout_seconds: float,
+    best_effort: bool = False,
 ) -> tuple[dict[str, object], SourceResult]:
-    adapter = CrawlSEOAdapter() if source == "CrawlSEO" else SEOmatorAdapter()
+    adapters = {"CrawlSEO": CrawlSEOAdapter(), "SEOmator": SEOmatorAdapter(), "PSI": PSIAdapter(), "NuHTML": NuHTMLAdapter(), "SecurityProbe": SecurityProbeAdapter(), "CommonCrawl": CommonCrawlAdapter()}
+    adapter = adapters[source]
+    wire_timeout_ms = _probe_wire_timeout_ms(timeout_seconds) if source in PROBE_EXECUTABLES else None
+    if wire_timeout_ms is not None and wire_timeout_ms < 1:
+        result = SourceResult(source, "unavailable", adapter.parse({"status": "unavailable", "reason": "timeout"}, plan).coverage, reason="timeout")
+        return _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict()), result
+    worker_plan = ({"timeout_ms": wire_timeout_ms} if wire_timeout_ms is not None
+                   else _worker_psi_plan(plan) if source == "PSI" else _worker_plan(plan))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plan_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=output_path.parent, prefix=".plan.", suffix=".json", delete=False) as handle:
             plan_path = Path(handle.name)
             os.chmod(plan_path, 0o600)
-            json.dump(_worker_plan(plan), handle, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            json.dump(worker_plan, handle, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
             handle.flush()
             os.fsync(handle.fileno())
         try:
@@ -938,9 +1057,17 @@ def _run_v2_source_wrapper(
             result = SourceResult(source, "unavailable", adapter.parse({"status": "unavailable", "reason": "waf"}, plan).coverage, reason="wrapper_unavailable")
             return _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict()), result
         if getattr(completed, "returncode", 1) != 0:
+            if best_effort:
+                result = SourceResult(source, "unavailable", adapter.parse({"status": "unavailable", "reason": "timeout"}, plan).coverage, reason="worker_unavailable")
+                return _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict()), result
             result = SourceResult(source, "failed", adapter.parse({"status": "failed", "reason": "audit_failed"}, plan).coverage, reason="audit_failed")
             return _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict()), result
-        result = _parse_source_payload(source, adapter, _read_json_object(output_path), plan)
+        payload = _read_json_object(output_path)
+        result = _parse_source_payload(source, adapter, payload, plan)
+        if source in PROBE_EXECUTABLES and result.status == "ok" and payload.get("site_url") != site_url:
+            result = _failed_source_result(source, plan)
+        if best_effort and result.status == "failed":
+            result = SourceResult(source, "unavailable", Coverage(plan.max_pages, 0, 0, tuple(plan.categories), (), (source,), ()), reason=result.reason)
         status = _source_status(source, result.status, obtained_at, reason=result.reason, coverage=result.coverage.as_dict())
         return status, result
     finally:
@@ -960,6 +1087,7 @@ def collect_sources(
     runner: Callable[..., object] = subprocess.run,
     crawlseo_executable: Path = CRAWLSEO_EXECUTABLE,
     seomator_executable: Path = SEOMATOR_EXECUTABLE,
+    psi_executable: Path = PSI_EXECUTABLE,
     obtained_at: str | None = None,
     deadline: RunDeadline | None = None,
 ) -> tuple[list[dict[str, object]], dict[str, SourceResult]]:
@@ -967,13 +1095,28 @@ def collect_sources(
     timestamp = obtained_at or _utc_now()
     budget = deadline or RunDeadline(selected_plan.overall_timeout_seconds)
     run_dir = evidence_dir / run_id
-    definitions = (("CrawlSEO", crawlseo_executable, "crawlseo.json"), ("SEOmator", seomator_executable, "seomator.json"))
+    definitions = (
+        ("CrawlSEO", crawlseo_executable, "crawlseo.json", False),
+        ("SEOmator", seomator_executable, "seomator.json", False),
+        ("PSI", psi_executable, "psi.json", True),
+        *((name, executable, f"{kind}.json", True) for (name, executable), kind in zip(PROBE_EXECUTABLES.items(), ("nu", "tls", "cc"))),
+    )
     statuses: list[dict[str, object]] = []
     results: dict[str, SourceResult] = {}
-    for source, executable, filename in definitions:
+    for source, executable, filename, best_effort in definitions:
+        try:
+            timeout = budget.remaining(PROBE_TIMEOUT_SECONDS if source in PROBE_EXECUTABLES else selected_plan.source_timeout_seconds)
+        except SeoEmployeeError:
+            if not best_effort:
+                raise
+            result = SourceResult(source, "unavailable", Coverage(selected_plan.max_pages, 0, 0, tuple(selected_plan.categories), (), (source,), ()), reason="timeout")
+            statuses.append(_source_status(source, result.status, timestamp, reason=result.reason, coverage=result.coverage.as_dict()))
+            results[source] = result
+            continue
         status, result = _run_v2_source_wrapper(
             source, executable, site_url, run_dir / filename, selected_plan, runner=runner,
-            obtained_at=timestamp, timeout_seconds=budget.remaining(selected_plan.source_timeout_seconds),
+            obtained_at=timestamp, timeout_seconds=timeout,
+            best_effort=best_effort,
         )
         statuses.append(status)
         results[source] = result
@@ -992,6 +1135,7 @@ def _optional_source_status(source: str, obtained_at: str, plan: AuditPlan) -> d
         "completed_sources": [],
         "unavailable_sources": [source],
         "unmapped_rules": [],
+        "subchecks": [],
     }
     return _source_status(source, "not_configured", obtained_at, reason="not_configured", coverage=coverage)
 
@@ -1015,7 +1159,7 @@ def _failed_source_result(source: str, plan: AuditPlan) -> SourceResult:
 
 def _parse_source_payload(
     source: str,
-    adapter: CrawlSEOAdapter | SEOmatorAdapter,
+    adapter: SourceAdapter,
     payload: Mapping[str, object] | None,
     plan: AuditPlan,
 ) -> SourceResult:
@@ -1066,7 +1210,28 @@ def _aggregate_coverage(plan: AuditPlan, results: Mapping[str, SourceResult]) ->
         "completed_sources": sorted(item.source for item in values if item.status == "ok"),
         "unavailable_sources": sorted(item.source for item in values if item.status != "ok"),
         "unmapped_rules": sorted({rule for item in values for rule in item.coverage.unmapped_rules}),
+        "sources": {
+            item.source: {
+                "status": item.status,
+                "crawled_pages": item.coverage.crawled_pages,
+                "sampled_pages": item.coverage.sampled_pages,
+                "unmapped_rules": list(item.coverage.unmapped_rules),
+                "notes": list(item.coverage.notes),
+                "subchecks": [subcheck.as_dict() for subcheck in item.coverage.subchecks],
+            }
+            for item in sorted(values, key=lambda item: item.source)
+        },
     }
+
+
+def _missing_data(plan: AuditPlan, results: Mapping[str, SourceResult]) -> list[str]:
+    missing = [item.source for item in results.values() if item.status != "ok"]
+    missing.extend(plan.optional_sources)
+    for item in results.values():
+        for subcheck in item.coverage.subchecks:
+            if subcheck.status in {"unavailable", "partial"}:
+                missing.append(f"{item.source}.{subcheck.name}")
+    return list(dict.fromkeys(missing))
 
 
 def normalize_v2_findings(
@@ -1090,6 +1255,7 @@ def normalize_findings(target_id: str, payloads: Mapping[str, Mapping[str, objec
 
 def _normalize_v2_results(target_id: str, plan: AuditPlan, results: Mapping[str, SourceResult]) -> list[dict[str, object]]:
     merged: dict[tuple[str, str, str], dict[str, object]] = {}
+    failed: set[tuple[str, str, str]] = set()
     catalog = load_rule_catalog()
     for result in results.values():
         for occurrence in result.occurrences:
@@ -1111,12 +1277,17 @@ def _normalize_v2_results(target_id: str, plan: AuditPlan, results: Mapping[str,
                 "confirmed_fact": definition.confirmed_fact or _bounded_fact(occurrence.fact),
                 "verification": definition.verification or f"Repeat {occurrence.source} rule {occurrence.source_rule} and confirm it no longer fails.",
             })
+            if occurrence.status == "fail":
+                failed.add(key)
             evidence = {"source": occurrence.source, "source_rule": occurrence.source_rule, "fact": _bounded_fact(occurrence.fact)}
             if evidence not in finding["evidence"]:
                 finding["evidence"].append(evidence)
     findings: list[dict[str, object]] = []
-    for finding in merged.values():
+    for key, finding in merged.items():
         definition = catalog[str(finding["rule_key"])]
+        severity, basis = effective_severity(definition.severity, confirmed_failure=key in failed)
+        finding["severity"] = severity
+        finding["severity_basis"] = basis
         sources = [str(item["source"]) for item in finding["evidence"] if isinstance(item, Mapping)]
         finding["evidence"] = sorted(finding["evidence"], key=lambda item: (str(item["source"]), str(item["source_rule"]), str(item["fact"])))
         finding["evidence_level"] = evidence_level(definition, sources)
@@ -1144,7 +1315,12 @@ def validate_model_input(value: Mapping[str, object]) -> None:
     if set(value) != MODEL_FIELDS:
         raise ModelInputError("model input fields do not match SC-SEO-031")
     definition = load_rule_catalog().get(str(value.get("rule_key")))
-    if definition is None or value.get("severity") != definition.severity or value.get("evidence_level") not in {"verified", "supported"}:
+    allowed_severities = (
+        {definition.severity, effective_severity(definition.severity, confirmed_failure=False)[0]}
+        if definition is not None
+        else set()
+    )
+    if definition is None or value.get("severity") not in allowed_severities or value.get("evidence_level") not in {"verified", "supported"}:
         raise ModelInputError("model input is invalid")
     sources = value.get("sources")
     if not isinstance(sources, list) or not sources or sources != sorted(set(sources)) or any(source not in definition.source_rules for source in sources):
@@ -1160,24 +1336,98 @@ def validate_model_input(value: Mapping[str, object]) -> None:
 
 
 def _not_compared() -> dict[str, object]:
-    return {"baseline": "not_compared", "new": 0, "fixed": 0, "unchanged": 0, "new_items": [], "fixed_items": [], "unchanged_items": []}
+    return {
+        "baseline": "not_compared",
+        "new": 0,
+        "fixed": 0,
+        "unchanged": 0,
+        "not_evaluated": 0,
+        "new_items": [],
+        "fixed_items": [],
+        "unchanged_items": [],
+        "not_evaluated_items": [],
+    }
+
+
+def _current_crawled_pages(results: Mapping[str, SourceResult]) -> int:
+    return max((result.coverage.crawled_pages for result in results.values()), default=0)
+
+
+def _baseline_coverage_comparable(baseline: Mapping[str, object], results: Mapping[str, SourceResult]) -> bool:
+    stored = baseline.get("coverage")
+    if not isinstance(stored, Mapping):
+        return True
+    previous_crawled = stored.get("crawled_pages")
+    if not isinstance(previous_crawled, int) or isinstance(previous_crawled, bool):
+        return True
+    return _current_crawled_pages(results) >= previous_crawled
+
+
+def _can_declare_fixed(
+    results: Mapping[str, SourceResult], *, coverage_comparable: bool
+) -> Callable[[Mapping[str, object]], bool]:
+    statuses = {result.source: result.status for result in results.values()}
+    catalog = load_rule_catalog()
+
+    def _evaluated(previous: Mapping[str, object]) -> bool:
+        if not coverage_comparable:
+            return False
+        definition = catalog.get(str(previous.get("rule_key")))
+        if definition is None:
+            return False
+        required = tuple(definition.source_rules)
+        return bool(required) and all(statuses.get(source) == "ok" for source in required)
+
+    return _evaluated
+
+
+def _reclassify_fixed(comparison: dict[str, object]) -> None:
+    fixed_items = list(comparison.get("fixed_items", []))
+    if not fixed_items:
+        return
+    comparison["fixed"] = 0
+    comparison["fixed_items"] = []
+    comparison["not_evaluated"] = int(comparison.get("not_evaluated", 0)) + len(fixed_items)
+    comparison["not_evaluated_items"] = list(comparison.get("not_evaluated_items", [])) + fixed_items
 
 
 def _comparison_for_v2(
-    tasks: Sequence[Mapping[str, object]], baseline: Mapping[str, object] | None, *, target_id: str, plan: AuditPlan, terminal_state: str,
+    tasks: Sequence[Mapping[str, object]],
+    baseline: Mapping[str, object] | None,
+    *,
+    target_id: str,
+    plan: AuditPlan,
+    terminal_state: str,
+    results: Mapping[str, SourceResult],
 ) -> tuple[dict[str, object], dict[str, object] | None]:
     if terminal_state == "failed":
         return _not_compared(), None
     if baseline is not None and (
-        baseline.get("target_id") != target_id or baseline.get("plan_signature") != _plan_signature(plan) or baseline.get("catalog_major") != _catalog_major()
+        baseline.get("target_id") != target_id
+        or baseline.get("plan_signature") != _plan_signature(plan)
+        or baseline.get("catalog_major") != _catalog_major()
+        or baseline.get("comparison_version") != COMPARISON_VERSION
     ):
         return _not_compared(), None
-    comparison, next_baseline = compare_with_baseline(tasks, baseline)
+    coverage_comparable = _baseline_coverage_comparable(baseline, results) if baseline is not None else True
+    comparison, next_baseline = compare_with_baseline(
+        tasks,
+        baseline,
+        can_declare_fixed=_can_declare_fixed(results, coverage_comparable=coverage_comparable),
+    )
     if terminal_state == "partial":
-        comparison["fixed"] = 0
-        comparison["fixed_items"] = []
+        _reclassify_fixed(comparison)
         return comparison, None
-    next_baseline.update({"schema": "extella.seo_employee_baseline.v2", "target_id": target_id, "plan_signature": _plan_signature(plan), "catalog_major": _catalog_major()})
+    next_baseline.update(
+        {
+            "schema": "extella.seo_employee_baseline.v2",
+            "comparison_version": COMPARISON_VERSION,
+            "target_id": target_id,
+            "plan_signature": _plan_signature(plan),
+            "catalog_major": _catalog_major(),
+            "coverage": {"planned_pages": plan.max_pages, "crawled_pages": _current_crawled_pages(results)},
+        }
+    )
     return comparison, next_baseline
 
 
@@ -1225,6 +1475,9 @@ def _action_proposal(
     }
 
 
+_ENRICH_ATTEMPTS = 3
+
+
 def _build_tasks(
     findings: Sequence[Mapping[str, object]],
     *,
@@ -1236,35 +1489,64 @@ def _build_tasks(
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     tasks: list[dict[str, object]] = []
     enriched_count = 0
+    total_attempts = 0
     failed = False
+    reasons = {"invalid_input": 0, "deadline": 0, "model_error": 0}
     for finding in findings:
         task: dict[str, object] = {"task_id": _task_identity(finding), **finding}
         try:
             model_input = build_model_input(finding)
-            enriched = (
-                enrich_with_agent_zero(model_input, timeout_seconds=deadline.remaining(AGENT_ZERO_TIMEOUT_SECONDS))
-                if enricher is enrich_with_agent_zero and deadline is not None
-                else _validate_enrichment(enricher(model_input))
-            )
-            task.update(enriched)
-            enriched_count += 1
         except (SeoEmployeeError, OSError, RuntimeError, ImportError):
             failed = True
+            reasons["invalid_input"] += 1
+            model_input = None
+        if model_input is not None:
+            enriched_ok = False
+            for _ in range(_ENRICH_ATTEMPTS):
+                timeout_seconds: float | None = None
+                if enricher is enrich_with_agent_zero and deadline is not None:
+                    try:
+                        timeout_seconds = deadline.remaining(AGENT_ZERO_TIMEOUT_SECONDS)
+                    except SeoEmployeeError:
+                        reasons["deadline"] += 1
+                        break
+                total_attempts += 1
+                try:
+                    enriched = (
+                        enrich_with_agent_zero(model_input, timeout_seconds=timeout_seconds)
+                        if timeout_seconds is not None
+                        else _validate_enrichment(enricher(model_input))
+                    )
+                    task.update(enriched)
+                    enriched_count += 1
+                    enriched_ok = True
+                    break
+                except (SeoEmployeeError, OSError, RuntimeError, ImportError):
+                    reasons["model_error"] += 1
+                    continue
+            if not enriched_ok:
+                failed = True
         proposal = _action_proposal(task, target_id=target_id, site_url=site_url, expires_at=expires_at)
         if proposal is not None:
             task["action_proposal"] = proposal
         tasks.append(task)
     total = len(tasks)
+    counts: dict[str, object] = {
+        "enriched": enriched_count,
+        "total": total,
+        "unavailable": total - enriched_count,
+        "attempts": total_attempts,
+        "reasons": dict(reasons),
+    }
     if total == 0:
-        return tasks, {"status": "not_needed", "limitation": "No deterministic findings require explanation.", "enriched": 0, "total": 0}
+        return tasks, {"status": "not_needed", "limitation": "No deterministic findings require explanation.", **counts}
     if failed:
         return tasks, {
             "status": "unavailable",
             "limitation": "One or more model enrichments are unavailable; deterministic evidence is preserved.",
-            "enriched": enriched_count,
-            "total": total,
+            **counts,
         }
-    return tasks, {"status": "ok", "limitation": "", "enriched": enriched_count, "total": total}
+    return tasks, {"status": "ok", "limitation": "", **counts}
 
 
 def _mode_result(plan: AuditPlan, results: Mapping[str, SourceResult]) -> dict[str, object]:
@@ -1294,9 +1576,14 @@ def _build_v2_report(
     deadline: RunDeadline | None = None,
 ) -> tuple[dict[str, object], dict[str, object] | None]:
     target_id = str(target["target_id"])
-    findings = prioritize_findings(_normalize_v2_results(target_id, plan, results))
+    findings = prioritize_findings(
+        _normalize_v2_results(target_id, plan, results),
+        limit=BASELINE_ITEM_LIMIT,
+        category_priority=plan.categories,
+    )
+    groups = group_findings_by_rule(findings)
     tasks, model_status = _build_tasks(
-        findings,
+        groups[:RECOMMENDATION_LIMIT],
         target_id=target_id,
         site_url=command["site_url"],
         expires_at=_iso(datetime.fromisoformat(completed_at.replace("Z", "+00:00")) + timedelta(days=7)),
@@ -1306,8 +1593,11 @@ def _build_v2_report(
     required_ok = required_sources_satisfied(plan, list(results.values()))
     any_factual = any(item.status == "ok" for item in results.values())
     state = "ready" if required_ok else "partial" if any_factual else "failed"
+    model_status["findings"] = len(findings)
+    model_status["recommendations"] = len(groups)
+    comparison_cards = [{"task_id": _task_identity(finding), **finding} for finding in findings]
     comparison, next_baseline = _comparison_for_v2(
-        tasks, baseline, target_id=target_id, plan=plan, terminal_state=state
+        comparison_cards, baseline, target_id=target_id, plan=plan, terminal_state=state, results=results
     )
     report: dict[str, object] = {
         "schema": REPORT_SCHEMA,
@@ -1320,7 +1610,7 @@ def _build_v2_report(
         "coverage": _aggregate_coverage(plan, results),
         "mode_result": _mode_result(plan, results),
         "model_enrichment": model_status,
-        "missing_data": [item.source for item in results.values() if item.status != "ok"],
+        "missing_data": _missing_data(plan, results),
         "comparison": comparison,
         "tasks": tasks,
     }

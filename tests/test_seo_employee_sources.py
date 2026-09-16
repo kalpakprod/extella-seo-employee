@@ -12,6 +12,10 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "experts"))
 
 from seo_employee_sources import (
     CrawlSEOAdapter,
+    PSIAdapter,
+    NuHTMLAdapter,
+    SecurityProbeAdapter,
+    CommonCrawlAdapter,
     SEOmatorAdapter,
     missing_sources,
     required_sources_satisfied,
@@ -23,13 +27,21 @@ PLAN = SimpleNamespace(
     categories=("core", "links"),
     performance_sample_pages=5,
     required_sources=("CrawlSEO", "SEOmator"),
+    psi_max_urls=3,
 )
 RULE = SimpleNamespace(rule_key="meta-description-missing", severity="warning")
 
 
 def crawlseo_payload(
-    *, pages: int = 25, max_pages: int = 25, issue_type: str = "MISSING_DESCRIPTION"
+    *,
+    pages: int = 25,
+    max_pages: int = 25,
+    issue_type: str = "MISSING_DESCRIPTION",
+    severity: str | None = "warning",
 ) -> dict[str, object]:
+    issue: dict[str, object] = {"type": issue_type, "url": "https://example.com/"}
+    if severity is not None:
+        issue["severity"] = severity
     return {
         "schema": "extella.crawlseo_source.v1",
         "source": "CrawlSEO",
@@ -43,7 +55,7 @@ def crawlseo_payload(
             "sampled_pages": 0,
             "categories": ["core", "links"],
         },
-        "issues": [{"type": issue_type, "severity": "warning", "url": "https://example.com/"}],
+        "issues": [issue],
     }
 
 
@@ -70,6 +82,31 @@ def seomator_payload(
             },
             {"categoryId": "links", "results": []},
         ],
+    }
+
+
+def psi_payload(
+    *,
+    urls: list[str] | None = None,
+    metrics: list[dict[str, object]] | None = None,
+    robots: str | None = "User-agent: *\nDisallow:\n",
+    sitemap: str | None = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://example.com/</loc></url></urlset>',
+    html: str | None = '<html><head><script type="application/ld+json">{"@type": "WebSite"}</script></head></html>',
+) -> dict[str, object]:
+    probed = urls if urls is not None else ["https://example.com/"]
+    return {
+        "schema": "extella.psi_source.v1",
+        "source": "PSI",
+        "site_url": "https://example.com/",
+        "probed_urls": probed,
+        "metrics": metrics if metrics is not None else [],
+        "psi_api": {"status": "ok", "reason": None},
+        "crux": {"status": "not_configured", "reason": None},
+        "sitefiles": {
+            "robots_txt": {"http_status": 200, "truncated": False, "content": robots or ""},
+            "sitemap_xml": {"http_status": 200, "truncated": False, "content": sitemap or ""},
+            "homepage_html": {"http_status": 200, "truncated": False, "content": html or ""},
+        },
     }
 
 
@@ -111,6 +148,287 @@ class SourceAdaptersTest(unittest.TestCase):
         }
         result = CrawlSEOAdapter().parse(payload, PLAN)
         self.assertEqual((result.status, result.reason), ("failed", "invalid_payload"))
+
+    def test_crawlseo_e2e_corpus_types_are_all_mapped(self) -> None:
+        payload = crawlseo_payload()
+        payload["issues"] = [
+            {"type": issue_type, "severity": "warning", "url": "https://example.com/"}
+            for issue_type in (
+                "DUPLICATE_DESCRIPTION", "DUPLICATE_TITLE", "MISSING_CANONICAL",
+                "MISSING_ROBOTS", "MISSING_SCHEMA", "MISSING_SITEMAP", "MIXED_CONTENT",
+            )
+        ]
+        result = CrawlSEOAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.coverage.unmapped_rules, ())
+        self.assertEqual(len(result.occurrences), 7)
+        self.assertEqual(
+            {occurrence.rule_key for occurrence in result.occurrences},
+            {
+                "content-duplicate-description", "core-title-unique", "core-canonical-present",
+                "technical-robots-txt-exists", "schema-present", "technical-sitemap-exists",
+                "security-mixed-content",
+            },
+        )
+
+    def test_crawlseo_issue_severity_maps_to_occurrence_status(self) -> None:
+        cases = {
+            "ERROR": "fail",
+            "error": "fail",
+            "CRITICAL": "fail",
+            "WARNING": "warn",
+            "warning": "warn",
+            "INFO": "warn",
+            "info": "warn",
+            "mystery-grade": "warn",
+        }
+        for raw, expected in cases.items():
+            with self.subTest(severity=raw):
+                with mock.patch("seo_employee_sources.canonical_rule", return_value=RULE):
+                    result = CrawlSEOAdapter().parse(
+                        crawlseo_payload(severity=raw), PLAN
+                    )
+                self.assertEqual(result.status, "ok")
+                self.assertEqual(len(result.occurrences), 1)
+                self.assertEqual(result.occurrences[0].status, expected)
+        with mock.patch("seo_employee_sources.canonical_rule", return_value=RULE):
+            result = CrawlSEOAdapter().parse(crawlseo_payload(severity=None), PLAN)
+        self.assertEqual(result.occurrences[0].status, "warn")
+
+    def test_seomator_warn_is_ingested_with_warn_status(self) -> None:
+        payload = seomator_payload()
+        payload["categoryResults"][0]["results"][0]["status"] = "warn"
+        with mock.patch("seo_employee_sources.canonical_rule", return_value=RULE):
+            result = SEOmatorAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(len(result.occurrences), 1)
+        self.assertEqual(result.occurrences[0].status, "warn")
+        self.assertEqual(result.coverage.unmapped_rules, ())
+
+    def test_seomator_warn_with_unusable_rule_fails_the_source(self) -> None:
+        payload = seomator_payload()
+        payload["categoryResults"][0]["results"][0]["status"] = "warn"
+        del payload["categoryResults"][0]["results"][0]["ruleId"]
+        result = SEOmatorAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "failed")
+
+    def test_approved_corpus_rules_are_all_mapped(self) -> None:
+        psi = PSIAdapter().parse(psi_payload(
+            metrics=[
+                {"url": "https://example.com/", "metric": "lcp", "lab": 5000, "field_p75": 4500},
+                {"url": "https://example.com/", "metric": "inp", "lab": 600, "field_p75": 550},
+                {"url": "https://example.com/", "metric": "cls", "lab": 0.3, "field_p75": 0.3},
+            ],
+            robots="Disallow /",
+            sitemap="not xml",
+            html='<html><head><script type="application/ld+json">{oops</script></head></html>',
+        ), PLAN)
+        self.assertEqual(psi.status, "ok")
+        self.assertEqual(psi.coverage.unmapped_rules, ())
+        self.assertEqual(
+            {item.source_rule for item in psi.occurrences},
+            {"psi-lcp", "psi-inp", "psi-cls", "ROBOTS_TXT_INVALID", "SITEMAP_INVALID", "SCHEMA_INVALID"},
+        )
+
+        crawlseo = CrawlSEOAdapter().parse(crawlseo_payload(issue_type="MISSING_DESCRIPTION"), PLAN)
+        seomator = SEOmatorAdapter().parse(seomator_payload(rule_id="core-description-present"), PLAN)
+        nu = NuHTMLAdapter().parse({
+            "schema": "extella.nu_source.v1", "source": "NuHTML",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "fetch": {"http_status": 200, "truncated": False, "bytes": 100},
+            "errors": 1, "warnings": 0, "exemplars": [],
+        }, PLAN)
+        tls = SecurityProbeAdapter().parse({
+            "schema": "extella.tls_source.v1", "source": "SecurityProbe",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "fetch": {"http_status": 200},
+            "headers": {"hsts": False, "hsts_max_age": None, "csp": False,
+                        "x_content_type_options": False, "referrer_policy": False, "frame_guard": False},
+            "ssl_labs": {"status": "ready", "detail": None, "grade": "F"},
+        }, PLAN)
+        cc = CommonCrawlAdapter().parse({
+            "schema": "extella.cc_source.v1", "source": "CommonCrawl",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "index": "CC-MAIN-2026-33", "excerpt": "An archived page title",
+            "record": {"url": "https://example.com/", "filename": "crawl-data/a.warc.gz",
+                       "offset": 10, "length": 1000, "status": "200"},
+        }, PLAN)
+        for result in (crawlseo, seomator, nu, tls, cc):
+            with self.subTest(source=result.source):
+                self.assertEqual(result.status, "ok")
+                self.assertEqual(result.coverage.unmapped_rules, ())
+
+    def test_psi_clean_corpus_emits_no_occurrences(self) -> None:
+        result = PSIAdapter().parse(psi_payload(), PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.occurrences, ())
+        self.assertEqual(result.coverage.unmapped_rules, ())
+
+    def test_psi_thresholds_emit_graded_occurrences(self) -> None:
+        payload = psi_payload(metrics=[
+            {"url": "https://example.com/", "metric": "lcp", "lab": 5000, "field_p75": 3100},
+            {"url": "https://example.com/", "metric": "cls", "lab": 0.15, "field_p75": None},
+            {"url": "https://example.com/", "metric": "inp", "lab": 100, "field_p75": 150},
+        ])
+        result = PSIAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        by_rule = {item.rule_key: item for item in result.occurrences}
+        self.assertEqual(set(by_rule), {"psi-lcp", "psi-cls"})
+        self.assertEqual(by_rule["psi-lcp"].status, "fail")
+        self.assertIn("5.0s", by_rule["psi-lcp"].fact)
+        self.assertIn("3.1s", by_rule["psi-lcp"].fact)
+        self.assertEqual(by_rule["psi-cls"].status, "warn")
+        self.assertIn("0.15", by_rule["psi-cls"].fact)
+
+    def test_psi_field_p75_can_fail_when_lab_passes(self) -> None:
+        payload = psi_payload(metrics=[
+            {"url": "https://example.com/", "metric": "lcp", "lab": 2000, "field_p75": 4500},
+        ])
+        result = PSIAdapter().parse(payload, PLAN)
+        by_rule = {item.rule_key: item for item in result.occurrences}
+        self.assertEqual(by_rule["psi-lcp"].status, "fail")
+        self.assertIn("field p75", by_rule["psi-lcp"].fact)
+
+    def test_psi_rejects_over_cap_foreign_and_unprobed_urls(self) -> None:
+        over = psi_payload(urls=[f"https://example.com/{index}" for index in range(4)])
+        self.assertEqual(PSIAdapter().parse(over, PLAN).status, "failed")
+        foreign = psi_payload(urls=["https://example.com/", "https://other.test/"])
+        self.assertEqual(PSIAdapter().parse(foreign, PLAN).status, "failed")
+        stray = psi_payload(metrics=[
+            {"url": "https://example.com/stray", "metric": "lcp", "lab": 5000, "field_p75": None},
+        ])
+        self.assertEqual(PSIAdapter().parse(stray, PLAN).status, "failed")
+
+    def test_psi_robots_parser_flags_orphan_rule_and_bad_line(self) -> None:
+        orphan = PSIAdapter().parse(psi_payload(robots="Disallow: /tmp/\n"), PLAN)
+        self.assertEqual(
+            [(item.source_rule, item.status) for item in orphan.occurrences],
+            [("ROBOTS_TXT_INVALID", "fail")],
+        )
+        self.assertIn("line 1", orphan.occurrences[0].fact)
+        bad_line = PSIAdapter().parse(psi_payload(robots="User-agent: *\njust some words\n"), PLAN)
+        self.assertEqual(len(bad_line.occurrences), 1)
+        self.assertIn("line 2", bad_line.occurrences[0].fact)
+
+    def test_psi_sitemap_parser_flags_malformed_and_doctype(self) -> None:
+        malformed = PSIAdapter().parse(psi_payload(sitemap="<urlset><oops"), PLAN)
+        self.assertEqual(
+            [(item.source_rule, item.status) for item in malformed.occurrences],
+            [("SITEMAP_INVALID", "fail")],
+        )
+        doctype = PSIAdapter().parse(
+            psi_payload(sitemap='<!DOCTYPE urlset [<!ENTITY x "y">]><urlset/>'), PLAN
+        )
+        self.assertEqual(len(doctype.occurrences), 1)
+        self.assertIn("DOCTYPE", doctype.occurrences[0].fact)
+
+    def test_psi_schema_parser_flags_broken_jsonld_only(self) -> None:
+        broken = PSIAdapter().parse(
+            psi_payload(html='<html><head><script type="application/ld+json">{oops</script></head></html>'),
+            PLAN,
+        )
+        self.assertEqual(
+            [(item.source_rule, item.status) for item in broken.occurrences],
+            [("SCHEMA_INVALID", "fail")],
+        )
+        bare = PSIAdapter().parse(psi_payload(html="<html><head></head></html>"), PLAN)
+        self.assertEqual(bare.occurrences, ())
+        payload = psi_payload(html="<html><head>" + "x" * 100 + "</head></html>")
+        payload["sitefiles"]["homepage_html"]["truncated"] = True
+        truncated = PSIAdapter().parse(payload, PLAN)
+        self.assertEqual(truncated.occurrences, ())
+
+    def test_psi_skips_unfetched_sitefiles(self) -> None:
+        payload = psi_payload()
+        for section in payload["sitefiles"].values():
+            section["http_status"] = 404
+            section["content"] = ""
+        result = PSIAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.occurrences, ())
+
+    def test_psi_degraded_sections_surface_as_coverage_notes(self) -> None:
+        payload = psi_payload()
+        payload["psi_api"] = {"status": "degraded", "reason": "http_429"}
+        payload["crux"] = {"status": "unavailable", "reason": "timeout"}
+        result = PSIAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(
+            result.coverage.notes,
+            (
+                "psi api http_429: lab metrics unavailable",
+                "crux timeout: field data unavailable",
+            ),
+        )
+        self.assertEqual(result.coverage.as_dict()["notes"], list(result.coverage.notes))
+        clean = PSIAdapter().parse(psi_payload(), PLAN)
+        self.assertEqual(
+            clean.coverage.notes, ("crux not_configured: field data unavailable without a key",)
+        )
+
+    def test_psi_subchecks_are_typed_for_lab_field_and_sitefiles(self) -> None:
+        clean = PSIAdapter().parse(psi_payload(), PLAN)
+        self.assertEqual(
+            {item.name: (item.status, item.reason) for item in clean.coverage.subchecks},
+            {
+                "field_crux": ("not_configured", "not_configured"),
+                "psi_lab": ("partial", "no_lab_metrics"),
+                "robots_txt": ("ok", ""),
+                "schema": ("ok", ""),
+                "sitemap_xml": ("ok", ""),
+            },
+        )
+        self.assertEqual(
+            [item.as_dict() for item in clean.coverage.subchecks if item.name == "robots_txt"],
+            [{"name": "robots_txt", "status": "ok", "reason": "", "scope": "https://example.com/robots.txt"}],
+        )
+        degraded = psi_payload(metrics=[
+            {"url": "https://example.com/", "metric": "lcp", "lab": 5000, "field_p75": None},
+        ])
+        degraded["psi_api"] = {"status": "degraded", "reason": "http_429"}
+        degraded["crux"] = {"status": "unavailable", "reason": "timeout"}
+        result = PSIAdapter().parse(degraded, PLAN)
+        self.assertEqual(
+            {item.name: (item.status, item.reason) for item in result.coverage.subchecks},
+            {
+                "field_crux": ("unavailable", "timeout"),
+                "psi_lab": ("unavailable", "http_429"),
+                "robots_txt": ("ok", ""),
+                "schema": ("ok", ""),
+                "sitemap_xml": ("ok", ""),
+            },
+        )
+
+    def test_psi_subchecks_report_unfetched_and_truncated_sitefiles(self) -> None:
+        payload = psi_payload()
+        payload["sitefiles"]["robots_txt"]["http_status"] = 404
+        payload["sitefiles"]["sitemap_xml"]["truncated"] = True
+        payload["sitefiles"]["homepage_html"]["truncated"] = True
+        result = PSIAdapter().parse(payload, PLAN)
+        self.assertEqual(
+            {item.name: (item.status, item.reason) for item in result.coverage.subchecks},
+            {
+                "field_crux": ("not_configured", "not_configured"),
+                "psi_lab": ("partial", "no_lab_metrics"),
+                "robots_txt": ("unavailable", "http_404"),
+                "schema": ("partial", "truncated"),
+                "sitemap_xml": ("partial", "truncated"),
+            },
+        )
+        self.assertEqual(result.coverage.unmapped_rules, ())
+
+    def test_psi_rejects_malformed_status_blocks(self) -> None:
+        payload = psi_payload()
+        payload["psi_api"] = {"status": "degraded", "reason": "bogus"}
+        self.assertEqual(PSIAdapter().parse(payload, PLAN).status, "failed")
+        payload = psi_payload()
+        del payload["crux"]
+        self.assertEqual(PSIAdapter().parse(payload, PLAN).status, "failed")
+
+    def test_psi_declared_unavailable_passes_through(self) -> None:
+        result = PSIAdapter().parse({"status": "unavailable", "reason": "timeout"}, PLAN)
+        self.assertEqual(result.status, "unavailable")
+        self.assertEqual(result.reason, "timeout")
 
     def test_seomator_unknown_rule_is_counted_not_emitted_as_task(self) -> None:
         with mock.patch("seo_employee_sources.canonical_rule", return_value=None):
@@ -262,6 +580,146 @@ class SourceAdaptersTest(unittest.TestCase):
         seo = SEOmatorAdapter().parse({"error": {"code": "timeout"}}, PLAN)
         self.assertFalse(required_sources_satisfied(PLAN, (crawl, seo)))
         self.assertEqual(missing_sources(PLAN, (crawl, seo)), ("SEOmator",))
+
+
+class ProbeAdapterTests(unittest.TestCase):
+    def tls_payload(self, grade="F"):
+        return {
+            "schema": "extella.tls_source.v1", "source": "SecurityProbe",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "fetch": {"http_status": 200},
+            "headers": {"hsts": True, "hsts_max_age": 0, "csp": False,
+                        "x_content_type_options": False, "referrer_policy": False, "frame_guard": False},
+            "ssl_labs": {"status": "ready", "detail": None, "grade": grade},
+        }
+
+    def test_security_thresholds_and_pending_are_honest(self):
+        adapter = SecurityProbeAdapter()
+        payload = self.tls_payload()
+        result = adapter.parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual({o.source_rule for o in result.occurrences}, {"TLS_HSTS", "TLS_CSP", "TLS_GRADE"})
+        self.assertEqual(result.coverage.unmapped_rules, ())
+        self.assertEqual((result.coverage.crawled_pages, result.coverage.sampled_pages), (0, 1))
+        self.assertTrue(all(o.severity == "warning" for o in result.occurrences))
+        payload["headers"].update(hsts_max_age=31536000, csp=True)
+        payload["ssl_labs"]["grade"] = "A"
+        self.assertEqual(adapter.parse(payload, PLAN).occurrences, ())
+        payload["ssl_labs"]["grade"] = "C"
+        self.assertEqual(adapter.parse(payload, PLAN).occurrences[0].status, "warn")
+        payload["ssl_labs"] = {"status": "pending", "detail": "in_progress", "grade": None}
+        result = adapter.parse(payload, PLAN)
+        self.assertEqual(result.occurrences, ())
+        self.assertTrue(any("ssl_labs unavailable" in note for note in result.coverage.notes))
+
+    def test_security_rejects_malformed_and_over_cap_payloads(self):
+        for mutate in (
+            lambda p: p.update(probed_urls=["https://example.com/", "https://example.com/a"]),
+            lambda p: p["headers"].update(hsts_max_age=True),
+            lambda p: p["headers"].update(csp="yes"),
+            lambda p: p["ssl_labs"].update(grade="Z"),
+            lambda p: p["ssl_labs"].update(status="pending"),
+            lambda p: p.update(fetch={"http_status": 403}),
+        ):
+            payload = self.tls_payload()
+            mutate(payload)
+            self.assertEqual(SecurityProbeAdapter().parse(payload, PLAN).status, "failed")
+
+    def test_nu_counts_map_to_one_rule_and_warnings_are_preserved(self):
+        payload = {
+            "schema": "extella.nu_source.v1", "source": "NuHTML",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "fetch": {"http_status": 200, "truncated": False, "bytes": 100},
+            "errors": 2, "warnings": 3, "exemplars": [],
+        }
+        result = NuHTMLAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.occurrences[0].source_rule, "NU_ERRORS")
+        self.assertEqual(result.occurrences[0].status, "fail")
+        self.assertEqual(result.coverage.unmapped_rules, ())
+        payload["errors"] = 0
+        self.assertEqual(NuHTMLAdapter().parse(payload, PLAN).occurrences[0].status, "warn")
+        payload["warnings"] = 0
+        self.assertEqual(NuHTMLAdapter().parse(payload, PLAN).occurrences, ())
+        payload["exemplars"] = [{"kind": "error", "line": 1, "message": "x" * 201}]
+        self.assertEqual(NuHTMLAdapter().parse(payload, PLAN).status, "failed")
+
+    def test_common_crawl_is_historical_evidence_and_never_live_coverage(self):
+        payload = {
+            "schema": "extella.cc_source.v1", "source": "CommonCrawl",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "index": "CC-MAIN-2026-33", "excerpt": "An archived page title",
+            "record": {"url": "https://example.com/", "filename": "crawl-data/a.warc.gz",
+                       "offset": 10, "length": 1000, "status": "200"},
+        }
+        result = CommonCrawlAdapter().parse(payload, PLAN)
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.coverage.crawled_pages, 0)
+        self.assertEqual(result.occurrences, ())
+        for mutate in (
+            lambda p: p.update(excerpt="x" * 501),
+            lambda p: p["record"].update(url="https://other.example/"),
+            lambda p: p["record"].update(url="https://example.com/other"),
+            lambda p: p["record"].update(filename="crawl-data/../secret.warc.gz"),
+            lambda p: p["record"].update(length=True),
+            lambda p: p.update(excerpt="token=secret"),
+        ):
+            bad = deepcopy(payload)
+            mutate(bad)
+            self.assertEqual(CommonCrawlAdapter().parse(bad, PLAN).status, "failed")
+        payload.update(record=None, excerpt="")
+        self.assertTrue(any("no archived record" in n for n in CommonCrawlAdapter().parse(payload, PLAN).coverage.notes))
+
+    def test_probe_subchecks_are_typed_for_each_measurement(self) -> None:
+        tls = SecurityProbeAdapter().parse(self.tls_payload(grade="A"), PLAN)
+        self.assertEqual(
+            {item.name: (item.status, item.reason) for item in tls.coverage.subchecks},
+            {"security_headers": ("ok", ""), "ssl_labs": ("ok", "")},
+        )
+        tls = SecurityProbeAdapter().parse(self.tls_payload(grade=None), PLAN)
+        self.assertEqual(
+            {item.name: item.status for item in tls.coverage.subchecks},
+            {"security_headers": "ok", "ssl_labs": "unavailable"},
+        )
+
+        nu = NuHTMLAdapter().parse({
+            "schema": "extella.nu_source.v1", "source": "NuHTML",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "fetch": {"http_status": 200, "truncated": False, "bytes": 100},
+            "errors": 0, "warnings": 0, "exemplars": [],
+        }, PLAN)
+        self.assertEqual(
+            {item.name: item.status for item in nu.coverage.subchecks}, {"htmlval": "ok"}
+        )
+
+        cc = CommonCrawlAdapter().parse({
+            "schema": "extella.cc_source.v1", "source": "CommonCrawl",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "index": "CC-MAIN-2026-33", "excerpt": "",
+            "record": {"url": "https://example.com/", "filename": "crawl-data/a.warc.gz",
+                       "offset": 10, "length": 1000, "status": "200"},
+        }, PLAN)
+        self.assertEqual(
+            {item.name: (item.status, item.reason) for item in cc.coverage.subchecks},
+            {"excerpt": ("unavailable", "byte_cap")},
+        )
+        cc = CommonCrawlAdapter().parse({
+            "schema": "extella.cc_source.v1", "source": "CommonCrawl",
+            "site_url": "https://example.com/", "probed_urls": ["https://example.com/"],
+            "index": "CC-MAIN-2026-33", "excerpt": "", "record": None,
+        }, PLAN)
+        self.assertEqual(
+            {item.name: (item.status, item.reason) for item in cc.coverage.subchecks},
+            {"excerpt": ("unavailable", "no_record")},
+        )
+
+    def test_all_probes_preserve_unavailable_without_findings(self):
+        for adapter in (NuHTMLAdapter(), SecurityProbeAdapter(), CommonCrawlAdapter()):
+            result = adapter.parse({"status": "unavailable", "reason": "timeout"}, PLAN)
+            self.assertEqual(result.status, "unavailable")
+            self.assertEqual(result.reason, "timeout")
+            self.assertEqual(result.occurrences, ())
+            self.assertEqual(result.coverage.unavailable_sources, (adapter.name,))
 
 
 if __name__ == "__main__":

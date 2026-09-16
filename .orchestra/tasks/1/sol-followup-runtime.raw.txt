@@ -1,0 +1,14 @@
+probe nu detail=fetch BadStatusLine
+probe tls detail=fetch BadStatusLine
+probe cc detail=BadStatusLine
+ssl-labs http://example.com/ calls= [] result= {'status': 'unavailable', 'detail': None, 'grade': None}
+ssl-labs https://example.com:8443/ calls= [] result= {'status': 'unavailable', 'detail': None, 'grade': None}
+malformed nu 200 {'status': 'unavailable', 'reason': 'http_503'}
+malformed tls 200 {'status': 'unavailable', 'reason': 'http_503'}
+malformed cc 200 {'status': 'unavailable', 'reason': 'http_503'}
+ipv6-host http://[2001:4860:4860::8888]/ [2001:4860:4860::8888]
+ipv6-host http://[2001:4860:4860::8888]:8080/ [2001:4860:4860::8888]:8080
+deadline budget=1.0 elapsed= 1.35 result=TimeoutError
+nat64 embedded-private rejected: site host is not a global address
+fallback addresses= ['93.184.216.34', '1.1.1.1'] result= (200, b'ok', False)
+all corrected runtime reproductions: PASS

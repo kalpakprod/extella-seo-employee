@@ -100,9 +100,188 @@ function severityFor(value) {
   return 'info';
 }
 
+const SOURCE_TWINS = new Map([
+  ['content-duplicate-description', ['CrawlSEO', 'DUPLICATE_DESCRIPTION']],
+  ['core-title-unique', ['CrawlSEO', 'DUPLICATE_TITLE']],
+  ['core-canonical-present', ['CrawlSEO', 'MISSING_CANONICAL']],
+  ['technical-robots-txt-exists', ['CrawlSEO', 'MISSING_ROBOTS']],
+  ['schema-present', ['CrawlSEO', 'MISSING_SCHEMA']],
+  ['technical-sitemap-exists', ['CrawlSEO', 'MISSING_SITEMAP']],
+  ['security-mixed-content', ['CrawlSEO', 'MIXED_CONTENT']],
+  ['technical-robots-txt-valid', ['PSI', 'ROBOTS_TXT_INVALID']],
+  ['technical-sitemap-valid', ['PSI', 'SITEMAP_INVALID']],
+  ['schema-valid', ['PSI', 'SCHEMA_INVALID']],
+]);
+
+const PROBE_STATIC_RULES = [
+  {
+    "rule_key": "nu-html-errors",
+    "category": "htmlval",
+    "severity": "warning",
+    "source_name": "W3C Nu HTML validation",
+    "source_description": "W3C Nu reports HTML errors or warnings on the sampled homepage.",
+    "source_severity": "warn/fail",
+    "severity_policy": "p2-probe-threshold-v1",
+    "confirmed_fact": null,
+    "remediation": null,
+    "actionable": false,
+    "profiles": [
+      "service_b2b",
+      "ecommerce",
+      "local_business",
+      "content_media",
+      "saas_marketplace"
+    ],
+    "source_rules": {
+      "NuHTML": "NU_ERRORS"
+    },
+    "corroboration": {
+      "verified": []
+    },
+    "verification": null,
+    "version": "2.1.0"
+  },
+  {
+    "rule_key": "probe-csp",
+    "category": "security",
+    "severity": "warning",
+    "source_name": "Content Security Policy",
+    "source_description": "The sampled homepage response has no Content-Security-Policy header.",
+    "source_severity": "warn/fail",
+    "severity_policy": "p2-probe-threshold-v1",
+    "confirmed_fact": null,
+    "remediation": null,
+    "actionable": false,
+    "profiles": [
+      "service_b2b",
+      "ecommerce",
+      "local_business",
+      "content_media",
+      "saas_marketplace"
+    ],
+    "source_rules": {
+      "SecurityProbe": "TLS_CSP"
+    },
+    "corroboration": {
+      "verified": []
+    },
+    "verification": null,
+    "version": "2.1.0"
+  },
+  {
+    "rule_key": "probe-hsts",
+    "category": "security",
+    "severity": "warning",
+    "source_name": "HTTP Strict Transport Security",
+    "source_description": "HTTPS homepage HSTS is absent, invalid, or has max-age below one year.",
+    "source_severity": "warn/fail",
+    "severity_policy": "p2-probe-threshold-v1",
+    "confirmed_fact": null,
+    "remediation": null,
+    "actionable": false,
+    "profiles": [
+      "service_b2b",
+      "ecommerce",
+      "local_business",
+      "content_media",
+      "saas_marketplace"
+    ],
+    "source_rules": {
+      "SecurityProbe": "TLS_HSTS"
+    },
+    "corroboration": {
+      "verified": []
+    },
+    "verification": null,
+    "version": "2.1.0"
+  },
+  {
+    "rule_key": "probe-tls-grade",
+    "category": "security",
+    "severity": "warning",
+    "source_name": "Cached TLS assessment",
+    "source_description": "SSL Labs cached grade C is a warning; D, E, F, T or M is a failure.",
+    "source_severity": "warn/fail",
+    "severity_policy": "p2-probe-threshold-v1",
+    "confirmed_fact": null,
+    "remediation": null,
+    "actionable": false,
+    "profiles": [
+      "service_b2b",
+      "ecommerce",
+      "local_business",
+      "content_media",
+      "saas_marketplace"
+    ],
+    "source_rules": {
+      "SecurityProbe": "TLS_GRADE"
+    },
+    "corroboration": {
+      "verified": []
+    },
+    "verification": null,
+    "version": "2.1.0"
+  }
+];
+
+const PSI_STATIC_RULES = [
+  {
+    rule_key: 'psi-cls',
+    category: 'perf',
+    severity: 'warning',
+    source_name: 'Cumulative Layout Shift',
+    source_description: 'PSI lab or CrUX field CLS exceeds the needs-improvement threshold.',
+    source_severity: 'fail',
+    severity_policy: 'psi-threshold-v1',
+    confirmed_fact: null,
+    remediation: null,
+    actionable: false,
+    profiles,
+    source_rules: { PSI: 'psi-cls' },
+    corroboration: { verified: [] },
+    verification: null,
+    version: '2.1.0',
+  },
+  {
+    rule_key: 'psi-inp',
+    category: 'perf',
+    severity: 'warning',
+    source_name: 'Interaction to Next Paint',
+    source_description: 'PSI lab or CrUX field INP exceeds the needs-improvement threshold.',
+    source_severity: 'fail',
+    severity_policy: 'psi-threshold-v1',
+    confirmed_fact: null,
+    remediation: null,
+    actionable: false,
+    profiles,
+    source_rules: { PSI: 'psi-inp' },
+    corroboration: { verified: [] },
+    verification: null,
+    version: '2.1.0',
+  },
+  {
+    rule_key: 'psi-lcp',
+    category: 'perf',
+    severity: 'warning',
+    source_name: 'Largest Contentful Paint',
+    source_description: 'PSI lab or CrUX field LCP exceeds the needs-improvement threshold.',
+    source_severity: 'fail',
+    severity_policy: 'psi-threshold-v1',
+    confirmed_fact: null,
+    remediation: null,
+    actionable: false,
+    profiles,
+    source_rules: { PSI: 'psi-lcp' },
+    corroboration: { verified: [] },
+    verification: null,
+    version: '2.1.0',
+  },
+];
+
 function catalogEntry(rule, statusById) {
   const legacyDescription = rule.id === 'core-description-present';
   const ruleKey = legacyDescription ? 'meta-description-missing' : rule.id;
+  const twin = legacyDescription ? ['CrawlSEO', 'MISSING_DESCRIPTION'] : SOURCE_TWINS.get(rule.id);
   const sourceSeverity = statusById.get(rule.id);
   if (!sourceSeverity) throw new Error(`missing documented source severity for ${rule.id}`);
   return {
@@ -117,12 +296,12 @@ function catalogEntry(rule, statusById) {
     remediation: legacyDescription ? 'Добавить точное meta description для страницы.' : null,
     actionable: legacyDescription,
     profiles,
-    source_rules: legacyDescription
-      ? { CrawlSEO: 'MISSING_DESCRIPTION', SEOmator: rule.id }
+    source_rules: twin !== undefined
+      ? { [twin[0]]: twin[1], SEOmator: rule.id }
       : { SEOmator: rule.id },
-    corroboration: legacyDescription ? { verified: [['CrawlSEO', 'SEOmator']] } : { verified: [] },
+    corroboration: twin !== undefined ? { verified: [[twin[0], 'SEOmator']] } : { verified: [] },
     verification: legacyDescription ? 'Повторить проверку и убедиться, что правило больше не срабатывает.' : null,
-    version: '2.0.0',
+    version: '2.1.0',
   };
 }
 
@@ -130,10 +309,10 @@ const revision = upstreamRevision();
 const documented = documentedRules();
 const statusById = new Map(documented.map((rule) => [rule.id, rule.severity]));
 const exported = registryRules();
-const rules = exported.map((rule) => catalogEntry(rule, statusById)).sort((left, right) => left.rule_key.localeCompare(right.rule_key));
+const rules = [...exported.map((rule) => catalogEntry(rule, statusById)), ...PSI_STATIC_RULES, ...PROBE_STATIC_RULES].sort((left, right) => left.rule_key.localeCompare(right.rule_key));
 const output = {
   schema: 'extella.seo_employee_rule_catalog.v2',
-  catalog_version: '2.0.0',
+  catalog_version: '2.1.0',
   upstream: { repository: 'seo-skills/seo-audit-skill', revision, mode: 'registry', limitation: null },
   rules,
 };

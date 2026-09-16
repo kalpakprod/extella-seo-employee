@@ -162,7 +162,7 @@ describe('presentation', () => {
     expect(markdown).toContain('Вопросы для интервью');
     expect(markdown).toContain('Senior Backend Engineer');
     expect(markdown).toContain('Цитата');
-    expect(markdown).toContain('res\-1/res\-1\-b0');
+    expect(markdown).toContain('res\\-1/res\\-1\\-b0');
     expect(markdown).not.toContain('<script>');
   });
 

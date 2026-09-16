@@ -1,2 +1,4 @@
 .orchestra/tasks/1/archive-index.txt
 .orchestra/tasks/1/archive-index-errors.txt
+node_modules/
+dist/

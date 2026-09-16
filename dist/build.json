@@ -6,10 +6,10 @@
     },
     "runtime": {
       "file": "extella-seo-employee-runtime-2.0.3.zip",
-      "sha256": "af550936789e3bb3f1180074a8cd6ca360d9e0d1685ec828082439774a8b33f4"
+      "sha256": "7669a19f48cdc64af976e4677b8ed5f1d07f52d8a1e415d37d966b8dcb6de426"
     }
   },
-  "payload_files": 90,
+  "payload_files": 109,
   "status": "success",
   "version": "2.0.3"
 }

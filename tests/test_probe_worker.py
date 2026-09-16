@@ -22,7 +22,7 @@ WORKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(WORKER)
 
 
-def _plan(timeout_ms: int = 5000) -> bytes:
+def _plan(timeout_ms: int = 30000) -> bytes:
     return json.dumps({"site_url": "https://example.com/", "plan": {"timeout_ms": timeout_ms}}).encode()
 
 
@@ -46,14 +46,14 @@ class ProbeHandleRunTest(unittest.TestCase):
                 self.assertEqual(payload["code"], "invalid_request")
 
     def test_site_fetching_kinds_reject_a_private_site_host(self) -> None:
-        body = json.dumps({"site_url": "http://127.0.0.1/", "plan": {"timeout_ms": 5000}}).encode()
+        body = json.dumps({"site_url": "http://127.0.0.1/", "plan": {"timeout_ms": 30000}}).encode()
         for kind in ("nu", "tls"):
             with self.subTest(kind=kind):
                 status, _payload = WORKER.handle_run(body, kind)
                 self.assertEqual(status, 400)
 
     def test_cc_kind_never_fetches_the_site_host(self) -> None:
-        body = json.dumps({"site_url": "http://127.0.0.1/", "plan": {"timeout_ms": 5000}}).encode()
+        body = json.dumps({"site_url": "http://127.0.0.1/", "plan": {"timeout_ms": 30000}}).encode()
         with mock.patch.object(WORKER, "_get_json", side_effect=OSError("down")):
             status, payload = WORKER._run_direct(body, "cc")
         self.assertEqual(status, 200)

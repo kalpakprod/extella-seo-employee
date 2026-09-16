@@ -287,7 +287,14 @@ def _read_json(raw: bytes) -> object:
         return None
 
 
-def _get_json(url: str, timeout: float, max_bytes: int = 2_000_000) -> object:
+_TRANSIENT_HTTP_ERRORS = (
+    http.client.BadStatusLine,
+    http.client.IncompleteRead,
+    ConnectionResetError,
+)
+
+
+def _get_json_once(url: str, timeout: float, max_bytes: int) -> object:
     request = urllib.request.Request(url, headers={"User-Agent": "ExtellaProbe/2.1"}, method="GET")
     with urllib.request.urlopen(request, timeout=timeout) as response:
         raw = response.read(max_bytes + 1)
@@ -297,6 +304,18 @@ def _get_json(url: str, timeout: float, max_bytes: int = 2_000_000) -> object:
     if "-index?" in url:
         return [_read_json(line) for line in raw.splitlines() if line.strip()]
     return _read_json(raw)
+
+
+def _get_json(url: str, timeout: float, max_bytes: int = 2_000_000) -> object:
+    """Idempotent GET with one retry for transient connection drops."""
+    budget_end = time.monotonic() + timeout
+    try:
+        return _get_json_once(url, timeout, max_bytes)
+    except _TRANSIENT_HTTP_ERRORS:
+        remaining = budget_end - time.monotonic()
+        if remaining < 0.1:
+            raise
+        return _get_json_once(url, remaining, max_bytes)
 
 
 def _remaining(deadline: float) -> float:

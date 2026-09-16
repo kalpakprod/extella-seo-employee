@@ -41,7 +41,9 @@ jobs:
 
       - name: Upstream Extella gates (pinned)
         run: |
-          git clone --depth 1 https://github.com/AnvarBakiyev/extella-agent-standards.git /tmp/extella-agent-standards
+          python3 -m pip install --quiet pyyaml
+          git clone https://github.com/AnvarBakiyev/extella-agent-standards.git /tmp/extella-agent-standards
+          git -C /tmp/extella-agent-standards checkout --detach d6118bd55310261ae9aeb1aa0ed4df58e4d57cb6
           test "$(git -C /tmp/extella-agent-standards rev-parse HEAD)" = "d6118bd55310261ae9aeb1aa0ed4df58e4d57cb6"
           cd /tmp/extella-agent-standards
           P="$GITHUB_WORKSPACE"

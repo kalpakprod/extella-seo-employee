@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -83,11 +84,16 @@ class ProductGatewayTest(unittest.TestCase):
         _, _, port = self._gateway(rate_limit_per_minute=60)
         secret = "gw-s3cr3t-value"
         stream = io.StringIO()
+        lines: list[str] = []
         with mock.patch.object(GATEWAY.sys, "stderr", stream):
             self.assertEqual(
                 self._get(port, "/health", headers={"Authorization": f"Bearer {secret}"})[0], 200
             )
-        lines = [line for line in stream.getvalue().splitlines() if line.strip()]
+            for _ in range(300):
+                lines = [line for line in stream.getvalue().splitlines() if line.strip()]
+                if lines:
+                    break
+                time.sleep(0.01)
         self.assertEqual(len(lines), 1)
         record = json.loads(lines[0])
         self.assertEqual(record["method"], "GET")

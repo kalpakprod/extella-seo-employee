@@ -480,7 +480,7 @@ class PsiSupervisorTest(unittest.TestCase):
 
     @staticmethod
     def _body(**overrides: object) -> bytes:
-        plan = {"max_urls": 1, "timeout_ms": 1000}
+        plan = {"max_urls": 1, "timeout_ms": 30000}
         plan.update(overrides.pop("plan", {}) if "plan" in overrides else {})
         payload = {"site_url": "https://example.com/", "plan": plan}
         payload.update(overrides)

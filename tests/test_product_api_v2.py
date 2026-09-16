@@ -7,6 +7,7 @@ import json
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -140,20 +141,25 @@ class ProductApiV2Test(unittest.TestCase):
             )
 
     def test_access_log_records_request_without_secret_values(self) -> None:
-        secret = "s3cr3t-authorization-value"
+        original_bearer = "s3cr3t-authorization-value"
         stream = io.StringIO()
+        lines: list[str] = []
         with mock.patch.object(SERVER.sys, "stderr", stream):
             self.assertEqual(
-                self._request("GET", "/api/unknown", headers={"Authorization": f"Bearer {secret}"}),
+                self._request("GET", "/api/unknown", headers={"Authorization": f"Bearer {original_bearer}"}),
                 401,
             )
-        lines = [line for line in stream.getvalue().splitlines() if line.strip()]
+            for _ in range(300):
+                lines = [line for line in stream.getvalue().splitlines() if line.strip()]
+                if lines:
+                    break
+                time.sleep(0.01)
         self.assertEqual(len(lines), 1)
         record = json.loads(lines[0])
         self.assertEqual(record["method"], "GET")
         self.assertEqual(record["route"], "/api/unknown")
         self.assertEqual(record["status"], 401)
-        self.assertNotIn(secret, stream.getvalue())
+        self.assertNotIn(original_bearer, stream.getvalue())
 
 
 if __name__ == "__main__":

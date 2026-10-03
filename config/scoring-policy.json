@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "weights": {
+    "must_have": 2,
+    "nice_to_have": 1
+  },
+  "matchValue": {
+    "matched": 1,
+    "partial": 0.5,
+    "missing": 0
+  },
+  "coverage": {
+    "minimumForOverall": 0.7
+  },
+  "overallBands": [
+    { "below": 0.2, "score": 1 },
+    { "below": 0.4, "score": 2 },
+    { "below": 0.6, "score": 3 },
+    { "below": 0.8, "score": 4 },
+    { "below": 1.01, "score": 5 }
+  ],
+  "caps": {
+    "confirmedMustHaveMismatch": 3
+  },
+  "subscoreGroups": {
+    "experience": ["experience"],
+    "skills": ["skill", "education", "language"],
+    "hrPreferences": ["location", "format", "compensation", "other"]
+  }
+}

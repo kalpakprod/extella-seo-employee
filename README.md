@@ -107,3 +107,13 @@ Smoke-test подтверждает транспорт Agent Zero и форма�
 `python3 tools/build_release.py` создаёт детерминированные page/runtime ZIP. Точные имена и SHA-256 последней локальной сборки записываются в `dist/build.json`; опубликованные неизменяемые версии находятся в [GitHub Releases](https://github.com/kalpakprod/extella-seo-employee/releases).
 
 Лицензии и условия использования компонентов определяются их исходными проектами. Уведомления сохранены в [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md). Перед коммерческим распространением нужен отдельный license review полного release bundle.
+
+## Extella HR review agent
+
+This checkout also contains an evidence-first HR application review agent. It accepts one vacancy
+and one candidate application, then returns requirement matching, strengths and weaknesses,
+red/green flags, an AI-pattern check, interview questions, and a score with coverage and limits.
+
+The HR MVP is documented in [`docs/hr-agent-spec.md`](./docs/hr-agent-spec.md); the implementation
+uses deterministic scoring and evidence validation, with Extella and expert ports prepared for
+future runtime integration. Run `npm run lint`, `npm run build`, and `npm test` to validate it.
